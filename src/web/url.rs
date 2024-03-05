@@ -28,3 +28,19 @@ pub fn create(value: &str) -> Result<Url, ParseError> {
         Err(e) => Err(e),
     }
 }
+
+pub fn join(base: &Url, path: &str) -> Result<Url, ParseError> {
+    if path.is_empty() {
+        return Ok(base.to_owned());
+    }
+
+    let url = base.clone();
+    url.join(path)
+}
+
+pub fn remove(url: &mut Url, path: &str) {
+    if path.is_empty() {
+        return;
+    }
+    url.set_path(&url.path().replace(path, ""));
+}

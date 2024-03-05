@@ -8,12 +8,15 @@ edition = "2021"
 [dependencies]
 csv = "1"
 colored = "2"
+crossbeam = "0"
+dotenv = "0"
+fake = { version = "2", features = ["derive", "http", "uuid", "serde_json"] }
 futures = "0"
-rand = "0.8.4"
-reqwest = "0"
+rand = "0"
+reqwest = { version = "0", features = ["blocking", "cookies", "json", "gzip", "deflate", "multipart", "socks", "stream"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1.36.0", features = ["full"] }
 url = { version = "2", features = ["serde"] }
 urlencoding = "2"
 
@@ -22,3 +25,4 @@ run = "cargo run"
 check = "cargo check"
 build = "cargo build"
 release = "cargo build --release"
+features = "cargo feature %1"

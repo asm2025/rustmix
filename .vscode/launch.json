@@ -7,11 +7,11 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'asmtools'",
+            "name": "Debug executable 'rustmix'",
             "cargo": {
-                "args": ["build", "--bin=asmtools"],
+                "args": ["build", "--bin=rustmix"],
                 "filter": {
-                    "name": "asmtools",
+                    "name": "rustmix",
                     "kind": "bin"
                 }
             },
@@ -21,11 +21,11 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in library 'asmtools'",
+            "name": "Debug unit tests in library 'rustmix'",
             "cargo": {
-                "args": ["test", "--no-run", "--lib", "--package=asmtools"],
+                "args": ["test", "--no-run", "--lib", "--package=rustmix"],
                 "filter": {
-                    "name": "asmtools",
+                    "name": "rustmix",
                     "kind": "lib"
                 }
             },
@@ -35,11 +35,11 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'asmtools'",
+            "name": "Debug unit tests in executable 'rustmix'",
             "cargo": {
-                "args": ["test", "--no-run", "--bin=asmtools"],
+                "args": ["test", "--no-run", "--bin=rustmix"],
                 "filter": {
-                    "name": "asmtools",
+                    "name": "rustmix",
                     "kind": "bin"
                 }
             },
