@@ -7,6 +7,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 pub mod io;
+pub mod threading;
 pub mod web;
 
 #[derive(Debug, Serialize, Deserialize)]
