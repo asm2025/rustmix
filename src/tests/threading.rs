@@ -39,9 +39,10 @@ impl TaskDelegate<usize> for ProCon {
         );
 
         if item % 5 == 0 {
-            return Ok(TaskResult::Error(
-                "Multiples of 5 are not allowed".to_string(),
-            ));
+            return Ok(TaskResult::Error(format!(
+                "Item {}. Multiples of 5 are not allowed",
+                item
+            )));
         } else if item % 3 == 0 {
             return Ok(TaskResult::TimedOut);
         }
@@ -54,15 +55,15 @@ impl TaskDelegate<usize> for ProCon {
         self.done_count
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         println!(
-            "Recieved result: {:?} item: {} in thread: {}",
-            result,
+            "Result item: {}: {:?} in thread: {}",
             item,
+            result,
             current_thread.name().unwrap()
         );
         true
     }
 
-    fn on_finished(&self, pc: &ProducerConsumer<usize>) {
+    fn on_finished(&self, _pc: &ProducerConsumer<usize>) {
         println!(
             "Got: {} tasks and finished {} tasks.",
             self.task_count.load(std::sync::atomic::Ordering::Relaxed),
@@ -83,10 +84,12 @@ pub async fn test_prodcon(threads: usize) -> Result<(), Box<dyn Error>> {
     let options = ProducerConsumerOptions::new();
     let pc = ProducerConsumer::<usize>::with_options(options);
     pc.start_producer(consumer.clone());
+    thread::sleep(Duration::ZERO);
 
     for _ in 0..th {
         let con = consumer.clone();
         pc.start_consumer(con);
+        thread::sleep(Duration::ZERO);
     }
 
     for i in 1..=100 {

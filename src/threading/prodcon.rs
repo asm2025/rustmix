@@ -1,5 +1,6 @@
 use crossbeam::channel;
 use std::{
+    collections::LinkedList,
     error::Error,
     future::Future,
     sync::{
@@ -10,6 +11,17 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::Notify;
+
+const CAPACITY_DEF: usize = 0;
+const QUEUE_BEHAVIOR_DEF: QueueBehavior = QueueBehavior::FIFO;
+const THRESHOLD_DEF: Duration = Duration::ZERO;
+const SLEEP_AFTER_ENQUEUE_DEF: Duration = Duration::ZERO;
+const PEEK_TIMEOUT_DEF: Duration = Duration::from_millis(50);
+const PEEK_TIMEOUT_MIN: Duration = Duration::from_millis(10);
+const PEEK_TIMEOUT_MAX: Duration = Duration::from_secs(5);
+const PAUSE_TIMEOUT_DEF: Duration = Duration::from_millis(50);
+const PAUSE_TIMEOUT_MIN: Duration = Duration::from_millis(10);
+const PAUSE_TIMEOUT_MAX: Duration = Duration::from_secs(5);
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TaskResult {
@@ -40,19 +52,19 @@ pub struct ProducerConsumerOptions {
     pub behavior: QueueBehavior,
     pub threshold: Duration,
     pub sleep_after_enqueue: Duration,
-    peek_timeout: Duration,
-    pause_timeout: Duration,
+    pub peek_timeout: Duration,
+    pub pause_timeout: Duration,
 }
 
 impl Default for ProducerConsumerOptions {
     fn default() -> Self {
         ProducerConsumerOptions {
-            capacity: 0,
-            behavior: QueueBehavior::FIFO,
-            threshold: Duration::ZERO,
-            sleep_after_enqueue: Duration::ZERO,
-            peek_timeout: Duration::from_millis(10),
-            pause_timeout: Duration::from_millis(50),
+            capacity: CAPACITY_DEF,
+            behavior: QUEUE_BEHAVIOR_DEF,
+            threshold: THRESHOLD_DEF,
+            sleep_after_enqueue: SLEEP_AFTER_ENQUEUE_DEF,
+            peek_timeout: PEEK_TIMEOUT_DEF.clamp(PEEK_TIMEOUT_MIN, PEEK_TIMEOUT_MAX),
+            pause_timeout: PAUSE_TIMEOUT_DEF.clamp(PAUSE_TIMEOUT_MIN, PAUSE_TIMEOUT_MAX),
         }
     }
 }
@@ -80,41 +92,13 @@ impl ProducerConsumerOptions {
             ..self
         }
     }
-
-    pub fn peek_timeout(&self) -> Duration {
-        self.peek_timeout
-    }
-
-    pub fn set_peek_timeout(&mut self, value: Duration) {
-        self.peek_timeout = if value.is_zero() {
-            Duration::from_millis(10)
-        } else if value.as_secs() > 1 {
-            Duration::from_secs(1)
-        } else {
-            value
-        };
-    }
-
-    pub fn pause_timeout(&self) -> Duration {
-        self.pause_timeout
-    }
-
-    pub fn set_pause_timeout(&mut self, value: Duration) {
-        self.pause_timeout = if value.is_zero() {
-            Duration::from_millis(50)
-        } else if value.as_secs() > 1 {
-            Duration::from_secs(1)
-        } else {
-            value
-        };
-    }
 }
 
 #[derive(Clone, Debug)]
 pub struct ProducerConsumer<T: Send + Sync + Clone + 'static> {
     options: ProducerConsumerOptions,
-    queue: Arc<Mutex<Vec<T>>>,
-    queue_cond: Arc<Condvar>,
+    items: Arc<Mutex<LinkedList<T>>>,
+    items_cond: Arc<Condvar>,
     finished: Arc<Mutex<bool>>,
     finished_cond: Arc<Condvar>,
     finished_notify: Arc<Notify>,
@@ -140,8 +124,8 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
             options: options,
             sender: sender,
             receiver: receiver,
-            queue: Arc::new(Mutex::new(Vec::new())),
-            queue_cond: Arc::new(Condvar::new()),
+            items: Arc::new(Mutex::new(LinkedList::new())),
+            items_cond: Arc::new(Condvar::new()),
             finished: Arc::new(Mutex::new(false)),
             finished_cond: Arc::new(Condvar::new()),
             finished_notify: Arc::new(Notify::new()),
@@ -164,8 +148,8 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
             options: options,
             sender: sender,
             receiver: receiver,
-            queue: Arc::new(Mutex::new(Vec::new())),
-            queue_cond: Arc::new(Condvar::new()),
+            items: Arc::new(Mutex::new(LinkedList::new())),
+            items_cond: Arc::new(Condvar::new()),
             finished: Arc::new(Mutex::new(false)),
             finished_cond: Arc::new(Condvar::new()),
             finished_notify: Arc::new(Notify::new()),
@@ -179,7 +163,7 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.queue.lock().unwrap().is_empty()
+        self.items.lock().unwrap().is_empty()
     }
 
     pub fn is_completed(&self) -> bool {
@@ -207,11 +191,11 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
                 .running_count
                 .load(std::sync::atomic::Ordering::Relaxed)
                 > 0)
-            || (self.queue.lock().unwrap().len() > 0)
+            || (self.items.lock().unwrap().len() > 0)
     }
 
     pub fn count(&self) -> usize {
-        self.queue.lock().unwrap().len()
+        self.items.lock().unwrap().len()
     }
 
     pub fn producers(&self) -> usize {
@@ -395,23 +379,22 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
     }
 
     pub fn enqueue(&self, item: T) {
-        let mut queue = self.queue.lock().unwrap();
-        queue.push(item);
-        self.queue_cond.notify_one();
+        let mut items = self.items.lock().unwrap();
+        items.push_back(item);
+        self.items_cond.notify_one();
     }
 
     fn dequeue(&self) -> Option<T> {
-        let mut queue = self.queue.lock().unwrap();
+        let mut items = self.items.lock().unwrap();
 
-        while queue.is_empty() && !self.is_cancelled() && !self.is_completed() {
+        while items.is_empty() && !self.is_cancelled() && !self.is_completed() {
             let result = self
-                .queue_cond
-                .wait_timeout(queue, self.options.peek_timeout)
+                .items_cond
+                .wait_timeout(items, self.options.peek_timeout)
                 .unwrap();
-            queue = result.0;
+            items = result.0;
 
             if result.1.timed_out() {
-                thread::sleep(Duration::ZERO);
                 continue;
             }
 
@@ -419,28 +402,27 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
                 return None;
             }
 
-            return Some(queue.remove(0));
+            return items.pop_front();
         }
 
-        if queue.is_empty() || self.is_cancelled() {
+        if items.is_empty() || self.is_cancelled() {
             return None;
         }
 
-        Some(queue.remove(0))
+        items.pop_front()
     }
 
     fn pop(&self) -> Option<T> {
-        let mut queue = self.queue.lock().unwrap();
+        let mut items = self.items.lock().unwrap();
 
-        while queue.is_empty() && !self.is_cancelled() && !self.is_completed() {
+        while items.is_empty() && !self.is_cancelled() && !self.is_completed() {
             let result = self
-                .queue_cond
-                .wait_timeout(queue, self.options.peek_timeout)
+                .items_cond
+                .wait_timeout(items, self.options.peek_timeout)
                 .unwrap();
-            queue = result.0;
+            items = result.0;
 
             if result.1.timed_out() {
-                thread::sleep(Duration::ZERO);
                 continue;
             }
 
@@ -448,51 +430,48 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
                 return None;
             }
 
-            return queue.pop();
+            return items.pop_back();
         }
 
-        if queue.is_empty() || self.is_cancelled() {
+        if items.is_empty() || self.is_cancelled() {
             return None;
         }
 
-        queue.pop()
-    }
-
-    pub fn remove(&self, index: usize) -> Option<T> {
-        let mut queue = self.queue.lock().unwrap();
-
-        if queue.is_empty() || index >= queue.len() {
-            return None;
-        }
-
-        Some(queue.remove(index))
+        items.pop_back()
     }
 
     pub fn peek(&self) -> Option<T> {
-        let queue = self.queue.lock().unwrap();
+        let items = self.items.lock().unwrap();
 
-        if queue.is_empty() {
+        if items.is_empty() {
             return None;
         }
 
-        Some(queue[0].clone())
+        if let Some(item) = match self.options.behavior {
+            QueueBehavior::FIFO => items.front(),
+            QueueBehavior::LIFO => items.back(),
+        } {
+            Some(item.clone())
+        } else {
+            None
+        }
     }
 
     pub fn clear(&self) {
-        let mut queue = self.queue.lock().unwrap();
-        queue.clear();
+        let mut items = self.items.lock().unwrap();
+        items.clear();
     }
 
     pub fn complete(&self) {
         self.completed
             .store(true, std::sync::atomic::Ordering::Relaxed);
-        self.queue_cond.notify_all();
+        self.items_cond.notify_all();
     }
 
     pub fn cancel(&self) {
         self.cancelled
             .store(true, std::sync::atomic::Ordering::Relaxed);
-        self.queue_cond.notify_all();
+        self.items_cond.notify_all();
     }
 
     pub fn pause(&self) {
@@ -503,7 +482,7 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
     pub fn resume(&self) {
         self.paused
             .store(false, std::sync::atomic::Ordering::Relaxed);
-        self.queue_cond.notify_all();
+        self.items_cond.notify_all();
     }
 
     pub fn wait(&self) {
@@ -517,7 +496,7 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
     pub async fn wait_async(&self) {
         while !*self.finished.lock().unwrap() {
             self.finished_notify.notified().await;
-            thread::sleep(self.options.peek_timeout);
+            thread::sleep(self.options.pause_timeout);
         }
     }
 
@@ -533,10 +512,10 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
         while !*finished && start.elapsed() < timeout {
             let result = self
                 .finished_cond
-                .wait_timeout(finished, self.options.peek_timeout)
+                .wait_timeout(finished, self.options.pause_timeout)
                 .unwrap();
             finished = result.0;
-            thread::sleep(self.options.peek_timeout);
+            thread::sleep(self.options.pause_timeout);
 
             if result.1.timed_out() || start.elapsed() >= timeout {
                 return false;
@@ -558,10 +537,10 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
         while !*finished && start.elapsed() < timeout {
             let result = self
                 .finished_cond
-                .wait_timeout(finished, self.options.peek_timeout)
+                .wait_timeout(finished, self.options.pause_timeout)
                 .unwrap();
             finished = result.0;
-            thread::sleep(self.options.peek_timeout);
+            thread::sleep(self.options.pause_timeout);
 
             if result.1.timed_out() || start.elapsed() >= timeout {
                 return Box::new(async move { false });
