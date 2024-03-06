@@ -1,18 +1,37 @@
 use colored::Colorize;
-use std::{error::Error, thread, time::Duration};
+use std::{
+    error::Error,
+    sync::{atomic::AtomicUsize, Arc},
+    thread,
+    time::Duration,
+};
 
 use rustmix::threading::prodcon::*;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-struct Consumer;
+#[derive(Debug, Clone)]
+struct ProCon {
+    pub task_count: Arc<AtomicUsize>,
+    pub done_count: Arc<AtomicUsize>,
+}
 
-impl TaskDelegate<usize> for Consumer {
+impl ProCon {
+    pub fn new() -> Self {
+        ProCon {
+            task_count: Arc::new(AtomicUsize::new(0)),
+            done_count: Arc::new(AtomicUsize::new(0)),
+        }
+    }
+}
+
+impl TaskDelegate<usize> for ProCon {
     fn on_task(
         &self,
         _pc: &ProducerConsumer<usize>,
         item: usize,
     ) -> Result<TaskResult, Box<dyn Error>> {
         let current_thread = thread::current();
+        self.task_count
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         println!(
             "Item: {} in thread: {}",
             item,
@@ -32,6 +51,8 @@ impl TaskDelegate<usize> for Consumer {
 
     fn on_result(&self, _pc: &ProducerConsumer<usize>, item: usize, result: TaskResult) -> bool {
         let current_thread = thread::current();
+        self.done_count
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         println!(
             "Recieved result: {:?} item: {} in thread: {}",
             result,
@@ -39,6 +60,14 @@ impl TaskDelegate<usize> for Consumer {
             current_thread.name().unwrap()
         );
         true
+    }
+
+    fn on_finished(&self, pc: &ProducerConsumer<usize>) {
+        println!(
+            "Got: {} tasks and finished {} tasks.",
+            self.task_count.load(std::sync::atomic::Ordering::Relaxed),
+            self.done_count.load(std::sync::atomic::Ordering::Relaxed)
+        );
     }
 }
 
@@ -50,22 +79,22 @@ pub async fn test_prodcon(threads: usize) -> Result<(), Box<dyn Error>> {
         th
     );
 
-    let consumer = Consumer;
+    let consumer = ProCon::new();
     let options = ProducerConsumerOptions::new();
     let pc = ProducerConsumer::<usize>::with_options(options);
-    pc.start_producer();
+    pc.start_producer(consumer.clone());
 
     for _ in 0..th {
         let con = consumer.clone();
         pc.start_consumer(con);
     }
 
-    for i in 0..=100 {
+    for i in 1..=100 {
         pc.enqueue(i);
-        thread::sleep(Duration::from_millis(10));
     }
 
     pc.complete();
+    thread::sleep(Duration::ZERO);
     let _ = pc.wait_async().await;
 
     Ok(())
