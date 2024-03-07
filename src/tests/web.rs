@@ -1,5 +1,3 @@
-use colored::Colorize;
-use fake::{faker::internet::en::UserAgent, Fake};
 use std::{collections::HashMap, error::Error};
 
 use rustmix::web::{http::Response, url};
@@ -7,7 +5,7 @@ use rustmix::web::{http::Response, url};
 use super::{get_employees, Employee};
 
 pub fn test_url_func() -> Result<(), Box<dyn Error>> {
-    println!("\n{}", "Testing Url functions...".magenta());
+    println!("\nTesting Url functions...");
 
     let url = url::create("https://www.rust-lang.org")?;
     println!("Absolute URL: {}", &url);
@@ -26,12 +24,11 @@ pub fn test_url_func() -> Result<(), Box<dyn Error>> {
 pub async fn test_reqwest_func() -> Result<(), Box<dyn Error>> {
     const BASE_URL: &str = "https://httpbin.org";
 
-    println!("\n{}", "Testing reqwest functions...".magenta());
+    println!("\nTesting reqwest functions...");
     println!("baseUrl: {BASE_URL}");
 
-    let user_agent: String = UserAgent().fake();
     let client = reqwest::Client::builder()
-        .user_agent(user_agent)
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3")
         .cookie_store(true)
         //.proxy(Proxy::http("http://localhost:8080")?)
         .build()?;

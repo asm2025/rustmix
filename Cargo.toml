@@ -7,10 +7,8 @@ edition = "2021"
 
 [dependencies]
 csv = "1"
-colored = "2"
 crossbeam = "0"
 dotenv = "0"
-fake = { version = "2", features = ["derive", "http", "uuid", "serde_json"] }
 futures = "0"
 rand = "0"
 reqwest = { version = "0", features = ["blocking", "cookies", "json", "gzip", "deflate", "multipart", "socks", "stream"] }

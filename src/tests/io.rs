@@ -1,4 +1,3 @@
-use colored::Colorize;
 use rand::{distributions::Alphanumeric, Rng};
 use std::{
     error::Error,
@@ -15,7 +14,7 @@ use rustmix::io::{
 use super::{get_employees, print_batch, Employee};
 
 pub fn test_path_func() -> Result<(), Box<dyn Error>> {
-    println!("\n{}", "Testing path functions...".magenta());
+    println!("\nTesting path functions...");
 
     let path = path::create(r"C:\").join("MyFile.txt");
     println!("{}", path.display());
@@ -37,7 +36,7 @@ pub fn test_path_func() -> Result<(), Box<dyn Error>> {
 }
 
 pub fn test_directory_func() -> Result<(), Box<dyn Error>> {
-    println!("\n{}", "Testing directory functions...".magenta());
+    println!("\nTesting directory functions...");
 
     let curdir = directory::current();
     let original_path_len = curdir.components().count();
@@ -48,20 +47,20 @@ pub fn test_directory_func() -> Result<(), Box<dyn Error>> {
 
     println!(
         "Current Dir: '{}'. It has {} components.",
-        curdir.display().to_string().green(),
-        original_path_len.to_string().cyan()
+        curdir.display().to_string(),
+        original_path_len.to_string()
     );
 
     let exists = directory::exists(&path);
     println!(
         "Does the directory exist? {}",
-        if exists { "Yes".green() } else { "No".red() }
+        if exists { "Yes" } else { "No" }
     );
 
     if !exists {
         println!(
             "\nI will try to create the directory '{}'",
-            path.display().to_string().yellow()
+            path.display().to_string()
         );
 
         let created = match directory::create(&path) {
@@ -70,24 +69,24 @@ pub fn test_directory_func() -> Result<(), Box<dyn Error>> {
         };
 
         if created.is_none() {
-            println!("{}", "Directory created using create()".underline());
+            println!("Directory created using create()");
         } else {
-            println!("{}", created.unwrap().yellow());
+            println!("{}", created.unwrap());
         }
     }
 
-    println!("\n{}", "I will delete the directory.".magenta());
+    println!("\n{}", "I will delete the directory.");
     let path = path::take(&path, original_path_len);
-    println!("The path is now '{}'", path.display().to_string().green());
+    println!("The path is now '{}'", path.display());
     match directory::delete(&path) {
-        Ok(_) => println!("{}", "Directory deleted.".green()),
-        Err(e) => println!("Error: {}", e.to_string().red()),
+        Ok(_) => println!("Directory deleted."),
+        Err(e) => println!("Error: {}", e),
     }
     Ok(())
 }
 
 pub fn test_file_func() -> Result<(), Box<dyn Error>> {
-    println!("\n{}", "Testing file functions...".magenta());
+    println!("\nTesting file functions...");
 
     let curdir = directory::current();
     let original_path_len = curdir.components().count();
@@ -98,22 +97,16 @@ pub fn test_file_func() -> Result<(), Box<dyn Error>> {
 
     println!(
         "\n\nCurrent Dir: '{}'. It has {} components.",
-        curdir.display().to_string().green(),
-        original_path_len.to_string().cyan()
+        curdir.display(),
+        original_path_len
     );
 
     let exists = path::exists(&path);
-    println!(
-        "Does the file exist? {}",
-        if exists { "Yes".green() } else { "No".red() }
-    );
+    println!("Does the file exist? {}", if exists { "Yes" } else { "No" });
 
-    println!(
-        "I will create or open the file '{}'",
-        &path.display().to_string().yellow()
-    );
+    println!("I will create or open the file '{}'", &path.display());
     let file = file::create(&path, Some(FileOpenOptions::Default))?;
-    println!("{}", "File created or openned.".green());
+    println!("File created or openned.");
 
     let mut writer = LineWriter::new(file);
     writeln!(&mut writer, "Hello, world!")?;
@@ -137,9 +130,8 @@ pub fn test_file_func() -> Result<(), Box<dyn Error>> {
     println!("File closed.");
 
     println!(
-        "\n{} {}",
-        "I will try to open the file '{}' and read it".magenta(),
-        &path.display().to_string().yellow()
+        "\nI will try to open the file '{}' and read it.",
+        &path.display()
     );
 
     let file = file::open(&path)?;
@@ -150,7 +142,7 @@ pub fn test_file_func() -> Result<(), Box<dyn Error>> {
 
     drop(file);
 
-    println!("\n{}", "I will apply the filter now.".magenta());
+    println!("\nI will apply the filter now.");
 
     let file = file::open(&path)?;
 
@@ -160,22 +152,12 @@ pub fn test_file_func() -> Result<(), Box<dyn Error>> {
 
     drop(file);
 
-    println!(
-        "\n{}{}{}",
-        "I will open the file and read it in batches of ".magenta(),
-        "5".cyan(),
-        " lines.".magenta()
-    );
+    println!("\nI will open the file and read it in batches of 5 lines.");
     let file = file::open(&path)?;
     file.read_batch(5, |batch, lines| print_batch(batch, lines))?;
     drop(file);
 
-    println!(
-        "\n{}{}{}",
-        "I will open the file and read it in batches of ".magenta(),
-        "5".cyan(),
-        " lines and apply the filter.".magenta()
-    );
+    println!("\nI will open the file and read it in batches of 5 lines and apply the filter.");
     let file = file::open(&path)?;
     file.read_batch_filtered(
         5,
@@ -185,14 +167,14 @@ pub fn test_file_func() -> Result<(), Box<dyn Error>> {
     drop(file);
 
     let employees = get_employees(3);
-    println!("\n{}", "I will test writing some json.".magenta());
+    println!("\nI will test writing some json.");
     path.set_extension("json");
-    println!("The path is now '{}'", path.display().to_string().yellow());
+    println!("The path is now '{}'", path.display());
     let mut file = file::create(&path, Some(FileOpenOptions::Default))?;
     file.write_json(&employees, Some(true))?;
     drop(file);
 
-    println!("\n{}", "I will open the file and read it.".magenta());
+    println!("\nI will open the file and read it.");
     let file = file::open(&path)?;
 
     for line in file.read()? {
@@ -201,9 +183,9 @@ pub fn test_file_func() -> Result<(), Box<dyn Error>> {
 
     drop(file);
 
-    println!("\n{}", "I will test writing some csv.".magenta());
+    println!("\nI will test writing some csv.");
     path.set_extension("csv");
-    println!("The path is now '{}'", path.display().to_string().yellow());
+    println!("The path is now '{}'", path.display());
     let mut file = file::create(&path, Some(FileOpenOptions::Default))?;
     let mut writer = file.create_delimited_writer(None, Some(true));
 
@@ -213,7 +195,7 @@ pub fn test_file_func() -> Result<(), Box<dyn Error>> {
 
     drop(writer);
 
-    println!("\n{}", "I will open the file and read it.".magenta());
+    println!("\nI will open the file and read it.");
     let mut file = file::open(&path)?;
     let mut reader = file.create_delimited_reader(None, Some(true));
 
@@ -227,9 +209,9 @@ pub fn test_file_func() -> Result<(), Box<dyn Error>> {
 
     drop(file);
 
-    println!("\n{}", "I will test writing some tsv.".magenta());
+    println!("\nI will test writing some tsv.");
     path.set_extension("tsv");
-    println!("The path is now '{}'", path.display().to_string().yellow());
+    println!("The path is now '{}'.", path.display());
     let mut file = file::create(&path, Some(FileOpenOptions::Default))?;
     let mut writer = file.create_delimited_writer(Some(b'\t'), None);
 
@@ -239,7 +221,7 @@ pub fn test_file_func() -> Result<(), Box<dyn Error>> {
 
     drop(writer);
 
-    println!("\n{}", "I will open the file and read it.".magenta());
+    println!("\nI will open the file and read it.");
     let mut file = file::open(&path)?;
     let reader = file.create_delimited_reader(Some(b'\t'), None);
 
@@ -250,12 +232,12 @@ pub fn test_file_func() -> Result<(), Box<dyn Error>> {
 
     drop(file);
 
-    println!("\n{}", "I will delete the directory.".magenta());
+    println!("\nI will delete the directory.");
     let path = path::take(&path, original_path_len);
-    println!("The path is now '{}'", path.display().to_string().yellow());
+    println!("The path is now '{}'", path.display());
     match directory::delete(&path) {
-        Ok(_) => println!("{}", "Folder deleted.".green()),
-        Err(e) => println!("Error: {}", e.to_string().red()),
+        Ok(_) => println!("Folder deleted."),
+        Err(e) => println!("Error: {}", e),
     }
     Ok(())
 }
