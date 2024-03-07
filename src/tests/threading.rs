@@ -1,4 +1,3 @@
-use colored::Colorize;
 use std::{
     error::Error,
     sync::{atomic::AtomicUsize, Arc},
@@ -74,11 +73,7 @@ impl TaskDelegate<usize> for ProCon {
 
 pub async fn test_prodcon(threads: usize) -> Result<(), Box<dyn Error>> {
     let th = if threads > 0 { threads } else { 1 };
-    println!(
-        "\n{} with {} threads...",
-        "Testing Producer/Consumer".magenta(),
-        th
-    );
+    println!("\nTesting Producer/Consumer with {} threads...", th);
 
     let consumer = ProCon::new();
     let options = ProducerConsumerOptions::new();

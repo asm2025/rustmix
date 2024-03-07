@@ -40,7 +40,7 @@ pub enum QueueBehavior {
     LIFO,
 }
 
-pub trait TaskDelegate<T: Send + Sync + Clone + 'static> {
+pub trait TaskDelegate<T: Send + Clone + 'static> {
     fn on_task(&self, pc: &ProducerConsumer<T>, item: T) -> Result<TaskResult, Box<dyn Error>>;
     fn on_result(&self, pc: &ProducerConsumer<T>, item: T, result: TaskResult) -> bool;
     fn on_finished(&self, pc: &ProducerConsumer<T>);
@@ -95,7 +95,7 @@ impl ProducerConsumerOptions {
 }
 
 #[derive(Clone, Debug)]
-pub struct ProducerConsumer<T: Send + Sync + Clone + 'static> {
+pub struct ProducerConsumer<T: Send + Clone + 'static> {
     options: ProducerConsumerOptions,
     items: Arc<Mutex<LinkedList<T>>>,
     items_cond: Arc<Condvar>,
@@ -112,7 +112,7 @@ pub struct ProducerConsumer<T: Send + Sync + Clone + 'static> {
     receiver: channel::Receiver<T>,
 }
 
-impl<T: Send + Sync + Clone> ProducerConsumer<T> {
+impl<T: Send + Clone> ProducerConsumer<T> {
     pub fn new() -> Self {
         let options: ProducerConsumerOptions = Default::default();
         let (sender, receiver) = if options.capacity > 0 {
@@ -255,10 +255,7 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
             .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
     }
 
-    pub fn start_producer<S: TaskDelegate<T> + Send + Sync + Clone + 'static>(
-        &self,
-        task_delegate: S,
-    ) {
+    pub fn start_producer<S: TaskDelegate<T> + Send + Clone + 'static>(&self, task_delegate: S) {
         self.inc_producers();
         let prod = Arc::new(Mutex::new(self.clone()));
         let td = task_delegate.clone();
@@ -322,10 +319,7 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
             .unwrap();
     }
 
-    pub fn start_consumer<S: TaskDelegate<T> + Send + Sync + Clone + 'static>(
-        &self,
-        task_delegate: S,
-    ) {
+    pub fn start_consumer<S: TaskDelegate<T> + Send + Clone + 'static>(&self, task_delegate: S) {
         self.inc_consumers();
         let cons = Arc::new(Mutex::new(self.clone()));
         let td = task_delegate.clone();
