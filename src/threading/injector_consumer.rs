@@ -1,6 +1,5 @@
-use crossbeam::channel;
+use crossbeam::dequeue::{Injector, Steal, Worker};
 use std::{
-    collections::LinkedList,
     error::Error,
     future::Future,
     sync::{
@@ -12,42 +11,18 @@ use std::{
 };
 use tokio::sync::Notify;
 
-const CAPACITY_DEF: usize = 0;
-const QUEUE_BEHAVIOR_DEF: QueueBehavior = QueueBehavior::FIFO;
-const THRESHOLD_DEF: Duration = Duration::ZERO;
-const SLEEP_AFTER_ENQUEUE_DEF: Duration = Duration::ZERO;
-const PEEK_TIMEOUT_DEF: Duration = Duration::from_millis(50);
-const PEEK_TIMEOUT_MIN: Duration = Duration::from_millis(10);
-const PEEK_TIMEOUT_MAX: Duration = Duration::from_secs(5);
-const PAUSE_TIMEOUT_DEF: Duration = Duration::from_millis(50);
-const PAUSE_TIMEOUT_MIN: Duration = Duration::from_millis(10);
-const PAUSE_TIMEOUT_MAX: Duration = Duration::from_secs(5);
+use super::*;
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum TaskResult {
-    #[default]
-    None,
-    Cancelled,
-    TimedOut,
-    Error(String),
-    Success,
+pub trait ConsumerDelegation<T: Send + Clone + 'static> {
+    fn process_task(&self, pc: &InjectorConsumer<T>, item: T)
+        -> Result<TaskResult, Box<dyn Error>>;
+    fn on_task_completed(&self, pc: &InjectorConsumer<T>, item: T, result: TaskResult) -> bool;
+    fn on_finished(&self, pc: &InjectorConsumer<T>);
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum QueueBehavior {
-    #[default]
-    FIFO,
-    LIFO,
-}
-
-pub trait TaskDelegate<T: Send + Clone + 'static> {
-    fn on_task(&self, pc: &ProducerConsumer<T>, item: T) -> Result<TaskResult, Box<dyn Error>>;
-    fn on_result(&self, pc: &ProducerConsumer<T>, item: T, result: TaskResult) -> bool;
-    fn on_finished(&self, pc: &ProducerConsumer<T>);
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ProducerConsumerOptions {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InjectorConsumerOptions {
+    pub threads: usize,
     pub capacity: usize,
     pub behavior: QueueBehavior,
     pub threshold: Duration,
@@ -56,10 +31,11 @@ pub struct ProducerConsumerOptions {
     pub pause_timeout: Duration,
 }
 
-impl Default for ProducerConsumerOptions {
+impl Default for InjectorConsumerOptions {
     fn default() -> Self {
-        ProducerConsumerOptions {
+        InjectorConsumerOptions {
             capacity: CAPACITY_DEF,
+            threads: THREADS_DEF,
             behavior: QUEUE_BEHAVIOR_DEF,
             threshold: THRESHOLD_DEF,
             sleep_after_enqueue: SLEEP_AFTER_ENQUEUE_DEF,
@@ -69,25 +45,29 @@ impl Default for ProducerConsumerOptions {
     }
 }
 
-impl ProducerConsumerOptions {
+impl InjectorConsumerOptions {
     pub fn new() -> Self {
         Default::default()
     }
 
     pub fn with_capacity(self, capacity: usize) -> Self {
-        ProducerConsumerOptions { capacity, ..self }
+        InjectorConsumerOptions { capacity, ..self }
+    }
+
+    pub fn with_threads(self, threads: usize) -> Self {
+        InjectorConsumerOptions { threads, ..self }
     }
 
     pub fn with_behavior(self, behavior: QueueBehavior) -> Self {
-        ProducerConsumerOptions { behavior, ..self }
+        InjectorConsumerOptions { behavior, ..self }
     }
 
     pub fn with_threshold(self, threshold: Duration) -> Self {
-        ProducerConsumerOptions { threshold, ..self }
+        InjectorConsumerOptions { threshold, ..self }
     }
 
     pub fn with_sleep_after_enqueue(self, sleep_after_enqueue: Duration) -> Self {
-        ProducerConsumerOptions {
+        InjectorConsumerOptions {
             sleep_after_enqueue,
             ..self
         }
@@ -95,8 +75,8 @@ impl ProducerConsumerOptions {
 }
 
 #[derive(Clone, Debug)]
-pub struct ProducerConsumer<T: Send + Clone + 'static> {
-    options: ProducerConsumerOptions,
+pub struct InjectorConsumer<T: Send + Clone + 'static> {
+    options: InjectorConsumerOptions,
     items: Arc<Mutex<LinkedList<T>>>,
     items_cond: Arc<Condvar>,
     finished: Arc<Mutex<bool>>,
@@ -112,15 +92,15 @@ pub struct ProducerConsumer<T: Send + Clone + 'static> {
     receiver: channel::Receiver<T>,
 }
 
-impl<T: Send + Clone> ProducerConsumer<T> {
+impl<T: Send + Clone> InjectorConsumer<T> {
     pub fn new() -> Self {
-        let options: ProducerConsumerOptions = Default::default();
+        let options: InjectorConsumerOptions = Default::default();
         let (sender, receiver) = if options.capacity > 0 {
             channel::bounded::<T>(options.capacity)
         } else {
             channel::unbounded::<T>()
         };
-        ProducerConsumer {
+        InjectorConsumer {
             options: options,
             sender: sender,
             receiver: receiver,
@@ -138,13 +118,13 @@ impl<T: Send + Clone> ProducerConsumer<T> {
         }
     }
 
-    pub fn with_options(options: ProducerConsumerOptions) -> Self {
+    pub fn with_options(options: InjectorConsumerOptions) -> Self {
         let (sender, receiver) = if options.capacity > 0 {
             channel::bounded::<T>(options.capacity)
         } else {
             channel::unbounded::<T>()
         };
-        ProducerConsumer {
+        InjectorConsumer {
             options: options,
             sender: sender,
             receiver: receiver,
@@ -208,7 +188,7 @@ impl<T: Send + Clone> ProducerConsumer<T> {
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
-    fn dec_producers(&self, td: &dyn TaskDelegate<T>) {
+    fn dec_producers(&self, td: &dyn ConsumerDelegation<T>) {
         self.producers_count
             .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
         self.check_finished(td);
@@ -224,13 +204,13 @@ impl<T: Send + Clone> ProducerConsumer<T> {
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
-    fn dec_consumers(&self, td: &dyn TaskDelegate<T>) {
+    fn dec_consumers(&self, td: &dyn ConsumerDelegation<T>) {
         self.consumers_count
             .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
         self.check_finished(td);
     }
 
-    fn check_finished(&self, td: &dyn TaskDelegate<T>) {
+    fn check_finished(&self, td: &dyn ConsumerDelegation<T>) {
         if self.is_completed() && self.producers() == 0 && self.consumers() == 0 {
             let mut finished = self.finished.lock().unwrap();
             *finished = true;
@@ -255,7 +235,10 @@ impl<T: Send + Clone> ProducerConsumer<T> {
             .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
     }
 
-    pub fn start_producer<S: TaskDelegate<T> + Send + Clone + 'static>(&self, task_delegate: S) {
+    pub fn start_producer<S: ConsumerDelegation<T> + Send + Clone + 'static>(
+        &self,
+        task_delegate: S,
+    ) {
         self.inc_producers();
         let prod = Arc::new(Mutex::new(self.clone()));
         let td = task_delegate.clone();
@@ -284,10 +267,7 @@ impl<T: Send + Clone> ProducerConsumer<T> {
 
                         producer.inc_running();
                         producer.sender.send(item).unwrap();
-
-                        if !producer.options.sleep_after_enqueue.is_zero() {
-                            thread::sleep(producer.options.sleep_after_enqueue);
-                        }
+                        thread::sleep(producer.options.sleep_after_enqueue);
                     };
                 }
 
@@ -298,11 +278,6 @@ impl<T: Send + Clone> ProducerConsumer<T> {
                     } {
                         if producer.is_cancelled() {
                             break;
-                        }
-
-                        if producer.is_paused() {
-                            thread::sleep(producer.options.pause_timeout);
-                            continue;
                         }
 
                         producer.inc_running();
@@ -319,7 +294,10 @@ impl<T: Send + Clone> ProducerConsumer<T> {
             .unwrap();
     }
 
-    pub fn start_consumer<S: TaskDelegate<T> + Send + Clone + 'static>(&self, task_delegate: S) {
+    pub fn start_consumer<S: ConsumerDelegation<T> + Send + Clone + 'static>(
+        &self,
+        task_delegate: S,
+    ) {
         self.inc_consumers();
         let cons = Arc::new(Mutex::new(self.clone()));
         let td = task_delegate.clone();
@@ -349,8 +327,8 @@ impl<T: Send + Clone> ProducerConsumer<T> {
                         continue;
                     };
 
-                    if let Ok(result) = td.on_task(&consumer, item.clone()) {
-                        if !td.on_result(&consumer, item, result) {
+                    if let Ok(result) = td.process_task(&consumer, item.clone()) {
+                        if !td.on_task_completed(&consumer, item, result) {
                             consumer.dec_running();
                             break;
                         }

@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use rustmix::threading::prodcon::*;
+use rustmix::threading::{producer_consumer::*, *};
 
 #[derive(Debug, Clone)]
 struct ProCon {
@@ -22,8 +22,8 @@ impl ProCon {
     }
 }
 
-impl TaskDelegate<usize> for ProCon {
-    fn on_task(
+impl ConsumerDelegation<usize> for ProCon {
+    fn process_task(
         &self,
         _pc: &ProducerConsumer<usize>,
         item: usize,
@@ -49,7 +49,12 @@ impl TaskDelegate<usize> for ProCon {
         Ok(TaskResult::Success)
     }
 
-    fn on_result(&self, _pc: &ProducerConsumer<usize>, item: usize, result: TaskResult) -> bool {
+    fn on_task_completed(
+        &self,
+        _pc: &ProducerConsumer<usize>,
+        item: usize,
+        result: TaskResult,
+    ) -> bool {
         let current_thread = thread::current();
         self.done_count
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -71,7 +76,7 @@ impl TaskDelegate<usize> for ProCon {
     }
 }
 
-pub async fn test_prodcon(threads: usize) -> Result<(), Box<dyn Error>> {
+pub async fn test_producer_consumer(threads: usize) -> Result<(), Box<dyn Error>> {
     let th = if threads > 0 { threads } else { 1 };
     println!("\nTesting Producer/Consumer with {} threads...", th);
 
@@ -79,12 +84,10 @@ pub async fn test_prodcon(threads: usize) -> Result<(), Box<dyn Error>> {
     let options = ProducerConsumerOptions::new();
     let pc = ProducerConsumer::<usize>::with_options(options);
     pc.start_producer(consumer.clone());
-    thread::sleep(Duration::ZERO);
 
     for _ in 0..th {
         let con = consumer.clone();
         pc.start_consumer(con);
-        thread::sleep(Duration::ZERO);
     }
 
     for i in 1..=100 {
@@ -92,7 +95,6 @@ pub async fn test_prodcon(threads: usize) -> Result<(), Box<dyn Error>> {
     }
 
     pc.complete();
-    thread::sleep(Duration::ZERO);
     let _ = pc.wait_async().await;
 
     Ok(())

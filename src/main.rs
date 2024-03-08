@@ -13,7 +13,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // tests::web::test_url_func()?;
     // tests::web::test_reqwest_func().await?;
 
-    tests::threading::test_prodcon(4).await?;
+    tests::threading::test_producer_consumer(4).await?;
 
     Ok(())
 }
