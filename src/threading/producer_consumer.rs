@@ -26,7 +26,7 @@ pub struct ProducerConsumerOptions {
     pub capacity: usize,
     pub behavior: QueueBehavior,
     pub threshold: Duration,
-    pub sleep_after_enqueue: Duration,
+    pub sleep_after_send: Duration,
     pub peek_timeout: Duration,
     pub pause_timeout: Duration,
 }
@@ -37,7 +37,7 @@ impl Default for ProducerConsumerOptions {
             capacity: CAPACITY_DEF,
             behavior: QUEUE_BEHAVIOR_DEF,
             threshold: THRESHOLD_DEF,
-            sleep_after_enqueue: SLEEP_AFTER_ENQUEUE_DEF,
+            sleep_after_send: SLEEP_AFTER_SEND_DEF,
             peek_timeout: PEEK_TIMEOUT_DEF.clamp(PEEK_TIMEOUT_MIN, PEEK_TIMEOUT_MAX),
             pause_timeout: PAUSE_TIMEOUT_DEF.clamp(PAUSE_TIMEOUT_MIN, PAUSE_TIMEOUT_MAX),
         }
@@ -49,22 +49,31 @@ impl ProducerConsumerOptions {
         Default::default()
     }
 
-    pub fn with_capacity(self, capacity: usize) -> Self {
-        ProducerConsumerOptions { capacity, ..self }
-    }
-
-    pub fn with_behavior(self, behavior: QueueBehavior) -> Self {
-        ProducerConsumerOptions { behavior, ..self }
-    }
-
-    pub fn with_threshold(self, threshold: Duration) -> Self {
-        ProducerConsumerOptions { threshold, ..self }
-    }
-
-    pub fn with_sleep_after_enqueue(self, sleep_after_enqueue: Duration) -> Self {
+    pub fn with_capacity(&self, capacity: usize) -> Self {
         ProducerConsumerOptions {
-            sleep_after_enqueue,
-            ..self
+            capacity,
+            ..self.clone()
+        }
+    }
+
+    pub fn with_behavior(&self, behavior: QueueBehavior) -> Self {
+        ProducerConsumerOptions {
+            behavior,
+            ..self.clone()
+        }
+    }
+
+    pub fn with_threshold(&self, threshold: Duration) -> Self {
+        ProducerConsumerOptions {
+            threshold,
+            ..self.clone()
+        }
+    }
+
+    pub fn with_sleep_after_send(&self, sleep_after_send: Duration) -> Self {
+        ProducerConsumerOptions {
+            sleep_after_send,
+            ..self.clone()
         }
     }
 }
@@ -155,17 +164,9 @@ impl<T: Send + Clone> ProducerConsumer<T> {
 
     pub fn is_busy(&self) -> bool {
         (self
-            .producers_count
+            .running_count
             .load(std::sync::atomic::Ordering::Relaxed)
             > 0)
-            || (self
-                .consumers_count
-                .load(std::sync::atomic::Ordering::Relaxed)
-                > 0)
-            || (self
-                .running_count
-                .load(std::sync::atomic::Ordering::Relaxed)
-                > 0)
             || (self.items.lock().unwrap().len() > 0)
     }
 
@@ -232,7 +233,7 @@ impl<T: Send + Clone> ProducerConsumer<T> {
 
     pub fn start_producer<S: ProducerConsumerDelegation<T> + Send + Clone + 'static>(
         &self,
-        task_delegate: S,
+        delegate: S,
     ) {
         if self.is_cancelled() {
             panic!("Queue is already cancelled.")
@@ -243,62 +244,60 @@ impl<T: Send + Clone> ProducerConsumer<T> {
         }
 
         self.inc_producers();
-        let prod = Arc::new(Mutex::new(self.clone()));
-        let td = task_delegate.clone();
+        let this = Arc::new(self.clone());
+        let delegate = delegate.clone();
         let builder = thread::Builder::new().name(format!("Producer {}", self.producers()));
         builder
             .spawn(move || {
-                let producer = prod.lock().unwrap();
-
                 loop {
-                    if producer.is_cancelled() || producer.is_completed() {
+                    if this.is_cancelled() || this.is_completed() {
                         break;
                     }
 
-                    if producer.is_paused() {
-                        thread::sleep(producer.options.pause_timeout);
+                    if this.is_paused() {
+                        thread::sleep(this.options.pause_timeout);
                         continue;
                     }
 
-                    if let Some(item) = match producer.options.behavior {
-                        QueueBehavior::FIFO => producer.dequeue(),
-                        QueueBehavior::LIFO => producer.pop(),
+                    if let Some(item) = match this.options.behavior {
+                        QueueBehavior::FIFO => this.dequeue(),
+                        QueueBehavior::LIFO => this.pop(),
                     } {
-                        producer.inc_running();
-                        producer.sender.send(item).unwrap();
+                        this.inc_running();
+                        this.sender.send(item).unwrap();
 
-                        if !producer.options.sleep_after_enqueue.is_zero() {
-                            thread::sleep(producer.options.sleep_after_enqueue);
+                        if !this.options.sleep_after_send.is_zero() {
+                            thread::sleep(this.options.sleep_after_send);
                         }
                     };
                 }
 
-                if !producer.is_cancelled() {
-                    while let Some(item) = match producer.options.behavior {
-                        QueueBehavior::FIFO => producer.dequeue(),
-                        QueueBehavior::LIFO => producer.pop(),
+                if !this.is_cancelled() {
+                    while let Some(item) = match this.options.behavior {
+                        QueueBehavior::FIFO => this.dequeue(),
+                        QueueBehavior::LIFO => this.pop(),
                     } {
-                        if producer.is_cancelled() {
+                        if this.is_cancelled() {
                             break;
                         }
 
-                        producer.inc_running();
-                        producer.sender.send(item).unwrap();
+                        this.inc_running();
+                        this.sender.send(item).unwrap();
 
-                        if !producer.options.sleep_after_enqueue.is_zero() {
-                            thread::sleep(producer.options.sleep_after_enqueue);
+                        if !this.options.sleep_after_send.is_zero() {
+                            thread::sleep(this.options.sleep_after_send);
                         }
                     }
                 }
 
-                producer.dec_producers(&td);
+                this.dec_producers(&delegate);
             })
             .unwrap();
     }
 
     pub fn start_consumer<S: ProducerConsumerDelegation<T> + Send + Clone + 'static>(
         &self,
-        task_delegate: S,
+        delegate: S,
     ) {
         if self.is_cancelled() {
             panic!("Queue is already cancelled.")
@@ -309,54 +308,47 @@ impl<T: Send + Clone> ProducerConsumer<T> {
         }
 
         self.inc_consumers();
-        let cons = Arc::new(Mutex::new(self.clone()));
-        let td = task_delegate.clone();
+        let this = Arc::new(self.clone());
+        let delegate = delegate.clone();
         let builder = thread::Builder::new().name(format!("Consumer {}", self.consumers()));
         builder
             .spawn(move || {
-                let consumer = cons.lock().unwrap();
-
                 loop {
-                    if consumer.is_cancelled()
-                        || (consumer.is_empty()
-                            && consumer.is_completed()
-                            && consumer.running() == 0)
+                    if this.is_cancelled()
+                        || (this.is_empty() && this.is_completed() && this.running() == 0)
                     {
                         break;
                     }
 
-                    if consumer.is_paused() {
-                        thread::sleep(consumer.options.pause_timeout);
+                    if this.is_paused() {
+                        thread::sleep(this.options.pause_timeout);
                         continue;
                     }
 
-                    let Ok(item) = consumer
-                        .receiver
-                        .recv_timeout(consumer.options.peek_timeout)
-                    else {
+                    let Ok(item) = this.receiver.recv_timeout(this.options.peek_timeout) else {
                         continue;
                     };
 
-                    if let Ok(result) = td.process_task(&consumer, item.clone()) {
+                    if let Ok(result) = delegate.process_task(&this, item.clone()) {
                         let time = Instant::now();
 
-                        if !td.on_task_completed(&consumer, item, result) {
-                            consumer.dec_running();
+                        if !delegate.on_task_completed(&this, item, result) {
+                            this.dec_running();
                             break;
                         }
 
-                        if !consumer.options.threshold.is_zero()
-                            && time.elapsed() < consumer.options.threshold
+                        if !this.options.threshold.is_zero()
+                            && time.elapsed() < this.options.threshold
                         {
-                            let remaining = consumer.options.threshold - time.elapsed();
+                            let remaining = this.options.threshold - time.elapsed();
                             thread::sleep(remaining);
                         }
 
-                        consumer.dec_running();
+                        this.dec_running();
                     }
                 }
 
-                consumer.dec_consumers(&td);
+                this.dec_consumers(&delegate);
             })
             .unwrap();
     }

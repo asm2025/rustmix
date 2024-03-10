@@ -23,6 +23,7 @@ pub trait ConsumerDelegation<T: Send + Clone + 'static> {
 pub struct ConsumerOptions {
     pub behavior: QueueBehavior,
     pub threshold: Duration,
+    pub sleep_after_send: Duration,
     pub peek_timeout: Duration,
     pub pause_timeout: Duration,
 }
@@ -32,6 +33,7 @@ impl Default for ConsumerOptions {
         ConsumerOptions {
             behavior: QUEUE_BEHAVIOR_DEF,
             threshold: THRESHOLD_DEF,
+            sleep_after_send: SLEEP_AFTER_SEND_DEF,
             peek_timeout: PEEK_TIMEOUT_DEF.clamp(PEEK_TIMEOUT_MIN, PEEK_TIMEOUT_MAX),
             pause_timeout: PAUSE_TIMEOUT_DEF.clamp(PAUSE_TIMEOUT_MIN, PAUSE_TIMEOUT_MAX),
         }
@@ -43,12 +45,25 @@ impl ConsumerOptions {
         Default::default()
     }
 
-    pub fn with_behavior(self, behavior: QueueBehavior) -> Self {
-        ConsumerOptions { behavior, ..self }
+    pub fn with_behavior(&self, behavior: QueueBehavior) -> Self {
+        ConsumerOptions {
+            behavior,
+            ..self.clone()
+        }
     }
 
-    pub fn with_threshold(self, threshold: Duration) -> Self {
-        ConsumerOptions { threshold, ..self }
+    pub fn with_threshold(&self, threshold: Duration) -> Self {
+        ConsumerOptions {
+            threshold,
+            ..self.clone()
+        }
+    }
+
+    pub fn with_sleep_after_send(&self, sleep_after_send: Duration) -> Self {
+        ConsumerOptions {
+            sleep_after_send,
+            ..self.clone()
+        }
     }
 }
 
@@ -174,7 +189,7 @@ impl<T: Send + Clone> Consumer<T> {
             .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
     }
 
-    pub fn start<S: ConsumerDelegation<T> + Send + Clone + 'static>(&self, task_delegate: S) {
+    pub fn start<S: ConsumerDelegation<T> + Send + Clone + 'static>(&self, delegate: S) {
         if self.is_cancelled() {
             panic!("Queue is already cancelled.")
         }
@@ -184,45 +199,41 @@ impl<T: Send + Clone> Consumer<T> {
         }
 
         self.inc_consumers();
-        let cons = Arc::new(Mutex::new(self.clone()));
-        let td = task_delegate.clone();
+        let this = Arc::new(self.clone());
+        let delegate = delegate.clone();
         let builder = thread::Builder::new().name(format!("Consumer {}", self.consumers()));
         builder
             .spawn(move || {
-                let consumer = cons.lock().unwrap();
-
                 loop {
-                    if consumer.is_cancelled()
-                        || (consumer.is_empty()
-                            && consumer.is_completed()
-                            && consumer.running() == 0)
+                    if this.is_cancelled()
+                        || (this.is_empty() && this.is_completed() && this.running() == 0)
                     {
                         break;
                     }
 
-                    if consumer.is_paused() {
-                        thread::sleep(consumer.options.pause_timeout);
+                    if this.is_paused() {
+                        thread::sleep(this.options.pause_timeout);
                         continue;
                     }
 
-                    if let Some(item) = match consumer.options.behavior {
-                        QueueBehavior::FIFO => consumer.dequeue(),
-                        QueueBehavior::LIFO => consumer.pop(),
+                    if let Some(item) = match this.options.behavior {
+                        QueueBehavior::FIFO => this.dequeue(),
+                        QueueBehavior::LIFO => this.pop(),
                     } {
-                        consumer.inc_running();
+                        this.inc_running();
 
-                        if let Ok(result) = td.process_task(&consumer, item.clone()) {
-                            if !td.on_task_completed(&consumer, item, result) {
-                                consumer.dec_running();
+                        if let Ok(result) = delegate.process_task(&this, item.clone()) {
+                            if !delegate.on_task_completed(&this, item, result) {
+                                this.dec_running();
                                 break;
                             }
                         }
 
-                        consumer.dec_running();
+                        this.dec_running();
                     }
                 }
 
-                consumer.dec_consumers(&td);
+                this.dec_consumers(&delegate);
             })
             .unwrap();
     }
@@ -246,6 +257,11 @@ impl<T: Send + Clone> Consumer<T> {
 
         let mut items = self.items.lock().unwrap();
         items.push_back(item);
+
+        if self.options.sleep_after_send > Duration::ZERO {
+            thread::sleep(self.options.sleep_after_send);
+        }
+
         self.items_cond.notify_one();
     }
 
