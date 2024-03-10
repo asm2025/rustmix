@@ -14,8 +14,8 @@ use tokio::sync::Notify;
 use super::*;
 
 pub trait ConsumerDelegation<T: Send + Clone + 'static> {
-    fn process_task(&self, pc: &Consumer<T>, item: T) -> Result<TaskResult, Box<dyn Error>>;
-    fn on_task_completed(&self, pc: &Consumer<T>, item: T, result: TaskResult) -> bool;
+    fn process(&self, pc: &Consumer<T>, item: &T) -> Result<TaskResult, Box<dyn Error>>;
+    fn on_completed(&self, pc: &Consumer<T>, item: &T, result: TaskResult) -> bool;
     fn on_finished(&self, pc: &Consumer<T>);
 }
 
@@ -222,10 +222,19 @@ impl<T: Send + Clone> Consumer<T> {
                     } {
                         this.inc_running();
 
-                        if let Ok(result) = delegate.process_task(&this, item.clone()) {
-                            if !delegate.on_task_completed(&this, item, result) {
+                        if let Ok(result) = delegate.process(&this, &item) {
+                            let time = Instant::now();
+
+                            if !delegate.on_completed(&this, &item, result) {
                                 this.dec_running();
                                 break;
+                            }
+
+                            if !this.options.threshold.is_zero()
+                                && time.elapsed() < this.options.threshold
+                            {
+                                let remaining = this.options.threshold - time.elapsed();
+                                thread::sleep(remaining);
                             }
                         }
 
@@ -234,6 +243,8 @@ impl<T: Send + Clone> Consumer<T> {
                 }
 
                 this.dec_consumers(&delegate);
+                drop(delegate);
+                drop(this);
             })
             .unwrap();
     }

@@ -4,6 +4,7 @@ use std::{
     thread,
 };
 
+use crossbeam::sync::WaitGroup;
 use rustmix::threading::{consumer::*, injector_consumer::*, producer_consumer::*, *};
 
 const THREADS: usize = 4;
@@ -25,10 +26,10 @@ impl TaskHandler {
 }
 
 impl ProducerConsumerDelegation<usize> for TaskHandler {
-    fn process_task(
+    fn process(
         &self,
         _pc: &ProducerConsumer<usize>,
-        item: usize,
+        item: &usize,
     ) -> Result<TaskResult, Box<dyn Error>> {
         let current_thread = thread::current();
         self.task_count
@@ -51,10 +52,10 @@ impl ProducerConsumerDelegation<usize> for TaskHandler {
         Ok(TaskResult::Success)
     }
 
-    fn on_task_completed(
+    fn on_completed(
         &self,
         _pc: &ProducerConsumer<usize>,
-        item: usize,
+        item: &usize,
         result: TaskResult,
     ) -> bool {
         let current_thread = thread::current();
@@ -79,11 +80,7 @@ impl ProducerConsumerDelegation<usize> for TaskHandler {
 }
 
 impl ConsumerDelegation<usize> for TaskHandler {
-    fn process_task(
-        &self,
-        _pc: &Consumer<usize>,
-        item: usize,
-    ) -> Result<TaskResult, Box<dyn Error>> {
+    fn process(&self, _pc: &Consumer<usize>, item: &usize) -> Result<TaskResult, Box<dyn Error>> {
         let current_thread = thread::current();
         self.task_count
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -105,7 +102,7 @@ impl ConsumerDelegation<usize> for TaskHandler {
         Ok(TaskResult::Success)
     }
 
-    fn on_task_completed(&self, _pc: &Consumer<usize>, item: usize, result: TaskResult) -> bool {
+    fn on_completed(&self, _pc: &Consumer<usize>, item: &usize, result: TaskResult) -> bool {
         let current_thread = thread::current();
         self.done_count
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -128,10 +125,10 @@ impl ConsumerDelegation<usize> for TaskHandler {
 }
 
 impl InjectorWorkerDelegation<usize> for TaskHandler {
-    fn process_task(
+    fn process(
         &self,
         _pc: &InjectorWorker<usize>,
-        item: usize,
+        item: &usize,
     ) -> Result<TaskResult, Box<dyn Error>> {
         let current_thread = thread::current();
         self.task_count
@@ -154,12 +151,7 @@ impl InjectorWorkerDelegation<usize> for TaskHandler {
         Ok(TaskResult::Success)
     }
 
-    fn on_task_completed(
-        &self,
-        _pc: &InjectorWorker<usize>,
-        item: usize,
-        result: TaskResult,
-    ) -> bool {
+    fn on_completed(&self, _pc: &InjectorWorker<usize>, item: &usize, result: TaskResult) -> bool {
         let current_thread = thread::current();
         self.done_count
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -188,17 +180,28 @@ pub async fn test_producer_consumer() -> Result<(), Box<dyn Error>> {
     let handler = TaskHandler::new();
     let options = ProducerConsumerOptions::new();
     let prodcon = ProducerConsumer::<usize>::with_options(options);
-    prodcon.start_producer(handler.clone());
+    let unit = TEST_SIZE / THREADS;
 
     for _ in 0..THREADS {
         let con = handler.clone();
         prodcon.start_consumer(con);
     }
 
-    for i in 1..=TEST_SIZE {
-        prodcon.enqueue(i);
+    let wg = WaitGroup::new();
+
+    for n in 0..THREADS {
+        let wgc = wg.clone();
+        let p = prodcon.new_producer();
+        thread::spawn(move || {
+            for i in 1..=unit {
+                p.enqueue(i + (unit * n));
+            }
+
+            drop(wgc);
+        });
     }
 
+    wg.wait();
     prodcon.complete();
     let _ = prodcon.wait_async().await;
 

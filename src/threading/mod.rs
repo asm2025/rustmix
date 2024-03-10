@@ -2,6 +2,7 @@ use std::time::Duration;
 
 pub mod consumer;
 pub mod injector_consumer;
+pub mod parallel_consumer;
 pub mod producer_consumer;
 
 const CAPACITY_DEF: usize = 0;

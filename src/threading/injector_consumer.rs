@@ -14,15 +14,14 @@ use tokio::sync::Notify;
 use super::*;
 
 pub trait InjectorWorkerDelegation<T: Send + Clone + 'static> {
-    fn process_task(&self, pc: &InjectorWorker<T>, item: T) -> Result<TaskResult, Box<dyn Error>>;
-    fn on_task_completed(&self, pc: &InjectorWorker<T>, item: T, result: TaskResult) -> bool;
+    fn process(&self, pc: &InjectorWorker<T>, item: &T) -> Result<TaskResult, Box<dyn Error>>;
+    fn on_completed(&self, pc: &InjectorWorker<T>, item: &T, result: TaskResult) -> bool;
     fn on_finished(&self, pc: &InjectorWorker<T>);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InjectorWorkerOptions {
     pub threads: usize,
-    pub capacity: usize,
     pub threshold: Duration,
     pub sleep_after_send: Duration,
     pub pause_timeout: Duration,
@@ -31,7 +30,6 @@ pub struct InjectorWorkerOptions {
 impl Default for InjectorWorkerOptions {
     fn default() -> Self {
         InjectorWorkerOptions {
-            capacity: CAPACITY_DEF,
             threads: THREADS_DEF,
             threshold: THRESHOLD_DEF,
             sleep_after_send: SLEEP_AFTER_SEND_DEF,
@@ -43,13 +41,6 @@ impl Default for InjectorWorkerOptions {
 impl InjectorWorkerOptions {
     pub fn new() -> Self {
         Default::default()
-    }
-
-    pub fn with_capacity(&self, capacity: usize) -> Self {
-        InjectorWorkerOptions {
-            capacity,
-            ..self.clone()
-        }
     }
 
     pub fn with_threads(&self, threads: usize) -> Self {
@@ -94,7 +85,7 @@ impl<T: Send + Clone> InjectorWorker<T> {
     pub fn new() -> Self {
         let options: InjectorWorkerOptions = Default::default();
         InjectorWorker {
-            options: options,
+            options,
             injector: Arc::new(Injector::new()),
             stealers: Arc::new(Mutex::new(Vec::new())),
             started: Arc::new(Mutex::new(false)),
@@ -111,7 +102,7 @@ impl<T: Send + Clone> InjectorWorker<T> {
 
     pub fn with_options(options: InjectorWorkerOptions) -> Self {
         InjectorWorker {
-            options: options,
+            options,
             injector: Arc::new(Injector::new()),
             stealers: Arc::new(Mutex::new(Vec::new())),
             started: Arc::new(Mutex::new(false)),
@@ -238,14 +229,14 @@ impl<T: Send + Clone> InjectorWorker<T> {
             let stealer = worker.stealer();
             stealers.push(stealer);
             self.inc_workers();
-            self.spawn(worker, delegate.clone());
+            self.spawn(worker, &delegate);
         }
     }
 
     fn spawn<S: InjectorWorkerDelegation<T> + Send + Clone + 'static>(
         &self,
         worker: Worker<T>,
-        delegate: S,
+        delegate: &S,
     ) {
         let this = Arc::new(self.clone());
         let global = this.injector.clone();
@@ -295,10 +286,19 @@ impl<T: Send + Clone> InjectorWorker<T> {
                         Some(item) => {
                             this.inc_running();
 
-                            if let Ok(result) = delegate.process_task(&this, item.clone()) {
-                                if !delegate.on_task_completed(&this, item, result) {
+                            if let Ok(result) = delegate.process(&this, &item) {
+                                let time = Instant::now();
+
+                                if !delegate.on_completed(&this, &item, result) {
                                     this.dec_running();
                                     break;
+                                }
+
+                                if !this.options.threshold.is_zero()
+                                    && time.elapsed() < this.options.threshold
+                                {
+                                    let remaining = this.options.threshold - time.elapsed();
+                                    thread::sleep(remaining);
                                 }
                             }
 
@@ -313,6 +313,10 @@ impl<T: Send + Clone> InjectorWorker<T> {
                 }
 
                 this.dec_workers(&delegate);
+                drop(this);
+                drop(global);
+                drop(local);
+                drop(delegate);
             })
             .unwrap();
     }
