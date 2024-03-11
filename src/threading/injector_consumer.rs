@@ -3,7 +3,7 @@ use std::{
     error::Error,
     future::Future,
     sync::{
-        atomic::{AtomicBool, AtomicUsize},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Condvar, Mutex,
     },
     thread,
@@ -137,22 +137,19 @@ impl<T: Send + Clone> InjectorWorker<T> {
     }
 
     pub fn is_completed(&self) -> bool {
-        self.completed.load(std::sync::atomic::Ordering::Relaxed)
+        self.completed.load(Ordering::SeqCst)
     }
 
     pub fn is_paused(&self) -> bool {
-        self.paused.load(std::sync::atomic::Ordering::Relaxed)
+        self.paused.load(Ordering::SeqCst)
     }
 
     pub fn is_cancelled(&self) -> bool {
-        self.cancelled.load(std::sync::atomic::Ordering::Relaxed)
+        self.cancelled.load(Ordering::SeqCst)
     }
 
     pub fn is_busy(&self) -> bool {
-        (self
-            .running_count
-            .load(std::sync::atomic::Ordering::Relaxed)
-            > 0)
+        (self.running_count.load(Ordering::SeqCst) > 0)
             || (self.injector.len() > 0)
             || (self.workers() > 0)
     }
@@ -169,18 +166,15 @@ impl<T: Send + Clone> InjectorWorker<T> {
     }
 
     pub fn workers(&self) -> usize {
-        self.workers_count
-            .load(std::sync::atomic::Ordering::Relaxed)
+        self.workers_count.load(Ordering::SeqCst)
     }
 
     fn inc_workers(&self) {
-        self.workers_count
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.workers_count.fetch_add(1, Ordering::SeqCst);
     }
 
     fn dec_workers(&self, td: &dyn InjectorWorkerDelegation<T>) {
-        self.workers_count
-            .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+        self.workers_count.fetch_sub(1, Ordering::SeqCst);
         self.check_finished(td);
     }
 
@@ -195,18 +189,15 @@ impl<T: Send + Clone> InjectorWorker<T> {
     }
 
     pub fn running(&self) -> usize {
-        self.running_count
-            .load(std::sync::atomic::Ordering::Relaxed)
+        self.running_count.load(Ordering::SeqCst)
     }
 
     fn inc_running(&self) {
-        self.running_count
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.running_count.fetch_add(1, Ordering::SeqCst);
     }
 
     fn dec_running(&self) {
-        self.running_count
-            .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+        self.running_count.fetch_sub(1, Ordering::SeqCst);
     }
 
     pub fn start<S: InjectorWorkerDelegation<T> + Send + Clone + 'static>(&self, delegate: S) {
@@ -229,11 +220,27 @@ impl<T: Send + Clone> InjectorWorker<T> {
             let stealer = worker.stealer();
             stealers.push(stealer);
             self.inc_workers();
-            self.spawn(worker, &delegate);
+            let this = Arc::new(self.clone());
+            let builder = thread::Builder::new().name(format!("Worker {}", self.workers()));
+            let del = delegate.clone();
+
+            if self.options.threshold.is_zero() {
+                builder
+                    .spawn(move || {
+                        this.run_consumer(worker, &del);
+                    })
+                    .unwrap();
+            } else {
+                builder
+                    .spawn(move || {
+                        this.run_consumer_with_threshold(worker, &del);
+                    })
+                    .unwrap();
+            }
         }
     }
 
-    fn spawn<S: InjectorWorkerDelegation<T> + Send + Clone + 'static>(
+    fn run_consumer<S: InjectorWorkerDelegation<T> + Send + Clone + 'static>(
         &self,
         worker: Worker<T>,
         delegate: &S,
@@ -242,83 +249,154 @@ impl<T: Send + Clone> InjectorWorker<T> {
         let global = this.injector.clone();
         let local = Arc::new(Mutex::new(worker));
         let delegate = delegate.clone();
-        let builder = thread::Builder::new().name(format!("Worker {}", self.workers()));
-        builder
-            .spawn(move || {
-                loop {
-                    if this.is_cancelled() {
-                        break;
-                    }
 
-                    if this.is_paused() {
-                        thread::sleep(this.options.pause_timeout);
-                        continue;
-                    }
+        loop {
+            if this.is_cancelled() {
+                break;
+            }
 
-                    let local = local.lock().unwrap();
-                    // Pop a task from the local queue, if not empty.
-                    match local.pop().or_else(|| {
-                        // Otherwise, we need to look for a task elsewhere.
-                        if this.is_cancelled() {
-                            return None;
-                        }
+            if this.is_paused() {
+                thread::sleep(this.options.pause_timeout);
+                continue;
+            }
 
-                        if this.is_paused() {
-                            thread::sleep(this.options.pause_timeout);
-                            return None;
-                        }
-
-                        // Try stealing a batch of tasks from the global queue.
-                        global
-                            .steal_batch_with_limit_and_pop(&local, 10)
-                            // Or try stealing a task from one of the other threads.
-                            .or_else(|| {
-                                this.stealers
-                                    .lock()
-                                    .unwrap()
-                                    .iter()
-                                    .map(|s| s.steal_batch_with_limit_and_pop(&local, 10))
-                                    .find(|s| s.is_success())
-                                    .unwrap_or_else(|| Steal::Empty)
-                            })
-                            .success()
-                    }) {
-                        Some(item) => {
-                            this.inc_running();
-
-                            if let Ok(result) = delegate.process(&this, &item) {
-                                let time = Instant::now();
-
-                                if !delegate.on_completed(&this, &item, result) {
-                                    this.dec_running();
-                                    break;
-                                }
-
-                                if !this.options.threshold.is_zero()
-                                    && time.elapsed() < this.options.threshold
-                                {
-                                    let remaining = this.options.threshold - time.elapsed();
-                                    thread::sleep(remaining);
-                                }
-                            }
-
-                            this.dec_running();
-                        }
-                        _ => {
-                            if this.is_cancelled() || this.is_completed() {
-                                break;
-                            }
-                        }
-                    }
+            let local = local.lock().unwrap();
+            // Pop a task from the local queue, if not empty.
+            match local.pop().or_else(|| {
+                // Otherwise, we need to look for a task elsewhere.
+                if this.is_cancelled() {
+                    return None;
                 }
 
-                this.dec_workers(&delegate);
-                drop(this);
-                drop(global);
-                drop(local);
-                drop(delegate);
-            })
-            .unwrap();
+                if this.is_paused() {
+                    thread::sleep(this.options.pause_timeout);
+                    return None;
+                }
+
+                // Try stealing a batch of tasks from the global queue.
+                global
+                    .steal_batch_with_limit_and_pop(&local, 10)
+                    // Or try stealing a task from one of the other threads.
+                    .or_else(|| {
+                        this.stealers
+                            .lock()
+                            .unwrap()
+                            .iter()
+                            .map(|s| s.steal_batch_with_limit_and_pop(&local, 10))
+                            .find(|s| s.is_success())
+                            .unwrap_or_else(|| Steal::Empty)
+                    })
+                    .success()
+            }) {
+                Some(item) => {
+                    this.inc_running();
+
+                    if let Ok(result) = delegate.process(&this, &item) {
+                        if !delegate.on_completed(&this, &item, result) {
+                            this.dec_running();
+                            break;
+                        }
+                    }
+
+                    this.dec_running();
+                }
+                _ => {
+                    if this.is_cancelled() || this.is_completed() {
+                        break;
+                    }
+                }
+            }
+        }
+
+        this.dec_workers(&delegate);
+        drop(this);
+        drop(global);
+        drop(local);
+        drop(delegate);
+    }
+
+    fn run_consumer_with_threshold<S: InjectorWorkerDelegation<T> + Send + Clone + 'static>(
+        &self,
+        worker: Worker<T>,
+        delegate: &S,
+    ) {
+        let this = Arc::new(self.clone());
+        let global = this.injector.clone();
+        let local = Arc::new(Mutex::new(worker));
+        let delegate = delegate.clone();
+
+        loop {
+            if this.is_cancelled() {
+                break;
+            }
+
+            if this.is_paused() {
+                thread::sleep(this.options.pause_timeout);
+                continue;
+            }
+
+            let local = local.lock().unwrap();
+            // Pop a task from the local queue, if not empty.
+            match local.pop().or_else(|| {
+                // Otherwise, we need to look for a task elsewhere.
+                if this.is_cancelled() {
+                    return None;
+                }
+
+                if this.is_paused() {
+                    thread::sleep(this.options.pause_timeout);
+                    return None;
+                }
+
+                // Try stealing a batch of tasks from the global queue.
+                global
+                    .steal_batch_with_limit_and_pop(&local, 10)
+                    // Or try stealing a task from one of the other threads.
+                    .or_else(|| {
+                        this.stealers
+                            .lock()
+                            .unwrap()
+                            .iter()
+                            .map(|s| s.steal_batch_with_limit_and_pop(&local, 10))
+                            .find(|s| s.is_success())
+                            .unwrap_or_else(|| Steal::Empty)
+                    })
+                    .success()
+            }) {
+                Some(item) => {
+                    this.inc_running();
+
+                    if let Ok(result) = delegate.process(&this, &item) {
+                        let time = Instant::now();
+
+                        if !delegate.on_completed(&this, &item, result) {
+                            this.dec_running();
+                            break;
+                        }
+
+                        if !this.options.threshold.is_zero()
+                            && time.elapsed() < this.options.threshold
+                        {
+                            let remaining = this.options.threshold - time.elapsed();
+                            thread::sleep(remaining);
+                        }
+                    }
+
+                    this.dec_running();
+                }
+                _ => {
+                    if this.is_cancelled() || this.is_completed() {
+                        break;
+                    }
+                }
+            }
+        }
+
+        this.dec_workers(&delegate);
+        drop(this);
+        drop(global);
+        drop(local);
+        drop(delegate);
     }
 
     pub fn stop(&self, enforce: bool) {
@@ -342,23 +420,19 @@ impl<T: Send + Clone> InjectorWorker<T> {
     }
 
     pub fn complete(&self) {
-        self.completed
-            .store(true, std::sync::atomic::Ordering::Relaxed);
+        self.completed.store(true, Ordering::SeqCst);
     }
 
     pub fn cancel(&self) {
-        self.cancelled
-            .store(true, std::sync::atomic::Ordering::Relaxed);
+        self.cancelled.store(true, Ordering::SeqCst);
     }
 
     pub fn pause(&self) {
-        self.paused
-            .store(true, std::sync::atomic::Ordering::Relaxed);
+        self.paused.store(true, Ordering::SeqCst);
     }
 
     pub fn resume(&self) {
-        self.paused
-            .store(false, std::sync::atomic::Ordering::Relaxed);
+        self.paused.store(false, Ordering::SeqCst);
     }
 
     pub fn wait(&self) {
@@ -377,7 +451,7 @@ impl<T: Send + Clone> InjectorWorker<T> {
     }
 
     pub fn wait_for(&self, timeout: Duration) -> bool {
-        if timeout == Duration::ZERO {
+        if timeout.is_zero() {
             self.wait();
             return true;
         }
@@ -402,7 +476,7 @@ impl<T: Send + Clone> InjectorWorker<T> {
     }
 
     pub async fn wait_for_async(&self, timeout: Duration) -> Box<dyn Future<Output = bool>> {
-        if timeout == Duration::ZERO {
+        if timeout.is_zero() {
             self.wait_async().await;
             return Box::new(async { true });
         }

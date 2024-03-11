@@ -3,7 +3,7 @@ use std::{
     error::Error,
     future::Future,
     sync::{
-        atomic::{AtomicBool, AtomicUsize},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Condvar, Mutex,
     },
     thread,
@@ -121,26 +121,20 @@ impl<T: Send + Clone> Consumer<T> {
     }
 
     pub fn is_completed(&self) -> bool {
-        self.completed.load(std::sync::atomic::Ordering::Relaxed)
+        self.completed.load(Ordering::SeqCst)
     }
 
     pub fn is_paused(&self) -> bool {
-        self.paused.load(std::sync::atomic::Ordering::Relaxed)
+        self.paused.load(Ordering::SeqCst)
     }
 
     pub fn is_cancelled(&self) -> bool {
-        self.cancelled.load(std::sync::atomic::Ordering::Relaxed)
+        self.cancelled.load(Ordering::SeqCst)
     }
 
     pub fn is_busy(&self) -> bool {
-        (self
-            .consumers_count
-            .load(std::sync::atomic::Ordering::Relaxed)
-            > 0)
-            || (self
-                .running_count
-                .load(std::sync::atomic::Ordering::Relaxed)
-                > 0)
+        (self.consumers_count.load(Ordering::SeqCst) > 0)
+            || (self.running_count.load(Ordering::SeqCst) > 0)
             || (self.items.lock().unwrap().len() > 0)
     }
 
@@ -149,18 +143,15 @@ impl<T: Send + Clone> Consumer<T> {
     }
 
     pub fn consumers(&self) -> usize {
-        self.consumers_count
-            .load(std::sync::atomic::Ordering::Relaxed)
+        self.consumers_count.load(Ordering::SeqCst)
     }
 
     fn inc_consumers(&self) {
-        self.consumers_count
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.consumers_count.fetch_add(1, Ordering::SeqCst);
     }
 
     fn dec_consumers(&self, td: &dyn ConsumerDelegation<T>) {
-        self.consumers_count
-            .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+        self.consumers_count.fetch_sub(1, Ordering::SeqCst);
         self.check_finished(td);
     }
 
@@ -175,18 +166,15 @@ impl<T: Send + Clone> Consumer<T> {
     }
 
     pub fn running(&self) -> usize {
-        self.running_count
-            .load(std::sync::atomic::Ordering::Relaxed)
+        self.running_count.load(Ordering::SeqCst)
     }
 
     fn inc_running(&self) {
-        self.running_count
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.running_count.fetch_add(1, Ordering::SeqCst);
     }
 
     fn dec_running(&self) {
-        self.running_count
-            .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+        self.running_count.fetch_sub(1, Ordering::SeqCst);
     }
 
     pub fn start<S: ConsumerDelegation<T> + Send + Clone + 'static>(&self, delegate: S) {
@@ -199,54 +187,105 @@ impl<T: Send + Clone> Consumer<T> {
         }
 
         self.inc_consumers();
-        let this = Arc::new(self.clone());
-        let delegate = delegate.clone();
         let builder = thread::Builder::new().name(format!("Consumer {}", self.consumers()));
-        builder
-            .spawn(move || {
-                loop {
-                    if this.is_cancelled()
-                        || (this.is_empty() && this.is_completed() && this.running() == 0)
-                    {
+        let this = Arc::new(self.clone());
+
+        if self.options.threshold.is_zero() {
+            builder
+                .spawn(move || {
+                    this.run_consumer(&delegate);
+                })
+                .unwrap();
+        } else {
+            builder
+                .spawn(move || {
+                    this.run_consumer_with_threshold(&delegate);
+                })
+                .unwrap();
+        }
+    }
+
+    fn run_consumer<S: ConsumerDelegation<T> + Send + Clone + 'static>(&self, delegate: &S) {
+        let delegate = delegate.clone();
+
+        loop {
+            if self.is_cancelled()
+                || (self.is_empty() && self.is_completed() && self.running() == 0)
+            {
+                break;
+            }
+
+            if self.is_paused() {
+                thread::sleep(self.options.pause_timeout);
+                continue;
+            }
+
+            if let Some(item) = match self.options.behavior {
+                QueueBehavior::FIFO => self.dequeue(),
+                QueueBehavior::LIFO => self.pop(),
+            } {
+                self.inc_running();
+
+                if let Ok(result) = delegate.process(self, &item) {
+                    if !delegate.on_completed(self, &item, result) {
+                        self.dec_running();
                         break;
-                    }
-
-                    if this.is_paused() {
-                        thread::sleep(this.options.pause_timeout);
-                        continue;
-                    }
-
-                    if let Some(item) = match this.options.behavior {
-                        QueueBehavior::FIFO => this.dequeue(),
-                        QueueBehavior::LIFO => this.pop(),
-                    } {
-                        this.inc_running();
-
-                        if let Ok(result) = delegate.process(&this, &item) {
-                            let time = Instant::now();
-
-                            if !delegate.on_completed(&this, &item, result) {
-                                this.dec_running();
-                                break;
-                            }
-
-                            if !this.options.threshold.is_zero()
-                                && time.elapsed() < this.options.threshold
-                            {
-                                let remaining = this.options.threshold - time.elapsed();
-                                thread::sleep(remaining);
-                            }
-                        }
-
-                        this.dec_running();
                     }
                 }
 
-                this.dec_consumers(&delegate);
-                drop(delegate);
-                drop(this);
-            })
-            .unwrap();
+                self.dec_running();
+            }
+        }
+
+        self.dec_consumers(&delegate);
+        drop(delegate);
+    }
+
+    fn run_consumer_with_threshold<S: ConsumerDelegation<T> + Send + Clone + 'static>(
+        &self,
+        delegate: &S,
+    ) {
+        let delegate = delegate.clone();
+
+        loop {
+            if self.is_cancelled()
+                || (self.is_empty() && self.is_completed() && self.running() == 0)
+            {
+                break;
+            }
+
+            if self.is_paused() {
+                thread::sleep(self.options.pause_timeout);
+                continue;
+            }
+
+            if let Some(item) = match self.options.behavior {
+                QueueBehavior::FIFO => self.dequeue(),
+                QueueBehavior::LIFO => self.pop(),
+            } {
+                self.inc_running();
+
+                if let Ok(result) = delegate.process(&self, &item) {
+                    let time = Instant::now();
+
+                    if !delegate.on_completed(&self, &item, result) {
+                        self.dec_running();
+                        break;
+                    }
+
+                    if !self.options.threshold.is_zero() && time.elapsed() < self.options.threshold
+                    {
+                        let remaining = self.options.threshold - time.elapsed();
+                        thread::sleep(remaining);
+                    }
+                }
+
+                self.dec_running();
+            }
+        }
+
+        self.dec_consumers(&delegate);
+        drop(delegate);
     }
 
     pub fn stop(&self, enforce: bool) {
@@ -269,7 +308,7 @@ impl<T: Send + Clone> Consumer<T> {
         let mut items = self.items.lock().unwrap();
         items.push_back(item);
 
-        if self.options.sleep_after_send > Duration::ZERO {
+        if !self.options.sleep_after_send.is_zero() {
             thread::sleep(self.options.sleep_after_send);
         }
 
@@ -355,25 +394,21 @@ impl<T: Send + Clone> Consumer<T> {
     }
 
     pub fn complete(&self) {
-        self.completed
-            .store(true, std::sync::atomic::Ordering::Relaxed);
+        self.completed.store(true, Ordering::SeqCst);
         self.items_cond.notify_all();
     }
 
     pub fn cancel(&self) {
-        self.cancelled
-            .store(true, std::sync::atomic::Ordering::Relaxed);
+        self.cancelled.store(true, Ordering::SeqCst);
         self.items_cond.notify_all();
     }
 
     pub fn pause(&self) {
-        self.paused
-            .store(true, std::sync::atomic::Ordering::Relaxed);
+        self.paused.store(true, Ordering::SeqCst);
     }
 
     pub fn resume(&self) {
-        self.paused
-            .store(false, std::sync::atomic::Ordering::Relaxed);
+        self.paused.store(false, Ordering::SeqCst);
         self.items_cond.notify_all();
     }
 
@@ -393,7 +428,7 @@ impl<T: Send + Clone> Consumer<T> {
     }
 
     pub fn wait_for(&self, timeout: Duration) -> bool {
-        if timeout == Duration::ZERO {
+        if timeout.is_zero() {
             self.wait();
             return true;
         }
@@ -418,7 +453,7 @@ impl<T: Send + Clone> Consumer<T> {
     }
 
     pub async fn wait_for_async(&self, timeout: Duration) -> Box<dyn Future<Output = bool>> {
-        if timeout == Duration::ZERO {
+        if timeout.is_zero() {
             self.wait_async().await;
             return Box::new(async { true });
         }

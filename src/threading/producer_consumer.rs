@@ -3,7 +3,7 @@ use std::{
     error::Error,
     future::Future,
     sync::{
-        atomic::{AtomicBool, AtomicUsize},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Condvar, Mutex,
     },
     thread,
@@ -151,32 +151,27 @@ impl<T: Send + Clone> ProducerConsumer<T> {
     }
 
     pub fn is_completed(&self) -> bool {
-        self.completed.load(std::sync::atomic::Ordering::Relaxed)
+        self.completed.load(Ordering::SeqCst)
     }
 
     pub fn is_cancelled(&self) -> bool {
-        self.cancelled.load(std::sync::atomic::Ordering::Relaxed)
+        self.cancelled.load(Ordering::SeqCst)
     }
 
     pub fn is_busy(&self) -> bool {
-        self.running_count
-            .load(std::sync::atomic::Ordering::Relaxed)
-            > 0
+        self.running_count.load(Ordering::SeqCst) > 0
     }
 
     pub fn consumers(&self) -> usize {
-        self.consumers_count
-            .load(std::sync::atomic::Ordering::Relaxed)
+        self.consumers_count.load(Ordering::SeqCst)
     }
 
     fn inc_consumers(&self) {
-        self.consumers_count
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.consumers_count.fetch_add(1, Ordering::SeqCst);
     }
 
     fn dec_consumers(&self, td: &dyn ProducerConsumerDelegation<T>) {
-        self.consumers_count
-            .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+        self.consumers_count.fetch_sub(1, Ordering::SeqCst);
         self.check_finished(td);
     }
 
@@ -191,18 +186,15 @@ impl<T: Send + Clone> ProducerConsumer<T> {
     }
 
     pub fn running(&self) -> usize {
-        self.running_count
-            .load(std::sync::atomic::Ordering::Relaxed)
+        self.running_count.load(Ordering::SeqCst)
     }
 
     fn inc_running(&self) {
-        self.running_count
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.running_count.fetch_add(1, Ordering::SeqCst);
     }
 
     fn dec_running(&self) {
-        self.running_count
-            .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+        self.running_count.fetch_sub(1, Ordering::SeqCst);
     }
 
     pub fn new_producer(&self) -> Producer<T> {
@@ -227,44 +219,75 @@ impl<T: Send + Clone> ProducerConsumer<T> {
 
         self.inc_consumers();
         let this = Arc::new(self.clone());
-        let delegate = delegate.clone();
         let builder = thread::Builder::new().name(format!("Consumer {}", self.consumers()));
-        builder
-            .spawn(move || {
-                loop {
-                    if this.is_cancelled() || (this.is_completed() && this.running() == 0) {
-                        break;
-                    }
 
-                    let Ok(item) = this.receiver.recv_timeout(this.options.peek_timeout) else {
-                        continue;
-                    };
-                    this.inc_running();
+        if self.options.threshold.is_zero() {
+            builder.spawn(move || this.run_consumer(delegate)).unwrap();
+        } else {
+            builder
+                .spawn(move || this.run_consumer_with_threshold(delegate))
+                .unwrap();
+        }
+    }
 
-                    if let Ok(result) = delegate.process(&this, &item) {
-                        let time = Instant::now();
+    fn run_consumer<S: ProducerConsumerDelegation<T> + Send + Clone + 'static>(&self, delegate: S) {
+        loop {
+            if self.is_cancelled() || (self.is_completed() && self.running() == 0) {
+                break;
+            }
 
-                        if !delegate.on_completed(&this, &item, result) {
-                            this.dec_running();
-                            break;
-                        }
+            let Ok(item) = self.receiver.recv_timeout(self.options.peek_timeout) else {
+                continue;
+            };
+            self.inc_running();
 
-                        if !this.options.threshold.is_zero()
-                            && time.elapsed() < this.options.threshold
-                        {
-                            let remaining = this.options.threshold - time.elapsed();
-                            thread::sleep(remaining);
-                        }
-                    }
+            if let Ok(result) = delegate.process(self, &item) {
+                if !delegate.on_completed(self, &item, result) {
+                    self.dec_running();
+                    break;
+                }
+            }
 
-                    this.dec_running();
+            self.dec_running();
+        }
+
+        self.dec_consumers(&delegate);
+        drop(delegate);
+    }
+
+    fn run_consumer_with_threshold<S: ProducerConsumerDelegation<T> + Send + Clone + 'static>(
+        &self,
+        delegate: S,
+    ) {
+        loop {
+            if self.is_cancelled() || (self.is_completed() && self.running() == 0) {
+                break;
+            }
+
+            let Ok(item) = self.receiver.recv_timeout(self.options.peek_timeout) else {
+                continue;
+            };
+            self.inc_running();
+
+            if let Ok(result) = delegate.process(&self, &item) {
+                let time = Instant::now();
+
+                if !delegate.on_completed(&self, &item, result) {
+                    self.dec_running();
+                    break;
                 }
 
-                this.dec_consumers(&delegate);
-                drop(delegate);
-                drop(this);
-            })
-            .unwrap();
+                if !self.options.threshold.is_zero() && time.elapsed() < self.options.threshold {
+                    let remaining = self.options.threshold - time.elapsed();
+                    thread::sleep(remaining);
+                }
+            }
+
+            self.dec_running();
+        }
+
+        self.dec_consumers(&delegate);
+        drop(delegate);
     }
 
     pub fn stop(&self, enforce: bool) {
@@ -276,13 +299,11 @@ impl<T: Send + Clone> ProducerConsumer<T> {
     }
 
     pub fn complete(&self) {
-        self.completed
-            .store(true, std::sync::atomic::Ordering::Relaxed);
+        self.completed.store(true, Ordering::SeqCst);
     }
 
     pub fn cancel(&self) {
-        self.cancelled
-            .store(true, std::sync::atomic::Ordering::Relaxed);
+        self.cancelled.store(true, Ordering::SeqCst);
     }
 
     pub fn wait(&self) {
@@ -301,7 +322,7 @@ impl<T: Send + Clone> ProducerConsumer<T> {
     }
 
     pub fn wait_for(&self, timeout: Duration) -> bool {
-        if timeout == Duration::ZERO {
+        if timeout.is_zero() {
             self.wait();
             return true;
         }
@@ -326,7 +347,7 @@ impl<T: Send + Clone> ProducerConsumer<T> {
     }
 
     pub async fn wait_for_async(&self, timeout: Duration) -> Box<dyn Future<Output = bool>> {
-        if timeout == Duration::ZERO {
+        if timeout.is_zero() {
             self.wait_async().await;
             return Box::new(async { true });
         }
