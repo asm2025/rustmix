@@ -91,6 +91,10 @@ impl<T: Send + Clone> Producer<T> {
         }
 
         self.sender.send(item).unwrap();
+
+        if !self.pc.options.sleep_after_send.is_zero() {
+            thread::sleep(self.pc.options.sleep_after_send);
+        }
     }
 }
 
@@ -111,11 +115,7 @@ pub struct ProducerConsumer<T: Send + Clone + 'static> {
 impl<T: Send + Clone> ProducerConsumer<T> {
     pub fn new() -> Self {
         let options: ProducerConsumerOptions = Default::default();
-        let (sender, receiver) = if options.capacity > 0 {
-            channel::bounded::<T>(options.capacity)
-        } else {
-            channel::unbounded::<T>()
-        };
+        let (sender, receiver) = channel::bounded::<T>(options.capacity);
         ProducerConsumer {
             options,
             sender,
@@ -222,15 +222,20 @@ impl<T: Send + Clone> ProducerConsumer<T> {
         let builder = thread::Builder::new().name(format!("Consumer {}", self.consumers()));
 
         if self.options.threshold.is_zero() {
-            builder.spawn(move || this.run_consumer(delegate)).unwrap();
+            builder.spawn(move || this.run_consumer(&delegate)).unwrap();
         } else {
             builder
-                .spawn(move || this.run_consumer_with_threshold(delegate))
+                .spawn(move || this.run_consumer_with_threshold(&delegate))
                 .unwrap();
         }
     }
 
-    fn run_consumer<S: ProducerConsumerDelegation<T> + Send + Clone + 'static>(&self, delegate: S) {
+    fn run_consumer<S: ProducerConsumerDelegation<T> + Send + Clone + 'static>(
+        &self,
+        delegate: &S,
+    ) {
+        let delegate = delegate.clone();
+
         loop {
             if self.is_cancelled() || (self.is_completed() && self.running() == 0) {
                 break;
@@ -257,8 +262,10 @@ impl<T: Send + Clone> ProducerConsumer<T> {
 
     fn run_consumer_with_threshold<S: ProducerConsumerDelegation<T> + Send + Clone + 'static>(
         &self,
-        delegate: S,
+        delegate: &S,
     ) {
+        let delegate = delegate.clone();
+
         loop {
             if self.is_cancelled() || (self.is_completed() && self.running() == 0) {
                 break;
@@ -315,10 +322,7 @@ impl<T: Send + Clone> ProducerConsumer<T> {
     }
 
     pub async fn wait_async(&self) {
-        while !*self.finished.lock().unwrap() {
-            self.finished_notify.notified().await;
-            thread::sleep(self.options.pause_timeout);
-        }
+        self.finished_notify.notified().await;
     }
 
     pub fn wait_for(&self, timeout: Duration) -> bool {
@@ -346,28 +350,28 @@ impl<T: Send + Clone> ProducerConsumer<T> {
         start.elapsed() < timeout
     }
 
-    pub async fn wait_for_async(&self, timeout: Duration) -> Box<dyn Future<Output = bool>> {
+    pub async fn wait_for_async(&self, timeout: Duration) -> bool {
         if timeout.is_zero() {
             self.wait_async().await;
-            return Box::new(async { true });
+            return true;
         }
 
         let start = Instant::now();
-        let mut finished = self.finished.lock().unwrap();
+        let finished = self.finished.lock().unwrap();
 
         while !*finished && start.elapsed() < timeout {
-            let result = self
-                .finished_cond
-                .wait_timeout(finished, self.options.pause_timeout)
-                .unwrap();
-            finished = result.0;
-            thread::sleep(self.options.pause_timeout);
+            let result =
+                tokio::time::timeout(self.options.pause_timeout, self.finished_notify.notified())
+                    .await
+                    .is_ok();
 
-            if result.1.timed_out() || start.elapsed() >= timeout {
-                return Box::new(async move { false });
+            if !result {
+                return false;
             }
+
+            thread::sleep(self.options.pause_timeout);
         }
 
-        Box::new(async move { start.elapsed() < timeout })
+        start.elapsed() < timeout
     }
 }
