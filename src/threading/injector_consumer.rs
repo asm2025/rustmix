@@ -30,7 +30,7 @@ pub struct InjectorWorkerOptions {
 impl Default for InjectorWorkerOptions {
     fn default() -> Self {
         InjectorWorkerOptions {
-            threads: THREADS_DEF,
+            threads: THREADS_DEF.clamp(THREADS_MIN, THREADS_MAX),
             threshold: THRESHOLD_DEF,
             sleep_after_send: SLEEP_AFTER_SEND_DEF,
             pause_timeout: PAUSE_TIMEOUT_DEF.clamp(PAUSE_TIMEOUT_MIN, PAUSE_TIMEOUT_MAX),
@@ -45,7 +45,7 @@ impl InjectorWorkerOptions {
 
     pub fn with_threads(&self, threads: usize) -> Self {
         InjectorWorkerOptions {
-            threads: if threads > 0 { threads } else { 1 },
+            threads: threads.clamp(THREADS_MIN, THREADS_MAX),
             ..self.clone()
         }
     }
@@ -72,13 +72,13 @@ pub struct InjectorWorker<T: Send + Clone + 'static> {
     stealers: Arc<Mutex<Vec<Stealer<T>>>>,
     started: Arc<Mutex<bool>>,
     finished: Arc<Mutex<bool>>,
-    finished_cond: Arc<Condvar>,
-    finished_notify: Arc<Notify>,
+    finishedc: Arc<Condvar>,
+    finishedn: Arc<Notify>,
     completed: Arc<AtomicBool>,
     paused: Arc<AtomicBool>,
     cancelled: Arc<AtomicBool>,
-    workers_count: Arc<AtomicUsize>,
-    running_count: Arc<AtomicUsize>,
+    workers: Arc<AtomicUsize>,
+    running: Arc<AtomicUsize>,
 }
 
 impl<T: Send + Clone> InjectorWorker<T> {
@@ -90,13 +90,13 @@ impl<T: Send + Clone> InjectorWorker<T> {
             stealers: Arc::new(Mutex::new(Vec::new())),
             started: Arc::new(Mutex::new(false)),
             finished: Arc::new(Mutex::new(false)),
-            finished_cond: Arc::new(Condvar::new()),
-            finished_notify: Arc::new(Notify::new()),
+            finishedc: Arc::new(Condvar::new()),
+            finishedn: Arc::new(Notify::new()),
             completed: Arc::new(AtomicBool::new(false)),
             paused: Arc::new(AtomicBool::new(false)),
             cancelled: Arc::new(AtomicBool::new(false)),
-            workers_count: Arc::new(AtomicUsize::new(0)),
-            running_count: Arc::new(AtomicUsize::new(0)),
+            workers: Arc::new(AtomicUsize::new(0)),
+            running: Arc::new(AtomicUsize::new(0)),
         }
     }
 
@@ -107,13 +107,13 @@ impl<T: Send + Clone> InjectorWorker<T> {
             stealers: Arc::new(Mutex::new(Vec::new())),
             started: Arc::new(Mutex::new(false)),
             finished: Arc::new(Mutex::new(false)),
-            finished_cond: Arc::new(Condvar::new()),
-            finished_notify: Arc::new(Notify::new()),
+            finishedc: Arc::new(Condvar::new()),
+            finishedn: Arc::new(Notify::new()),
             completed: Arc::new(AtomicBool::new(false)),
             paused: Arc::new(AtomicBool::new(false)),
             cancelled: Arc::new(AtomicBool::new(false)),
-            workers_count: Arc::new(AtomicUsize::new(0)),
-            running_count: Arc::new(AtomicUsize::new(0)),
+            workers: Arc::new(AtomicUsize::new(0)),
+            running: Arc::new(AtomicUsize::new(0)),
         }
     }
 
@@ -149,7 +149,7 @@ impl<T: Send + Clone> InjectorWorker<T> {
     }
 
     pub fn is_busy(&self) -> bool {
-        (self.running_count.load(Ordering::SeqCst) > 0)
+        (self.running.load(Ordering::SeqCst) > 0)
             || (self.injector.len() > 0)
             || (self.workers() > 0)
     }
@@ -166,15 +166,15 @@ impl<T: Send + Clone> InjectorWorker<T> {
     }
 
     pub fn workers(&self) -> usize {
-        self.workers_count.load(Ordering::SeqCst)
+        self.workers.load(Ordering::SeqCst)
     }
 
     fn inc_workers(&self) {
-        self.workers_count.fetch_add(1, Ordering::SeqCst);
+        self.workers.fetch_add(1, Ordering::SeqCst);
     }
 
     fn dec_workers(&self, td: &dyn InjectorWorkerDelegation<T>) {
-        self.workers_count.fetch_sub(1, Ordering::SeqCst);
+        self.workers.fetch_sub(1, Ordering::SeqCst);
         self.check_finished(td);
     }
 
@@ -183,21 +183,22 @@ impl<T: Send + Clone> InjectorWorker<T> {
             let mut finished = self.finished.lock().unwrap();
             *finished = true;
             td.on_finished(self);
-            self.finished_cond.notify_all();
-            self.finished_notify.notify_waiters();
+            self.set_started(false);
+            self.finishedc.notify_all();
+            self.finishedn.notify_waiters();
         }
     }
 
     pub fn running(&self) -> usize {
-        self.running_count.load(Ordering::SeqCst)
+        self.running.load(Ordering::SeqCst)
     }
 
     fn inc_running(&self) {
-        self.running_count.fetch_add(1, Ordering::SeqCst);
+        self.running.fetch_add(1, Ordering::SeqCst);
     }
 
     fn dec_running(&self) {
-        self.running_count.fetch_sub(1, Ordering::SeqCst);
+        self.running.fetch_sub(1, Ordering::SeqCst);
     }
 
     pub fn start<S: InjectorWorkerDelegation<T> + Send + Clone + 'static>(&self, delegate: S) {
@@ -220,21 +221,17 @@ impl<T: Send + Clone> InjectorWorker<T> {
             let stealer = worker.stealer();
             stealers.push(stealer);
             self.inc_workers();
-            let this = Arc::new(self.clone());
-            let builder = thread::Builder::new().name(format!("Worker {}", self.workers()));
+            let this = self.clone();
             let del = delegate.clone();
+            let builder = thread::Builder::new().name(format!("Worker {}", self.workers()));
 
             if self.options.threshold.is_zero() {
                 builder
-                    .spawn(move || {
-                        this.run_consumer(worker, &del);
-                    })
+                    .spawn(move || this.run_consumer(worker, del))
                     .unwrap();
             } else {
                 builder
-                    .spawn(move || {
-                        this.run_consumer_with_threshold(worker, &del);
-                    })
+                    .spawn(move || this.run_consumer_with_threshold(worker, del))
                     .unwrap();
             }
         }
@@ -243,12 +240,11 @@ impl<T: Send + Clone> InjectorWorker<T> {
     fn run_consumer<S: InjectorWorkerDelegation<T> + Send + Clone + 'static>(
         &self,
         worker: Worker<T>,
-        delegate: &S,
+        delegate: S,
     ) {
         let this = Arc::new(self.clone());
         let global = this.injector.clone();
         let local = Arc::new(Mutex::new(worker));
-        let delegate = delegate.clone();
 
         loop {
             if this.is_cancelled() {
@@ -312,18 +308,16 @@ impl<T: Send + Clone> InjectorWorker<T> {
         drop(this);
         drop(global);
         drop(local);
-        drop(delegate);
     }
 
     fn run_consumer_with_threshold<S: InjectorWorkerDelegation<T> + Send + Clone + 'static>(
         &self,
         worker: Worker<T>,
-        delegate: &S,
+        delegate: S,
     ) {
         let this = Arc::new(self.clone());
         let global = this.injector.clone();
         let local = Arc::new(Mutex::new(worker));
-        let delegate = delegate.clone();
 
         loop {
             if this.is_cancelled() {
@@ -396,7 +390,6 @@ impl<T: Send + Clone> InjectorWorker<T> {
         drop(this);
         drop(global);
         drop(local);
-        drop(delegate);
     }
 
     pub fn stop(&self, enforce: bool) {
@@ -439,13 +432,13 @@ impl<T: Send + Clone> InjectorWorker<T> {
         let finished = self.finished.lock().unwrap();
 
         if !*finished {
-            let _ignored = self.finished_cond.wait(finished).unwrap();
+            let _ignored = self.finishedc.wait(finished).unwrap();
         }
     }
 
     pub async fn wait_async(&self) {
         while !*self.finished.lock().unwrap() {
-            self.finished_notify.notified().await;
+            self.finishedn.notified().await;
             thread::sleep(self.options.pause_timeout);
         }
     }
@@ -461,7 +454,7 @@ impl<T: Send + Clone> InjectorWorker<T> {
 
         while !*finished && start.elapsed() < timeout {
             let result = self
-                .finished_cond
+                .finishedc
                 .wait_timeout(finished, self.options.pause_timeout)
                 .unwrap();
             finished = result.0;
@@ -486,7 +479,7 @@ impl<T: Send + Clone> InjectorWorker<T> {
 
         while !*finished && start.elapsed() < timeout {
             let result = self
-                .finished_cond
+                .finishedc
                 .wait_timeout(finished, self.options.pause_timeout)
                 .unwrap();
             finished = result.0;

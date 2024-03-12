@@ -2,11 +2,14 @@ use std::time::Duration;
 
 pub mod consumer;
 pub mod injector_consumer;
+pub mod mpsc;
 pub mod parallel_consumer;
 pub mod producer_consumer;
 
 const CAPACITY_DEF: usize = 0;
 const THREADS_DEF: usize = 1;
+const THREADS_MIN: usize = 1;
+const THREADS_MAX: usize = 255;
 const QUEUE_BEHAVIOR_DEF: QueueBehavior = QueueBehavior::FIFO;
 const THRESHOLD_DEF: Duration = Duration::ZERO;
 const SLEEP_AFTER_SEND_DEF: Duration = Duration::ZERO;

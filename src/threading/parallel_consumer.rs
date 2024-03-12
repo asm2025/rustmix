@@ -29,7 +29,7 @@ pub struct ParallelOptions {
 impl Default for ParallelOptions {
     fn default() -> Self {
         ParallelOptions {
-            threads: THREADS_DEF,
+            threads: THREADS_DEF.clamp(THREADS_MIN, THREADS_MAX),
             threshold: THRESHOLD_DEF,
             pause_timeout: PAUSE_TIMEOUT_DEF.clamp(PAUSE_TIMEOUT_MIN, PAUSE_TIMEOUT_MAX),
         }
@@ -43,7 +43,7 @@ impl ParallelOptions {
 
     pub fn with_threads(&self, threads: usize) -> Self {
         ParallelOptions {
-            threads: if threads > 0 { threads } else { 1 },
+            threads: threads.clamp(THREADS_MIN, THREADS_MAX),
             ..self.clone()
         }
     }
@@ -60,12 +60,12 @@ impl ParallelOptions {
 pub struct Parallel {
     options: ParallelOptions,
     finished: Arc<Mutex<bool>>,
-    finished_cond: Arc<Condvar>,
-    finished_notify: Arc<Notify>,
+    finishedc: Arc<Condvar>,
+    finishedn: Arc<Notify>,
     completed: Arc<AtomicBool>,
     paused: Arc<AtomicBool>,
     cancelled: Arc<AtomicBool>,
-    running_count: Arc<AtomicUsize>,
+    running: Arc<AtomicUsize>,
 }
 
 impl Parallel {
@@ -74,12 +74,12 @@ impl Parallel {
         Parallel {
             options,
             finished: Arc::new(Mutex::new(false)),
-            finished_cond: Arc::new(Condvar::new()),
-            finished_notify: Arc::new(Notify::new()),
+            finishedc: Arc::new(Condvar::new()),
+            finishedn: Arc::new(Notify::new()),
             completed: Arc::new(AtomicBool::new(false)),
             paused: Arc::new(AtomicBool::new(false)),
             cancelled: Arc::new(AtomicBool::new(false)),
-            running_count: Arc::new(AtomicUsize::new(0)),
+            running: Arc::new(AtomicUsize::new(0)),
         }
     }
 
@@ -87,12 +87,12 @@ impl Parallel {
         Parallel {
             options,
             finished: Arc::new(Mutex::new(false)),
-            finished_cond: Arc::new(Condvar::new()),
-            finished_notify: Arc::new(Notify::new()),
+            finishedc: Arc::new(Condvar::new()),
+            finishedn: Arc::new(Notify::new()),
             completed: Arc::new(AtomicBool::new(false)),
             paused: Arc::new(AtomicBool::new(false)),
             cancelled: Arc::new(AtomicBool::new(false)),
-            running_count: Arc::new(AtomicUsize::new(0)),
+            running: Arc::new(AtomicUsize::new(0)),
         }
     }
 
@@ -109,19 +109,19 @@ impl Parallel {
     }
 
     pub fn is_busy(&self) -> bool {
-        self.running_count.load(Ordering::SeqCst) > 0
+        self.running.load(Ordering::SeqCst) > 0
     }
 
     pub fn running(&self) -> usize {
-        self.running_count.load(Ordering::SeqCst)
+        self.running.load(Ordering::SeqCst)
     }
 
     fn inc_running(&self) {
-        self.running_count.fetch_add(1, Ordering::SeqCst);
+        self.running.fetch_add(1, Ordering::SeqCst);
     }
 
     fn dec_running<T: Send + 'static>(&self, td: &dyn ParallelDelegation<T>) {
-        self.running_count.fetch_sub(1, Ordering::SeqCst);
+        self.running.fetch_sub(1, Ordering::SeqCst);
         self.check_finished(td);
     }
 
@@ -130,8 +130,8 @@ impl Parallel {
             let mut finished = self.finished.lock().unwrap();
             *finished = true;
             td.on_finished(self);
-            self.finished_cond.notify_all();
-            self.finished_notify.notify_waiters();
+            self.finishedc.notify_all();
+            self.finishedn.notify_waiters();
         }
     }
 
@@ -265,13 +265,13 @@ impl Parallel {
         let finished = self.finished.lock().unwrap();
 
         if !*finished {
-            let _ignored = self.finished_cond.wait(finished).unwrap();
+            let _ignored = self.finishedc.wait(finished).unwrap();
         }
     }
 
     pub async fn wait_async(&self) {
         while !*self.finished.lock().unwrap() {
-            self.finished_notify.notified().await;
+            self.finishedn.notified().await;
             thread::sleep(self.options.pause_timeout);
         }
     }
@@ -287,7 +287,7 @@ impl Parallel {
 
         while !*finished && start.elapsed() < timeout {
             let result = self
-                .finished_cond
+                .finishedc
                 .wait_timeout(finished, self.options.pause_timeout)
                 .unwrap();
             finished = result.0;
@@ -312,7 +312,7 @@ impl Parallel {
 
         while !*finished && start.elapsed() < timeout {
             let result = self
-                .finished_cond
+                .finishedc
                 .wait_timeout(finished, self.options.pause_timeout)
                 .unwrap();
             finished = result.0;

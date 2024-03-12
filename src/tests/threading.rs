@@ -10,7 +10,7 @@ use std::{
 
 use crossbeam::sync::WaitGroup;
 use rustmix::threading::{
-    consumer::*, injector_consumer::*, parallel_consumer::*, producer_consumer::*, *,
+    consumer::*, injector_consumer::*, mpsc::*, parallel_consumer::*, producer_consumer::*, *,
 };
 
 const THREADS: usize = 4;
@@ -194,6 +194,45 @@ impl ParallelDelegation<usize> for TaskHandler {
     }
 
     fn on_finished(&self, _pc: &Parallel) {
+        println!(
+            "Got: {} tasks and finished {} tasks.",
+            self.task_count.load(Ordering::SeqCst),
+            self.done_count.load(Ordering::SeqCst)
+        );
+    }
+}
+
+impl MPSCDelegation<usize> for TaskHandler {
+    fn process(&self, _pc: &MPSC<usize>, item: &usize) -> Result<TaskResult, Box<dyn Error>> {
+        let thread = thread::current();
+        let thread_name = thread.name().unwrap_or(THREADS_NAME);
+        self.task_count.fetch_add(1, Ordering::SeqCst);
+        println!("Item: {} in thread: {}", item, thread_name);
+
+        if item % 5 == 0 {
+            return Ok(TaskResult::Error(format!(
+                "Item {}. Multiples of 5 are not allowed",
+                item
+            )));
+        } else if item % 3 == 0 {
+            return Ok(TaskResult::TimedOut);
+        }
+
+        Ok(TaskResult::Success)
+    }
+
+    fn on_completed(&self, _pc: &MPSC<usize>, item: &usize, result: TaskResult) -> bool {
+        let thread = thread::current();
+        let thread_name = thread.name().unwrap_or(THREADS_NAME);
+        self.done_count.fetch_add(1, Ordering::SeqCst);
+        println!(
+            "Result item: {}: {:?} in thread: {}",
+            item, result, thread_name
+        );
+        true
+    }
+
+    fn on_finished(&self, _pc: &MPSC<usize>) {
         println!(
             "Got: {} tasks and finished {} tasks.",
             self.task_count.load(Ordering::SeqCst),
