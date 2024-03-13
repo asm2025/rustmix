@@ -6,7 +6,7 @@ mod tests;
 async fn main() -> Result<(), Box<dyn Error>> {
     dotenv::dotenv().ok();
 
-    // tests::io::test_path_func()?;
+    tests::io::test_path_func()?;
     // tests::io::test_directory_func()?;
     // tests::io::test_file_func()?;
 
