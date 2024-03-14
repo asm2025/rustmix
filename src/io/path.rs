@@ -25,7 +25,7 @@ pub fn remove(path: &PathBuf, n: usize) -> PathBuf {
     buffer
 }
 
-pub fn create(value: &str) -> PathBuf {
+pub fn from(value: &str) -> PathBuf {
     let mut buffer = PathBuf::new();
 
     if !value.is_empty() {

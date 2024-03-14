@@ -16,19 +16,21 @@ use super::{get_employees, print_batch, Employee};
 pub fn test_path_func() -> Result<(), Box<dyn Error>> {
     println!("\nTesting path functions...");
 
-    let path = path::create(r"C:\").join("MyFile.txt");
+    let curdir = directory::current().into_os_string().into_string().unwrap();
+
+    let path = path::from(&curdir).join("MyFile.txt");
     println!("{}", path.display());
 
-    let path = path::create(r"C:\").join("My Folder").join("MyFile.txt");
+    let path = path::from(&curdir).join("My Folder").join("MyFile.txt");
     println!("{}", path.display());
 
-    let path = path::create(r"C:\")
+    let path = path::from(&curdir)
         .join("My Folder")
         .join("My Subfolder")
         .join("MyFile.txt");
     println!("{}", path.display());
 
-    let path: PathBuf = [r"C:\", "My Folder", "My Subfolder", "", "NonEmpty"]
+    let path: PathBuf = [&curdir, "My Folder", "My Subfolder", "", "NonEmpty"]
         .iter()
         .collect();
     println!("{}", path.display());
@@ -40,7 +42,7 @@ pub fn test_directory_func() -> Result<(), Box<dyn Error>> {
 
     let curdir = directory::current();
     let original_path_len = curdir.components().count();
-    let path = path::create(curdir.to_str().unwrap())
+    let path = path::from(curdir.to_str().unwrap())
         .join("My Folder")
         .join("My Subfolder")
         .join("NonEmpty");
@@ -90,7 +92,7 @@ pub fn test_file_func() -> Result<(), Box<dyn Error>> {
 
     let curdir = directory::current();
     let original_path_len = curdir.components().count();
-    let mut path = path::create(curdir.to_str().unwrap())
+    let mut path = path::from(curdir.to_str().unwrap())
         .join("My Folder")
         .join("My Subfolder")
         .join("NonEmpty");
