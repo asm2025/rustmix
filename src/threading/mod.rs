@@ -2,7 +2,6 @@ use std::time::Duration;
 
 pub mod consumer;
 pub mod injector_consumer;
-pub mod mpsc;
 pub mod parallel_consumer;
 pub mod producer_consumer;
 

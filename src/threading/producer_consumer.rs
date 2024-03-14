@@ -304,7 +304,7 @@ impl<T: Send + Clone> ProducerConsumer<T> {
         let finished = self.finished.lock().unwrap();
 
         if !*finished {
-            let _ = self.finishedc.wait(finished).unwrap();
+            drop(self.finishedc.wait(finished).unwrap());
         }
     }
 
