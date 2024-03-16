@@ -1,46 +1,34 @@
-use std::{borrow::Cow, string::FromUtf8Error};
 pub use url::{ParseError, Url};
 use urlencoding::{decode, encode};
 
-use crate::string::StringEx;
-
-pub fn url_encode(value: &str) -> Cow<str> {
-    encode(value)
+pub fn url_encode<T: AsRef<str>>(value: T) -> String {
+    encode(value.as_ref()).to_string()
 }
 
-pub fn url_decode(value: &str) -> Result<Cow<str>, FromUtf8Error> {
-    decode(value)
+pub fn url_decode<T: AsRef<str>>(value: T) -> String {
+    decode(value.as_ref()).unwrap().to_string()
 }
 
-pub fn create(value: &str) -> Result<Url, ParseError> {
-    let url = value.trim_many(&['/', ' ']);
-
-    if url.is_empty() {
-        return Err(ParseError::EmptyHost);
-    }
-
-    match Url::parse(&url) {
-        Ok(url) => Ok(url),
-        Err(ParseError::RelativeUrlWithoutBase) => {
-            let url = format!("http://localhost/{}", url);
-            Url::parse(&url)
-        }
-        Err(e) => Err(e),
-    }
+pub fn create<T: AsRef<str>>(value: T) -> Url {
+    Url::parse(value.as_ref()).unwrap()
 }
 
-pub fn join(base: &Url, path: &str) -> Result<Url, ParseError> {
-    if path.is_empty() {
-        return Ok(base.to_owned());
+pub fn join<T: AsRef<str>>(base: &Url, value: T) -> Url {
+    let value = value.as_ref();
+
+    if value.is_empty() {
+        return base.to_owned();
     }
 
     let url = base.clone();
-    url.join(path)
+    url.join(value.as_ref()).unwrap()
 }
 
-pub fn remove(url: &mut Url, path: &str) {
-    if path.is_empty() {
+pub fn remove<T: AsRef<str>>(url: &mut Url, value: T) {
+    let value = value.as_ref();
+
+    if value.is_empty() {
         return;
     }
-    url.set_path(&url.path().replace(path, ""));
+    url.set_path(&url.path().replace(value, ""));
 }

@@ -13,7 +13,7 @@ use rustmix::io::{
 
 use super::{get_employees, print_batch, Employee};
 
-pub fn test_path_func() -> Result<(), Box<dyn Error>> {
+pub fn test_path() -> Result<(), Box<dyn Error>> {
     println!("\nTesting path functions...");
 
     let curdir = directory::current().into_os_string().into_string().unwrap();
@@ -37,7 +37,7 @@ pub fn test_path_func() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn test_directory_func() -> Result<(), Box<dyn Error>> {
+pub fn test_directory() -> Result<(), Box<dyn Error>> {
     println!("\nTesting directory functions...");
 
     let curdir = directory::current();
@@ -87,7 +87,7 @@ pub fn test_directory_func() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn test_file_func() -> Result<(), Box<dyn Error>> {
+pub fn test_file() -> Result<(), Box<dyn Error>> {
     println!("\nTesting file functions...");
 
     let curdir = directory::current();
