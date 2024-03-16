@@ -1,5 +1,4 @@
 pub mod http;
-pub mod mail;
 pub mod url;
 
 use reqwest::header;

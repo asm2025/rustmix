@@ -1,11 +1,7 @@
-use std::{
-    collections::HashMap,
-    error::Error,
-    io::{self, Read},
-};
+use std::{collections::HashMap, error::Error};
 
 use super::{get_employees, Employee};
-use rustmix::web::{http::Response, mail, url, *};
+use rustmix::web::{http::Response, url, *};
 
 pub fn test_url() -> Result<(), Box<dyn Error>> {
     println!("\nTesting Url functions...");
@@ -75,23 +71,6 @@ pub async fn test_reqwest() -> Result<(), Box<dyn Error>> {
         //.text()
         .await?;
     println!("response: {response:#?}");
-
-    Ok(())
-}
-
-pub async fn test_tmp_mail() -> Result<(), Box<dyn Error>> {
-    println!("\nTesting Temp Mail functions...");
-
-    let email = mail::get_temp_mail();
-    println!("Email: {}@{}", email.username, email.domain);
-
-    println!("Enter the email: ");
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-
-    let email = mail::get_temp_mail_from(&input.trim());
-    let otp = mail::get_temp_mail_otp(&email, "neryuz@outlook.com", "My OTP is ", 14).await?;
-    println!("OTP: {}", otp);
 
     Ok(())
 }

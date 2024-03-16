@@ -12,7 +12,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     //tests::web::test_url()?;
     //tests::web::test_reqwest().await?;
-    tests::web::test_tmp_mail().await?;
+
+    tests::mail::test_tmp_mail().await?;
 
     //tests::threading::test_producer_consumer().await?;
     //tests::threading::test_consumer().await?;

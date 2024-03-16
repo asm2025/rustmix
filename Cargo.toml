@@ -19,6 +19,7 @@ url = { version = "2", features = ["serde"] }
 urlencoding = "2"
 rayon = "1"
 ua_generator = "0"
+lettre = "0"
 tempmail = "0"
 
 [dependencies.pyo3]
