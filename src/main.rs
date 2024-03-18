@@ -15,7 +15,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     //tests::mail::test_secmail().await?;
     //tests::mail::test_emailfake().await?;
-    tests::mail::test_tempmail().await?;
+    //tests::mail::test_tempmail().await?;
 
     //tests::threading::test_producer_consumer().await?;
     //tests::threading::test_consumer().await?;
