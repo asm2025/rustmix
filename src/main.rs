@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     //tests::threading::test_injector_worker().await?;
     //tests::threading::test_parallel().await?;
 
-    //tests::python::test_python();
+    tests::python::test_python();
 
     Ok(())
 }
