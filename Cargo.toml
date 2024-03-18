@@ -21,10 +21,11 @@ rayon = "1"
 ua_generator = "0"
 lettre = "0"
 tempmail = "0"
-
-[dependencies.pyo3]
-version = "0.20.3"
-features = ["auto-initialize"]
+regex = "1"
+once_cell = "1"
+chrono = "0"
+html-entities = "0"
+# pyo3 = { version = "0", features = ["auto-initialize"] }
 
 [package.metadata.scripts]
 run = "cargo run"

@@ -1,28 +1,69 @@
+use chrono::{NaiveDateTime, NaiveTime, Utc};
+use html_entities::decode_html_entities;
+use once_cell::sync::Lazy;
+use regex::Regex;
+use serde::Serialize;
+use serde_json::{json, Value};
 use std::error::Error;
-use tempmail::{Domain, Tempmail as TempMail};
 
-pub struct Tempmail {
-    email: TempMail,
+use super::super::web::build_client_for_api;
+
+const BASE_URL: &str = "https://api.internal.temp-mail.io/api/v3/email/";
+
+static __HTTP_CLIENT: Lazy<reqwest::Client> = Lazy::new(|| build_client_for_api().build().unwrap());
+
+#[derive(Serialize)]
+struct NewNameLengeth {
+    #[serde(rename = "min_name_length")]
+    min: usize,
+    #[serde(rename = "max_name_length")]
+    max: usize,
 }
 
-impl Tempmail {
-    pub fn new() -> Self {
-        Tempmail {
-            email: TempMail::random(),
+pub struct TempMail {
+    username: String,
+    domain: String,
+}
+
+impl TempMail {
+    pub fn new(username: &str, domain: &str) -> Self {
+        if username.is_empty() {
+            panic!("username is empty");
+        }
+
+        if domain.is_empty() {
+            panic!("domain is empty");
+        }
+
+        TempMail {
+            username: username.to_string(),
+            domain: domain.to_string(),
         }
     }
 
-    pub fn from(email: TempMail) -> Self {
-        Tempmail { email }
+    pub async fn random() -> Result<Self, Box<dyn Error>> {
+        let url = format!("{}{}", BASE_URL, "new");
+        let json: Value = __HTTP_CLIENT
+            .post(&url)
+            .json(&json!(NewNameLengeth { min: 4, max: 32 }))
+            .send()
+            .await?
+            .json()
+            .await?;
+
+        match json {
+            Value::Object(map) => {
+                let email = map.get("email").unwrap().as_str().unwrap();
+                Ok(Self::parse(email))
+            }
+            _ => panic!("Invalid response"),
+        }
     }
 
-    pub fn from_domain(user_name: &str, domain: Domain) -> Self {
-        if user_name.is_empty() {
-            panic!("user_name is empty");
-        }
-
-        Tempmail {
-            email: TempMail::new(user_name, Some(domain)),
+    pub fn from(email: &TempMail) -> Self {
+        TempMail {
+            username: email.username.clone(),
+            domain: email.domain.clone(),
         }
     }
 
@@ -33,32 +74,31 @@ impl Tempmail {
 
         if let Some(index) = email.find('@') {
             let (username, domain) = email.split_at(index);
-            let domain = domain_from_str(&domain[1..]).unwrap();
-            Tempmail::from(TempMail::new(username, Some(domain)))
+            TempMail {
+                username: username.to_string(),
+                domain: domain[1..].to_string(),
+            }
         } else {
             panic!("email is invalid");
         }
     }
 
-    pub fn username(&self) -> &String {
-        &self.email.username
+    pub fn username(&self) -> &str {
+        &self.username
     }
 
-    pub fn domain(&self) -> &Domain {
-        &self.email.domain
+    pub fn domain(&self) -> &str {
+        &self.domain
     }
 
     pub fn address(&self) -> String {
-        format!("{}@{}", self.email.username, self.email.domain)
+        format!("{}@{}", self.username, self.domain)
     }
 
-    pub fn set_email(&mut self, email: TempMail) {
-        self.email = email;
-    }
-
-    pub async fn get_otp(
+    pub async fn find_string(
         &self,
-        from: &str,
+        from: Option<&str>,
+        date: Option<NaiveDateTime>,
         expected: &str,
         size: usize,
     ) -> Result<String, Box<dyn Error>> {
@@ -66,48 +106,61 @@ impl Tempmail {
             panic!("Expected is empty");
         }
 
-        if from.is_empty() {
-            panic!("From is empty");
-        }
-
         if size == 0 {
             panic!("Size is zero");
         }
 
-        let messages = self.email.get_messages().await?;
+        let from = match from {
+            Some(from) => from.to_lowercase(),
+            None => "".to_owned(),
+        };
+        let date_min =
+            date.unwrap_or_else(|| NaiveDateTime::new(Utc::now().date_naive(), NaiveTime::MIN));
+        let url = format!("{}{}{}", BASE_URL, self.address(), "/messages");
+        let json: Value = __HTTP_CLIENT.get(&url).send().await?.json().await?;
 
-        if messages.is_empty() {
-            return Ok("".to_string());
-        }
-
-        if let Some(message) = messages.iter().find(|m| m.from.contains(expected)) {
-            let otp = match message.body.find(expected) {
-                Some(index) => {
-                    let start = index + expected.len() + 1;
-                    let end = start + size;
-                    message.body[start..end].to_string()
+        match json {
+            Value::Array(messages) => {
+                if messages.is_empty() {
+                    return Ok("".to_string());
                 }
-                None => "".to_string(),
-            };
-            return Ok(otp);
+
+                if let Some(raw_message) = messages.iter().rev().find(|m| {
+                    (from.is_empty() || m["from"].as_str().unwrap_or("").contains(&from))
+                        && NaiveDateTime::parse_from_str(
+                            m["created_at"].as_str().unwrap(),
+                            "%Y-%m-%dT%H:%M:%S%.fZ",
+                        )
+                        .unwrap()
+                            > date_min
+                }) {
+                    let body = raw_message["body_text"].as_str().unwrap_or("");
+                    let str = match &body.find(expected) {
+                        Some(index) => {
+                            let index = index + expected.len();
+
+                            let size = if size + index < body.len() {
+                                size
+                            } else {
+                                body.len() - index
+                            };
+
+                            if size == 0 {
+                                return Ok("".to_string());
+                            }
+
+                            let text = &body[index..];
+                            let text = text.chars().take(size).collect::<String>();
+                            return Ok(text);
+                        }
+                        None => "".to_string(),
+                    };
+                    Ok(str)
+                } else {
+                    Ok("".to_string())
+                }
+            }
+            _ => panic!("Invalid response"),
         }
-
-        Ok("".to_string())
-    }
-}
-
-fn domain_from_str(s: &str) -> Result<Domain, std::io::Error> {
-    match s.to_lowercase().as_str() {
-        "1secmail.com" => Ok(Domain::SecMailCom),
-        "1secmail.org" => Ok(Domain::SecMailOrg),
-        "1secmail.net" => Ok(Domain::SecMailNet),
-        "wwjmp.com" => Ok(Domain::WwjmpCom),
-        "esiix.com" => Ok(Domain::EsiixCom),
-        "xojxe.com" => Ok(Domain::XojxeCom),
-        "yoggm.com" => Ok(Domain::YoggmCom),
-        _ => Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "Invalid domain",
-        )),
     }
 }

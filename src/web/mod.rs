@@ -25,6 +25,7 @@ pub fn build_client() -> reqwest::ClientBuilder {
         })
         .user_agent(get_user_agent())
         .cookie_store(true)
+        .pool_max_idle_per_host(0)
         .timeout(std::time::Duration::from_secs(30))
 }
 
