@@ -15,6 +15,7 @@ use super::*;
 
 pub trait ConsumerDelegation<T: Send + Clone + 'static> {
     fn process(&self, pc: &Consumer<T>, item: &T) -> Result<TaskResult>;
+    fn on_started(&self, pc: &Consumer<T>);
     fn on_completed(&self, pc: &Consumer<T>, item: &T, result: TaskResult) -> bool;
     fn on_finished(&self, pc: &Consumer<T>);
 }
@@ -72,6 +73,7 @@ pub struct Consumer<T: Send + Clone + 'static> {
     options: ConsumerOptions,
     items: Arc<Mutex<LinkedList<T>>>,
     items_cond: Arc<Condvar>,
+    started: Arc<Mutex<bool>>,
     finished: Arc<Mutex<bool>>,
     finishedc: Arc<Condvar>,
     finishedn: Arc<Notify>,
@@ -89,6 +91,7 @@ impl<T: Send + Clone> Consumer<T> {
             options: options,
             items: Arc::new(Mutex::new(LinkedList::new())),
             items_cond: Arc::new(Condvar::new()),
+            started: Arc::new(Mutex::new(false)),
             finished: Arc::new(Mutex::new(false)),
             finishedc: Arc::new(Condvar::new()),
             finishedn: Arc::new(Notify::new()),
@@ -105,6 +108,7 @@ impl<T: Send + Clone> Consumer<T> {
             options: options,
             items: Arc::new(Mutex::new(LinkedList::new())),
             items_cond: Arc::new(Condvar::new()),
+            started: Arc::new(Mutex::new(false)),
             finished: Arc::new(Mutex::new(false)),
             finishedc: Arc::new(Condvar::new()),
             finishedn: Arc::new(Notify::new()),
@@ -118,6 +122,21 @@ impl<T: Send + Clone> Consumer<T> {
 
     pub fn is_empty(&self) -> bool {
         self.items.lock().unwrap().is_empty()
+    }
+
+    pub fn is_started(&self) -> bool {
+        *self.started.lock().unwrap()
+    }
+
+    fn set_started(&self, value: bool) -> bool {
+        let mut started = self.started.lock().unwrap();
+
+        if *started && value {
+            return false;
+        }
+
+        *started = true;
+        true
     }
 
     pub fn is_completed(&self) -> bool {
@@ -160,6 +179,7 @@ impl<T: Send + Clone> Consumer<T> {
             let mut finished = self.finished.lock().unwrap();
             *finished = true;
             td.on_finished(self);
+            self.set_started(false);
             self.finishedc.notify_all();
             self.finishedn.notify_waiters();
         }
@@ -184,6 +204,10 @@ impl<T: Send + Clone> Consumer<T> {
 
         if self.is_completed() && self.is_empty() {
             panic!("Queue is already completed.")
+        }
+
+        if self.set_started(true) {
+            delegate.on_started(self);
         }
 
         self.inc_consumers();

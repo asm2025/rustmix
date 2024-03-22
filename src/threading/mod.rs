@@ -3,7 +3,7 @@ pub mod injector_consumer;
 pub mod parallel_consumer;
 pub mod producer_consumer;
 
-use std::time::Duration;
+use std::{fmt, time::Duration};
 
 const CAPACITY_DEF: usize = 0;
 const THREADS_DEF: usize = 1;
@@ -29,9 +29,30 @@ pub enum TaskResult {
     Success,
 }
 
+impl fmt::Display for TaskResult {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            TaskResult::Cancelled => write!(f, "Cancelled"),
+            TaskResult::TimedOut => write!(f, "Timedout"),
+            TaskResult::Error(e) => write!(f, "Error: {}", e),
+            TaskResult::Success => write!(f, "Success"),
+            _ => Ok(()),
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum QueueBehavior {
     #[default]
     FIFO,
     LIFO,
+}
+
+impl fmt::Display for QueueBehavior {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            QueueBehavior::FIFO => write!(f, "FIFO"),
+            QueueBehavior::LIFO => write!(f, "LIFO"),
+        }
+    }
 }

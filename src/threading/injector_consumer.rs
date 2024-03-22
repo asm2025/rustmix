@@ -15,6 +15,7 @@ use super::*;
 
 pub trait InjectorWorkerDelegation<T: Send + Clone + 'static> {
     fn process(&self, pc: &InjectorWorker<T>, item: &T) -> Result<TaskResult>;
+    fn on_started(&self, pc: &InjectorWorker<T>);
     fn on_completed(&self, pc: &InjectorWorker<T>, item: &T, result: TaskResult) -> bool;
     fn on_finished(&self, pc: &InjectorWorker<T>);
 }
@@ -214,6 +215,7 @@ impl<T: Send + Clone> InjectorWorker<T> {
             return;
         }
 
+        delegate.on_started(self);
         let mut stealers = self.stealers.lock().unwrap();
 
         for _ in 0..self.options.threads {

@@ -15,6 +15,7 @@ use super::*;
 
 pub trait ParallelDelegation<T: Send + 'static> {
     fn process(&self, pc: &Parallel, item: &T) -> Result<TaskResult>;
+    fn on_started(&self, pc: &Parallel);
     fn on_completed(&self, pc: &Parallel, item: &T, result: TaskResult) -> bool;
     fn on_finished(&self, pc: &Parallel);
 }
@@ -59,6 +60,7 @@ impl ParallelOptions {
 #[derive(Clone, Debug)]
 pub struct Parallel {
     options: ParallelOptions,
+    started: Arc<Mutex<bool>>,
     finished: Arc<Mutex<bool>>,
     finishedc: Arc<Condvar>,
     finishedn: Arc<Notify>,
@@ -73,6 +75,7 @@ impl Parallel {
         let options: ParallelOptions = Default::default();
         Parallel {
             options,
+            started: Arc::new(Mutex::new(false)),
             finished: Arc::new(Mutex::new(false)),
             finishedc: Arc::new(Condvar::new()),
             finishedn: Arc::new(Notify::new()),
@@ -86,6 +89,7 @@ impl Parallel {
     pub fn with_options(options: ParallelOptions) -> Self {
         Parallel {
             options,
+            started: Arc::new(Mutex::new(false)),
             finished: Arc::new(Mutex::new(false)),
             finishedc: Arc::new(Condvar::new()),
             finishedn: Arc::new(Notify::new()),
@@ -94,6 +98,21 @@ impl Parallel {
             cancelled: Arc::new(AtomicBool::new(false)),
             running: Arc::new(AtomicUsize::new(0)),
         }
+    }
+
+    pub fn is_started(&self) -> bool {
+        *self.started.lock().unwrap()
+    }
+
+    fn set_started(&self, value: bool) -> bool {
+        let mut started = self.started.lock().unwrap();
+
+        if *started && value {
+            return false;
+        }
+
+        *started = true;
+        true
     }
 
     pub fn is_completed(&self) -> bool {
@@ -130,6 +149,7 @@ impl Parallel {
             let mut finished = self.finished.lock().unwrap();
             *finished = true;
             td.on_finished(self);
+            self.set_started(false);
             self.finishedc.notify_all();
             self.finishedn.notify_waiters();
         }
@@ -146,6 +166,10 @@ impl Parallel {
     ) {
         if self.is_cancelled() {
             panic!("Queue is already cancelled.")
+        }
+
+        if self.set_started(true) {
+            delegate.on_started(self);
         }
 
         if self.options.threshold.is_zero() {

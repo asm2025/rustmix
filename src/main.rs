@@ -24,7 +24,7 @@ async fn main() -> Result<()> {
 
     //tests::python::test_python();
 
-    tests::ai::test_whisper().await?;
+    //tests::ai::test_whisper().await?;
 
     Ok(())
 }

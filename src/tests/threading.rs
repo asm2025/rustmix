@@ -33,6 +33,10 @@ impl TaskHandler {
 }
 
 impl ProducerConsumerDelegation<usize> for TaskHandler {
+    fn on_started(&self, pc: &ProducerConsumer<usize>) {
+        println!("Producer/Consumer started");
+    }
+
     fn process(&self, _pc: &ProducerConsumer<usize>, item: &usize) -> Result<TaskResult> {
         let thread = thread::current();
         let thread_name = thread.name().unwrap_or(THREADS_NAME);
@@ -78,6 +82,10 @@ impl ProducerConsumerDelegation<usize> for TaskHandler {
 }
 
 impl ConsumerDelegation<usize> for TaskHandler {
+    fn on_started(&self, pc: &Consumer<usize>) {
+        println!("Consumer started");
+    }
+
     fn process(&self, _pc: &Consumer<usize>, item: &usize) -> Result<TaskResult> {
         let thread = thread::current();
         let thread_name = thread.name().unwrap_or(THREADS_NAME);
@@ -117,6 +125,10 @@ impl ConsumerDelegation<usize> for TaskHandler {
 }
 
 impl InjectorWorkerDelegation<usize> for TaskHandler {
+    fn on_started(&self, pc: &InjectorWorker<usize>) {
+        println!("Injector/Worker started");
+    }
+
     fn process(&self, _pc: &InjectorWorker<usize>, item: &usize) -> Result<TaskResult> {
         let thread = thread::current();
         let thread_name = thread.name().unwrap_or(THREADS_NAME);
@@ -156,6 +168,10 @@ impl InjectorWorkerDelegation<usize> for TaskHandler {
 }
 
 impl ParallelDelegation<usize> for TaskHandler {
+    fn on_started(&self, pc: &Parallel) {
+        println!("Parallel started");
+    }
+
     fn process(&self, _pc: &Parallel, item: &usize) -> Result<TaskResult> {
         let thread = thread::current();
         let thread_name = thread.name().unwrap_or(THREADS_NAME);
