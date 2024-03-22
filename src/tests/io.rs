@@ -1,6 +1,6 @@
+use anyhow::Result;
 use rand::{distributions::Alphanumeric, Rng};
 use std::{
-    error::Error,
     io::{LineWriter, Write},
     path::PathBuf,
 };
@@ -13,7 +13,7 @@ use rustmix::io::{
 
 use super::{get_employees, print_batch, Employee};
 
-pub fn test_path() -> Result<(), Box<dyn Error>> {
+pub fn test_path() -> Result<()> {
     println!("\nTesting path functions...");
 
     let curdir = directory::current().into_os_string().into_string().unwrap();
@@ -37,7 +37,7 @@ pub fn test_path() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn test_directory() -> Result<(), Box<dyn Error>> {
+pub fn test_directory() -> Result<()> {
     println!("\nTesting directory functions...");
 
     let curdir = directory::current();
@@ -87,7 +87,7 @@ pub fn test_directory() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn test_file() -> Result<(), Box<dyn Error>> {
+pub fn test_file() -> Result<()> {
     println!("\nTesting file functions...");
 
     let curdir = directory::current();

@@ -1,10 +1,11 @@
+use anyhow::Result;
 use csv::{ReaderBuilder, WriterBuilder};
-pub use serde::{de, Deserialize, Serialize};
-pub use serde_json;
-use std::{error::Error, fs};
-pub use std::{
+use serde::{de, Serialize};
+use serde_json;
+use std::fs;
+use std::{
     fs::OpenOptions,
-    io::{BufRead, BufReader, Result as ioResult, Write},
+    io::{BufRead, BufReader, Write},
     path::Path,
 };
 
@@ -24,16 +25,13 @@ pub fn exists<T: AsRef<Path>>(path: T) -> bool {
     path.exists() && path.is_file()
 }
 
-pub fn open<T: AsRef<Path>>(path: T) -> ioResult<std::fs::File> {
+pub fn open<T: AsRef<Path>>(path: T) -> Result<std::fs::File> {
     let mut opt = OpenOptions::new();
     opt.read(true);
     from_options(path, &opt)
 }
 
-pub fn create<T: AsRef<Path>>(
-    path: T,
-    options: Option<FileOpenOptions>,
-) -> ioResult<std::fs::File> {
+pub fn create<T: AsRef<Path>>(path: T, options: Option<FileOpenOptions>) -> Result<std::fs::File> {
     let path = path.as_ref();
     let dir = path.parent().unwrap();
     directory::ensure(dir)?;
@@ -50,32 +48,32 @@ pub fn create<T: AsRef<Path>>(
     from_options(path, &opt)
 }
 
-pub fn from_options<T: AsRef<Path>>(path: T, options: &OpenOptions) -> ioResult<std::fs::File> {
+pub fn from_options<T: AsRef<Path>>(path: T, options: &OpenOptions) -> Result<std::fs::File> {
     let path = path.as_ref();
-    options.open(path)
+    options.open(path).map_err(Into::into)
 }
 
-pub fn delete<T: AsRef<Path>>(path: T) -> ioResult<()> {
+pub fn delete<T: AsRef<Path>>(path: T) -> Result<()> {
     let path = path.as_ref();
 
     if !path.exists() {
         return Ok(());
     }
 
-    fs::remove_file(path)
+    fs::remove_file(path).map_err(Into::into)
 }
 
 pub trait FileEx {
-    fn read<'a>(&'a self) -> ioResult<impl Iterator<Item = String> + 'a>;
+    fn read<'a>(&'a self) -> Result<impl Iterator<Item = String> + 'a>;
     fn read_filtered<'a, F: Fn(&str) -> bool + 'static>(
         &'a self,
         filter: F,
-    ) -> ioResult<impl Iterator<Item = String> + 'a>;
+    ) -> Result<impl Iterator<Item = String> + 'a>;
     fn read_batch<'a, R: Fn(u32, Vec<String>) -> bool + 'static>(
         &'a self,
         batch: usize,
         callback: R,
-    ) -> ioResult<u32>;
+    ) -> Result<u32>;
     fn read_batch_filtered<
         'a,
         F: Fn(&str) -> bool + 'static,
@@ -85,15 +83,11 @@ pub trait FileEx {
         batch: usize,
         filter: F,
         callback: R,
-    ) -> ioResult<u32>;
-    fn write<'a, T: AsRef<str>>(&'a mut self, data: &'a T) -> ioResult<()>;
-    fn write_lines<'a, T: AsRef<str>>(&'a mut self, data: impl Iterator<Item = T>) -> ioResult<()>;
-    fn read_json<'a, T: de::DeserializeOwned>(&'a self) -> Result<T, Box<dyn Error>>;
-    fn write_json<'a, T: Serialize>(
-        &'a mut self,
-        data: &'a T,
-        pretty: Option<bool>,
-    ) -> Result<(), Box<dyn Error>>;
+    ) -> Result<u32>;
+    fn write<'a, T: AsRef<str>>(&'a mut self, data: &'a T) -> Result<()>;
+    fn write_lines<'a, T: AsRef<str>>(&'a mut self, data: impl Iterator<Item = T>) -> Result<()>;
+    fn read_json<'a, T: de::DeserializeOwned>(&'a self) -> Result<T>;
+    fn write_json<'a, T: Serialize>(&'a mut self, data: &'a T, pretty: Option<bool>) -> Result<()>;
     fn create_delimited_reader<'a>(
         &'a mut self,
         delimiter: Option<u8>,
@@ -107,7 +101,7 @@ pub trait FileEx {
 }
 
 impl FileEx for std::fs::File {
-    fn read(&self) -> ioResult<impl Iterator<Item = String>> {
+    fn read(&self) -> Result<impl Iterator<Item = String>> {
         let reader = BufReader::new(self);
         Ok(reader
             .lines()
@@ -118,7 +112,7 @@ impl FileEx for std::fs::File {
     fn read_filtered<'a, F: Fn(&str) -> bool + 'static>(
         &'a self,
         filter: F,
-    ) -> ioResult<impl Iterator<Item = String> + 'a> {
+    ) -> Result<impl Iterator<Item = String> + 'a> {
         let reader = BufReader::new(self);
         Ok(reader
             .lines()
@@ -130,7 +124,7 @@ impl FileEx for std::fs::File {
         &'a self,
         batch: usize,
         callback: R,
-    ) -> ioResult<u32> {
+    ) -> Result<u32> {
         let batch = if batch == 0 {
             LINES_BUFFER_DEFAULT
         } else {
@@ -185,7 +179,7 @@ impl FileEx for std::fs::File {
         batch: usize,
         filter: F,
         callback: R,
-    ) -> ioResult<u32> {
+    ) -> Result<u32> {
         let batch = if batch == 0 {
             LINES_BUFFER_DEFAULT
         } else {
@@ -231,11 +225,11 @@ impl FileEx for std::fs::File {
         Ok(batch_number)
     }
 
-    fn write<'a, T: AsRef<str>>(&'a mut self, data: &'a T) -> ioResult<()> {
-        writeln!(self, "{}", data.as_ref())
+    fn write<'a, T: AsRef<str>>(&'a mut self, data: &'a T) -> Result<()> {
+        writeln!(self, "{}", data.as_ref()).map_err(Into::into)
     }
 
-    fn write_lines<'a, T: AsRef<str>>(&'a mut self, data: impl Iterator<Item = T>) -> ioResult<()> {
+    fn write_lines<'a, T: AsRef<str>>(&'a mut self, data: impl Iterator<Item = T>) -> Result<()> {
         for line in data.into_iter() {
             writeln!(self, "{}", line.as_ref())?;
         }
@@ -243,17 +237,13 @@ impl FileEx for std::fs::File {
         Ok(())
     }
 
-    fn read_json<'a, T: de::DeserializeOwned>(&'a self) -> Result<T, Box<dyn Error>> {
+    fn read_json<'a, T: de::DeserializeOwned>(&'a self) -> Result<T> {
         let reader = BufReader::new(self);
         let data: T = serde_json::from_reader(reader)?;
         Ok(data)
     }
 
-    fn write_json<'a, T: Serialize>(
-        &'a mut self,
-        data: &'a T,
-        pretty: Option<bool>,
-    ) -> Result<(), Box<dyn Error>> {
+    fn write_json<'a, T: Serialize>(&'a mut self, data: &'a T, pretty: Option<bool>) -> Result<()> {
         let serialize = match pretty {
             Some(true) => serde_json::to_string_pretty,
             _ => serde_json::to_string,

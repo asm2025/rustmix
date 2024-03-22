@@ -1,6 +1,6 @@
+use anyhow::Result;
 use rayon::{prelude::*, ThreadPoolBuilder};
 use std::{
-    error::Error,
     future::Future,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -14,7 +14,7 @@ use tokio::sync::Notify;
 use super::*;
 
 pub trait ParallelDelegation<T: Send + 'static> {
-    fn process(&self, pc: &Parallel, item: &T) -> Result<TaskResult, Box<dyn Error>>;
+    fn process(&self, pc: &Parallel, item: &T) -> Result<TaskResult>;
     fn on_completed(&self, pc: &Parallel, item: &T, result: TaskResult) -> bool;
     fn on_finished(&self, pc: &Parallel);
 }

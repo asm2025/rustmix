@@ -1,14 +1,12 @@
-use std::{
-    error::Error,
-    io::{self, Write},
-};
+use anyhow::Result;
+use std::io::{self, Write};
 
 use rustmix::mail::{emailfake::EmailFake, secmail::SecMail, tempmail::TempMail};
 
 const PREFIX: &str = "My string is ";
 const PREFIX_LEN: usize = 14;
 
-pub async fn test_secmail() -> Result<(), Box<dyn Error>> {
+pub async fn test_secmail() -> Result<()> {
     println!("\nTesting SecMail functions...");
 
     let mut email = SecMail::random();
@@ -40,7 +38,7 @@ pub async fn test_secmail() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub async fn test_emailfake() -> Result<(), Box<dyn Error>> {
+pub async fn test_emailfake() -> Result<()> {
     println!("\nTesting EmailFake functions...");
 
     let mut email = EmailFake::random().await?;
@@ -72,7 +70,7 @@ pub async fn test_emailfake() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub async fn test_tempmail() -> Result<(), Box<dyn Error>> {
+pub async fn test_tempmail() -> Result<()> {
     println!("\nTesting TempMail functions...");
 
     let mut email = TempMail::random().await?;

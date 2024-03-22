@@ -1,6 +1,6 @@
+use anyhow::Result;
 use crossbeam::deque::{Injector, Steal, Stealer, Worker};
 use std::{
-    error::Error,
     future::Future,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -14,7 +14,7 @@ use tokio::sync::Notify;
 use super::*;
 
 pub trait InjectorWorkerDelegation<T: Send + Clone + 'static> {
-    fn process(&self, pc: &InjectorWorker<T>, item: &T) -> Result<TaskResult, Box<dyn Error>>;
+    fn process(&self, pc: &InjectorWorker<T>, item: &T) -> Result<TaskResult>;
     fn on_completed(&self, pc: &InjectorWorker<T>, item: &T, result: TaskResult) -> bool;
     fn on_finished(&self, pc: &InjectorWorker<T>);
 }

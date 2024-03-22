@@ -1,5 +1,6 @@
+use anyhow::Result;
 use lettre::{
-    transport::smtp::{authentication::Credentials, response::Response, Error},
+    transport::smtp::{authentication::Credentials, response::Response},
     Message, SmtpTransport, Transport,
 };
 
@@ -21,13 +22,13 @@ impl Mailer {
         Mailer { smtp }
     }
 
-    pub fn send(&self, from: &str, to: &str, subject: &str, body: &str) -> Result<Response, Error> {
+    pub fn send(&self, from: &str, to: &str, subject: &str, body: &str) -> Result<Response> {
         let email = Message::builder()
             .from(from.parse().unwrap())
             .to(to.parse().unwrap())
             .subject(subject)
             .body(body.to_string())
             .unwrap();
-        self.smtp.send(&email)
+        self.smtp.send(&email).map_err(Into::into)
     }
 }

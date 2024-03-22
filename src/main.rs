@@ -1,9 +1,9 @@
-use std::error::Error;
+use anyhow::Result;
 
 mod tests;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> Result<()> {
     dotenv::dotenv().ok();
 
     //tests::io::test_path()?;
@@ -22,7 +22,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     //tests::threading::test_injector_worker().await?;
     //tests::threading::test_parallel().await?;
 
-    tests::python::test_python();
+    //tests::python::test_python();
+
+    tests::ai::test_whisper().await?;
 
     Ok(())
 }

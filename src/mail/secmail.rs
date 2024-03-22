@@ -1,7 +1,7 @@
+use anyhow::Result;
 use chrono::{NaiveDateTime, NaiveTime, Utc};
 use html_entities::decode_html_entities;
-use std::error::Error;
-pub use tempmail::{Domain, Tempmail};
+use tempmail::{Domain, Tempmail};
 
 pub struct SecMail {
     email: Tempmail,
@@ -62,7 +62,7 @@ impl SecMail {
         date: Option<NaiveDateTime>,
         expected: &str,
         size: usize,
-    ) -> Result<String, Box<dyn Error>> {
+    ) -> Result<String> {
         if expected.is_empty() {
             panic!("Expected is empty");
         }

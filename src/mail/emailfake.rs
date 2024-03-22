@@ -1,8 +1,8 @@
+use anyhow::{Error, Result};
 use chrono::{NaiveDateTime, NaiveTime, Utc};
 use html_entities::decode_html_entities;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use std::error::Error;
 
 use super::super::web::build_client;
 
@@ -47,44 +47,26 @@ impl EmailFake {
         }
     }
 
-    pub async fn random() -> Result<Self, Box<dyn Error>> {
+    pub async fn random() -> Result<Self> {
         let body = get_content(BASE_URL).await?;
 
         if body.is_empty() {
-            return Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "Failed to get email-fake.com",
-            )));
+            return Err(Error::msg("Failed to get email-fake.com"));
         }
 
         let start = match body.find("fem coserch") {
             Some(index) => index,
-            None => {
-                return Err(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Failed to find coserch",
-                )))
-            }
+            None => return Err(Error::msg("Failed to find coserch")),
         };
         let body = &body[start..];
         let end = match body.find("fem dropselect") {
             Some(index) => index,
-            None => {
-                return Err(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Failed to find dropselect",
-                )))
-            }
+            None => return Err(Error::msg("Failed to find dropselect")),
         };
         let body = &body[..end];
         let captures = match USERNAME_DOMAIN_REGEX.captures(&body) {
             Some(captures) => captures,
-            None => {
-                return Err(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    "Failed to find username and domain",
-                )))
-            }
+            None => return Err(Error::msg("Failed to find username and domain")),
         };
         let username = captures.get(1).unwrap().as_str();
         let domain = captures.get(2).unwrap().as_str();
@@ -135,7 +117,7 @@ impl EmailFake {
         date: Option<NaiveDateTime>,
         expected: &str,
         size: usize,
-    ) -> Result<String, Box<dyn Error>> {
+    ) -> Result<String> {
         if expected.is_empty() {
             panic!("Expected is empty");
         }
@@ -233,13 +215,13 @@ impl EmailFake {
     }
 }
 
-async fn get_content(url: &str) -> Result<String, Box<dyn Error>> {
+async fn get_content(url: &str) -> Result<String> {
     let response = __HTTP_CLIENT.get(url).send().await?;
 
     if response.status() != 200 {
-        return Err(Box::new(std::io::Error::new(
-            std::io::ErrorKind::ConnectionRefused,
-            format!("Failed to get email-fake.com. {}", response.status()),
+        return Err(Error::msg(format!(
+            "Failed to get email-fake.com. {}",
+            response.status()
         )));
     }
 

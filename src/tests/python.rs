@@ -1,9 +1,11 @@
-use std::error::Error;
+use anyhow::Result;
+use pyo3::types::PyBytes;
 
-use pyo3::types::{PyBytes, PyDict};
-use rustmix::python::{self, whisper};
+#[cfg(feature = "python")]
+use rustmix::python;
 
-pub fn test_python() -> Result<(), Box<dyn Error>> {
+#[cfg(feature = "python")]
+pub fn test_python() -> Result<()> {
     let version = python::version()?;
     let user = python::user()?;
     println!("Python version: {:?}", version);

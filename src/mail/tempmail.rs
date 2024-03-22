@@ -1,10 +1,8 @@
+use anyhow::Result;
 use chrono::{NaiveDateTime, NaiveTime, Utc};
-use html_entities::decode_html_entities;
 use once_cell::sync::Lazy;
-use regex::Regex;
 use serde::Serialize;
 use serde_json::{json, Value};
-use std::error::Error;
 
 use super::super::web::build_client_for_api;
 
@@ -41,7 +39,7 @@ impl TempMail {
         }
     }
 
-    pub async fn random() -> Result<Self, Box<dyn Error>> {
+    pub async fn random() -> Result<Self> {
         let url = format!("{}{}", BASE_URL, "new");
         let json: Value = __HTTP_CLIENT
             .post(&url)
@@ -101,7 +99,7 @@ impl TempMail {
         date: Option<NaiveDateTime>,
         expected: &str,
         size: usize,
-    ) -> Result<String, Box<dyn Error>> {
+    ) -> Result<String> {
         if expected.is_empty() {
             panic!("Expected is empty");
         }

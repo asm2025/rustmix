@@ -1,6 +1,7 @@
+use anyhow::Result;
+use crossbeam::sync::WaitGroup;
 use std::{
     collections,
-    error::Error,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -8,7 +9,6 @@ use std::{
     thread,
 };
 
-use crossbeam::sync::WaitGroup;
 use rustmix::threading::{
     consumer::*, injector_consumer::*, parallel_consumer::*, producer_consumer::*, *,
 };
@@ -33,11 +33,7 @@ impl TaskHandler {
 }
 
 impl ProducerConsumerDelegation<usize> for TaskHandler {
-    fn process(
-        &self,
-        _pc: &ProducerConsumer<usize>,
-        item: &usize,
-    ) -> Result<TaskResult, Box<dyn Error>> {
+    fn process(&self, _pc: &ProducerConsumer<usize>, item: &usize) -> Result<TaskResult> {
         let thread = thread::current();
         let thread_name = thread.name().unwrap_or(THREADS_NAME);
 
@@ -82,7 +78,7 @@ impl ProducerConsumerDelegation<usize> for TaskHandler {
 }
 
 impl ConsumerDelegation<usize> for TaskHandler {
-    fn process(&self, _pc: &Consumer<usize>, item: &usize) -> Result<TaskResult, Box<dyn Error>> {
+    fn process(&self, _pc: &Consumer<usize>, item: &usize) -> Result<TaskResult> {
         let thread = thread::current();
         let thread_name = thread.name().unwrap_or(THREADS_NAME);
         self.task_count.fetch_add(1, Ordering::SeqCst);
@@ -121,11 +117,7 @@ impl ConsumerDelegation<usize> for TaskHandler {
 }
 
 impl InjectorWorkerDelegation<usize> for TaskHandler {
-    fn process(
-        &self,
-        _pc: &InjectorWorker<usize>,
-        item: &usize,
-    ) -> Result<TaskResult, Box<dyn Error>> {
+    fn process(&self, _pc: &InjectorWorker<usize>, item: &usize) -> Result<TaskResult> {
         let thread = thread::current();
         let thread_name = thread.name().unwrap_or(THREADS_NAME);
         self.task_count.fetch_add(1, Ordering::SeqCst);
@@ -164,7 +156,7 @@ impl InjectorWorkerDelegation<usize> for TaskHandler {
 }
 
 impl ParallelDelegation<usize> for TaskHandler {
-    fn process(&self, _pc: &Parallel, item: &usize) -> Result<TaskResult, Box<dyn Error>> {
+    fn process(&self, _pc: &Parallel, item: &usize) -> Result<TaskResult> {
         let thread = thread::current();
         let thread_name = thread.name().unwrap_or(THREADS_NAME);
         self.task_count.fetch_add(1, Ordering::SeqCst);
@@ -202,7 +194,7 @@ impl ParallelDelegation<usize> for TaskHandler {
     }
 }
 
-pub async fn test_producer_consumer() -> Result<(), Box<dyn Error>> {
+pub async fn test_producer_consumer() -> Result<()> {
     println!("\nTesting Producer/Consumer with {} threads...", THREADS);
 
     let now = std::time::Instant::now();
@@ -238,7 +230,7 @@ pub async fn test_producer_consumer() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub async fn test_consumer() -> Result<(), Box<dyn Error>> {
+pub async fn test_consumer() -> Result<()> {
     println!("\nTesting Consumer with {} threads...", THREADS);
 
     let now = std::time::Instant::now();
@@ -262,7 +254,7 @@ pub async fn test_consumer() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub async fn test_injector_worker() -> Result<(), Box<dyn Error>> {
+pub async fn test_injector_worker() -> Result<()> {
     println!("\nTesting Injector/Worker with {} threads...", THREADS);
 
     let now = std::time::Instant::now();
@@ -282,7 +274,7 @@ pub async fn test_injector_worker() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub async fn test_parallel() -> Result<(), Box<dyn Error>> {
+pub async fn test_parallel() -> Result<()> {
     println!("\nTesting Parallel with {} threads...", THREADS);
 
     let now = std::time::Instant::now();

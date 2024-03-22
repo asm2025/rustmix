@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+pub mod ai;
 pub mod io;
 pub mod mail;
 pub mod python;

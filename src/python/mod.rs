@@ -1,5 +1,3 @@
-pub mod whisper;
-
 use pyo3::{
     prelude::*,
     types::{IntoPyDict, PyDict},

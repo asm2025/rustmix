@@ -1,9 +1,10 @@
-use std::{collections::HashMap, error::Error};
+use anyhow::Result;
+use std::collections::HashMap;
 
 use super::{get_employees, Employee};
 use rustmix::web::{http::Response, url, *};
 
-pub fn test_url() -> Result<(), Box<dyn Error>> {
+pub fn test_url() -> Result<()> {
     println!("\nTesting Url functions...");
 
     let url = url::create("https://www.rust-lang.org");
@@ -20,7 +21,7 @@ pub fn test_url() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub async fn test_reqwest() -> Result<(), Box<dyn Error>> {
+pub async fn test_reqwest() -> Result<()> {
     const BASE_URL: &str = "https://httpbin.org";
 
     println!("\nTesting reqwest functions...");
