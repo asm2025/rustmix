@@ -2,10 +2,14 @@ use serde::{Deserialize, Serialize};
 
 pub mod ai;
 pub mod io;
-pub mod mail;
-pub mod python;
 pub mod threading;
 pub mod web;
+
+#[cfg(feature = "mail")]
+pub mod mail;
+
+#[cfg(feature = "mail")]
+pub mod python;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Employee {

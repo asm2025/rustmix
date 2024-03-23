@@ -1,4 +1,6 @@
 use anyhow::Result;
+
+#[cfg(feature = "python")]
 use pyo3::types::PyBytes;
 
 #[cfg(feature = "python")]
