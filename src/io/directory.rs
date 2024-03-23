@@ -7,14 +7,13 @@ pub fn current() -> PathBuf {
 }
 
 pub fn exists<T: AsRef<Path>>(path: T) -> bool {
-    let path = path.as_ref();
-    path.exists() && path.is_dir()
+    path.as_ref().is_dir()
 }
 
 pub fn create<T: AsRef<Path>>(path: T) -> Result<()> {
     let path = path.as_ref();
 
-    if path.exists() {
+    if path.is_dir() {
         return Ok(());
     }
 
@@ -24,7 +23,7 @@ pub fn create<T: AsRef<Path>>(path: T) -> Result<()> {
 pub fn ensure<T: AsRef<Path>>(path: T) -> Result<()> {
     let path = path.as_ref();
 
-    if path.exists() {
+    if path.is_dir() {
         return Ok(());
     }
 
@@ -34,7 +33,7 @@ pub fn ensure<T: AsRef<Path>>(path: T) -> Result<()> {
 pub fn delete<T: AsRef<Path>>(path: T) -> Result<()> {
     let path = path.as_ref();
 
-    if !path.exists() {
+    if !path.is_dir() {
         return Ok(());
     }
 

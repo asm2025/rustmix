@@ -3,6 +3,7 @@ use pyo3::{
     types::{IntoPyDict, PyDict},
 };
 use std::fs;
+
 #[derive(Debug)]
 pub struct VersionInfo {
     pub major: u8,

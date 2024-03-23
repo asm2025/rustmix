@@ -14,8 +14,8 @@ use tokio::sync::Notify;
 use super::*;
 
 pub trait ParallelDelegation<T: Send + 'static> {
-    fn process(&self, pc: &Parallel, item: &T) -> Result<TaskResult>;
     fn on_started(&self, pc: &Parallel);
+    fn process(&self, pc: &Parallel, item: &T) -> Result<TaskResult>;
     fn on_completed(&self, pc: &Parallel, item: &T, result: TaskResult) -> bool;
     fn on_finished(&self, pc: &Parallel);
 }

@@ -14,8 +14,8 @@ use tokio::sync::Notify;
 use super::*;
 
 pub trait ConsumerDelegation<T: Send + Clone + 'static> {
-    fn process(&self, pc: &Consumer<T>, item: &T) -> Result<TaskResult>;
     fn on_started(&self, pc: &Consumer<T>);
+    fn process(&self, pc: &Consumer<T>, item: &T) -> Result<TaskResult>;
     fn on_completed(&self, pc: &Consumer<T>, item: &T, result: TaskResult) -> bool;
     fn on_finished(&self, pc: &Consumer<T>);
 }

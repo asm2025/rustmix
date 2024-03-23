@@ -1,15 +1,17 @@
 use serde::{Deserialize, Serialize};
 
-pub mod ai;
 pub mod io;
-pub mod threading;
-pub mod web;
-
+#[cfg(feature = "logging-slog")]
+pub mod loggin_slog;
 #[cfg(feature = "mail")]
 pub mod mail;
-
-#[cfg(feature = "mail")]
+#[cfg(feature = "python")]
 pub mod python;
+#[cfg(feature = "threading")]
+pub mod threading;
+pub mod web;
+#[cfg(feature = "whisper")]
+pub mod whisper;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Employee {

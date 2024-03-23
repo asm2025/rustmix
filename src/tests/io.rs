@@ -1,39 +1,33 @@
 use anyhow::Result;
 use rand::{distributions::Alphanumeric, Rng};
 use std::{
-    io::{LineWriter, Write},
+    io::{stdin, LineWriter, Write},
     path::PathBuf,
 };
 
 use rustmix::io::{
     directory,
-    file::{self, FileEx, FileOpenOptions},
-    path,
+    file::{self, FileEx},
+    path::{self, IntoPath, PathExt},
 };
 
 use super::{get_employees, print_batch, Employee};
 
 pub fn test_path() -> Result<()> {
     println!("\nTesting path functions...");
-
-    let curdir = directory::current().into_os_string().into_string().unwrap();
-
-    let path = path::from(&curdir).join("MyFile.txt");
+    let curdir = directory::current();
+    let path = (curdir.as_str(), "MyFile.txt").into_path();
     println!("{}", path.display());
 
-    let path = path::from(&curdir).join("My Folder").join("MyFile.txt");
+    let path = (curdir.as_str(), "My Folder", "MyFile.txt").into_path();
     println!("{}", path.display());
 
-    let path = path::from(&curdir)
-        .join("My Folder")
-        .join("My Subfolder")
-        .join("MyFile.txt");
+    let path = (curdir.as_str(), "My Folder", "My Subfolder", "MyFile.txt").into_path();
     println!("{}", path.display());
 
-    let path: PathBuf = [&curdir, "My Folder", "My Subfolder", "", "NonEmpty"]
-        .iter()
-        .collect();
+    let path: PathBuf = [curdir.as_str(), "My Folder", "My Subfolder", "", "NonEmpty"].into_path();
     println!("{}", path.display());
+
     Ok(())
 }
 
@@ -42,16 +36,15 @@ pub fn test_directory() -> Result<()> {
 
     let curdir = directory::current();
     let original_path_len = curdir.components().count();
-    let path = path::from(curdir.to_str().unwrap())
-        .join("My Folder")
-        .join("My Subfolder")
-        .join("NonEmpty");
+    let path = (curdir.as_str(), "My Folder", "My Subfolder", "NonEmpty").into_path();
 
     println!(
         "Current Dir: '{}'. It has {} components.",
-        curdir.display().to_string(),
-        original_path_len.to_string()
+        &curdir.display(),
+        &original_path_len
     );
+
+    println!("Target Dir: '{}'", &path.display());
 
     let exists = directory::exists(&path);
     println!(
@@ -60,30 +53,33 @@ pub fn test_directory() -> Result<()> {
     );
 
     if !exists {
-        println!(
-            "\nI will try to create the directory '{}'",
-            path.display().to_string()
-        );
+        println!("\nI will try to create the directory '{}'", &path.display());
 
-        let created = match directory::create(&path) {
+        let created_err = match directory::create(&path) {
             Ok(_) => None,
             Err(e) => Some(format!("Error: {}", e)),
         };
 
-        if created.is_none() {
-            println!("Directory created using create()");
+        if created_err.is_none() {
+            println!("Directory created using create('{}')", &path.display());
         } else {
-            println!("{}", created.unwrap());
+            println!("{}", created_err.unwrap());
+            directory::ensure(&path)?;
+            println!("Directory created using ensure('{}')", &path.display());
         }
     }
 
-    println!("\n{}", "I will delete the directory.");
-    let path = path::take(&path, original_path_len);
-    println!("The path is now '{}'", path.display());
-    match directory::delete(&path) {
-        Ok(_) => println!("Directory deleted."),
-        Err(e) => println!("Error: {}", e),
+    let parts = path::split_path(&path.as_str());
+
+    for part in parts {
+        println!("{}", &part);
     }
+
+    println!("\n{}", "I will delete the directory.");
+    let path = path.take(original_path_len + 1);
+    println!("The path is now '{}'", &path.display());
+    delete_dir(&path)?;
+
     Ok(())
 }
 
@@ -92,22 +88,19 @@ pub fn test_file() -> Result<()> {
 
     let curdir = directory::current();
     let original_path_len = curdir.components().count();
-    let mut path = path::from(curdir.to_str().unwrap())
-        .join("My Folder")
-        .join("My Subfolder")
-        .join("NonEmpty");
+    let mut path = (curdir.as_str(), "My Folder", "My Subfolder", "NonEmpty").into_path();
 
     println!(
         "\n\nCurrent Dir: '{}'. It has {} components.",
-        curdir.display(),
-        original_path_len
+        &curdir.display(),
+        &original_path_len
     );
 
-    let exists = path::exists(&path);
+    let exists = path.exists();
     println!("Does the file exist? {}", if exists { "Yes" } else { "No" });
 
     println!("I will create or open the file '{}'", &path.display());
-    let file = file::create(&path, Some(FileOpenOptions::Default))?;
+    let file = file::create(&path)?;
     println!("File created or openned.");
 
     let mut writer = LineWriter::new(file);
@@ -172,7 +165,7 @@ pub fn test_file() -> Result<()> {
     println!("\nI will test writing some json.");
     path.set_extension("json");
     println!("The path is now '{}'", path.display());
-    let mut file = file::create(&path, Some(FileOpenOptions::Default))?;
+    let mut file = file::create(&path)?;
     file.write_json(&employees, Some(true))?;
     drop(file);
 
@@ -188,7 +181,7 @@ pub fn test_file() -> Result<()> {
     println!("\nI will test writing some csv.");
     path.set_extension("csv");
     println!("The path is now '{}'", path.display());
-    let mut file = file::create(&path, Some(FileOpenOptions::Default))?;
+    let mut file = file::create(&path)?;
     let mut writer = file.create_delimited_writer(None, Some(true));
 
     for employee in &employees {
@@ -214,7 +207,7 @@ pub fn test_file() -> Result<()> {
     println!("\nI will test writing some tsv.");
     path.set_extension("tsv");
     println!("The path is now '{}'.", path.display());
-    let mut file = file::create(&path, Some(FileOpenOptions::Default))?;
+    let mut file = file::create(&path)?;
     let mut writer = file.create_delimited_writer(Some(b'\t'), None);
 
     for person in &employees {
@@ -235,11 +228,27 @@ pub fn test_file() -> Result<()> {
     drop(file);
 
     println!("\nI will delete the directory.");
-    let path = path::take(&path, original_path_len);
-    println!("The path is now '{}'", path.display());
-    match directory::delete(&path) {
-        Ok(_) => println!("Folder deleted."),
-        Err(e) => println!("Error: {}", e),
+    let path = path.take(original_path_len + 1);
+    println!("The path is now '{}'", &path.display());
+    delete_dir(&path)?;
+
+    Ok(())
+}
+
+fn delete_dir(path: &PathBuf) -> Result<()> {
+    print!("Do you want to delete the directory? (y/n): ");
+    std::io::stdout().flush()?;
+    let mut input = String::new();
+    stdin().read_line(&mut input)?;
+
+    if input.trim().to_lowercase() == "y" {
+        match directory::delete(&path) {
+            Ok(_) => println!("Folder deleted."),
+            Err(e) => println!("Error: {}", e),
+        }
+    } else {
+        println!("Directory not deleted.");
     }
+
     Ok(())
 }

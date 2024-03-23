@@ -6,8 +6,8 @@ mod tests;
 async fn main() -> Result<()> {
     dotenv::dotenv().ok();
 
-    //tests::io::test_path()?;
-    //tests::io::test_directory()?;
+    tests::io::test_path()?;
+    tests::io::test_directory()?;
     //tests::io::test_file()?;
 
     //tests::web::test_url()?;
@@ -24,7 +24,9 @@ async fn main() -> Result<()> {
 
     //tests::python::test_python();
 
-    //tests::ai::test_whisper().await?;
+    //tests::whisper::test_whisper().await?;
+
+    tests::loggin_slog::test_loggin_slog()?;
 
     Ok(())
 }

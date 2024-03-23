@@ -2,9 +2,8 @@ use anyhow::Result;
 use csv::{ReaderBuilder, WriterBuilder};
 use serde::{de, Serialize};
 use serde_json;
-use std::fs;
 use std::{
-    fs::OpenOptions,
+    fs::{self, OpenOptions},
     io::{BufRead, BufReader, Write},
     path::Path,
 };
@@ -21,8 +20,7 @@ pub enum FileOpenOptions {
 }
 
 pub fn exists<T: AsRef<Path>>(path: T) -> bool {
-    let path = path.as_ref();
-    path.exists() && path.is_file()
+    path.as_ref().is_file()
 }
 
 pub fn open<T: AsRef<Path>>(path: T) -> Result<std::fs::File> {
@@ -31,7 +29,11 @@ pub fn open<T: AsRef<Path>>(path: T) -> Result<std::fs::File> {
     from_options(path, &opt)
 }
 
-pub fn create<T: AsRef<Path>>(path: T, options: Option<FileOpenOptions>) -> Result<std::fs::File> {
+pub fn create<T: AsRef<Path>>(path: T) -> Result<std::fs::File> {
+    create_with(path, FileOpenOptions::Default)
+}
+
+pub fn create_with<T: AsRef<Path>>(path: T, options: FileOpenOptions) -> Result<std::fs::File> {
     let path = path.as_ref();
     let dir = path.parent().unwrap();
     directory::ensure(dir)?;
@@ -39,10 +41,9 @@ pub fn create<T: AsRef<Path>>(path: T, options: Option<FileOpenOptions>) -> Resu
     let mut opt = OpenOptions::new();
     opt.read(true);
     match options {
-        Some(FileOpenOptions::New) => opt.create_new(true),
-        Some(FileOpenOptions::Truncate) => opt.create(true).truncate(true),
-        Some(FileOpenOptions::Append) => opt.create(true).append(true),
-        _ => opt.create(true),
+        FileOpenOptions::New => opt.create_new(true),
+        FileOpenOptions::Truncate => opt.create(true).truncate(true),
+        _ => opt.create(true).append(true),
     };
     opt.write(true);
     from_options(path, &opt)
@@ -64,40 +65,39 @@ pub fn delete<T: AsRef<Path>>(path: T) -> Result<()> {
 }
 
 pub trait FileEx {
-    fn read<'a>(&'a self) -> Result<impl Iterator<Item = String> + 'a>;
-    fn read_filtered<'a, F: Fn(&str) -> bool + 'static>(
-        &'a self,
+    fn read(&self) -> Result<impl Iterator<Item = String>>;
+    fn read_filtered<F: Fn(&str) -> bool + 'static>(
+        &self,
         filter: F,
-    ) -> Result<impl Iterator<Item = String> + 'a>;
-    fn read_batch<'a, R: Fn(u32, Vec<String>) -> bool + 'static>(
-        &'a self,
+    ) -> Result<impl Iterator<Item = String>>;
+    fn read_batch<R: Fn(u32, Vec<String>) -> bool + 'static>(
+        &self,
         batch: usize,
         callback: R,
     ) -> Result<u32>;
     fn read_batch_filtered<
-        'a,
         F: Fn(&str) -> bool + 'static,
         R: Fn(u32, Vec<String>) -> bool + 'static,
     >(
-        &'a self,
+        &self,
         batch: usize,
         filter: F,
         callback: R,
     ) -> Result<u32>;
-    fn write<'a, T: AsRef<str>>(&'a mut self, data: &'a T) -> Result<()>;
-    fn write_lines<'a, T: AsRef<str>>(&'a mut self, data: impl Iterator<Item = T>) -> Result<()>;
-    fn read_json<'a, T: de::DeserializeOwned>(&'a self) -> Result<T>;
-    fn write_json<'a, T: Serialize>(&'a mut self, data: &'a T, pretty: Option<bool>) -> Result<()>;
-    fn create_delimited_reader<'a>(
-        &'a mut self,
+    fn write<T: AsRef<str>>(&mut self, data: &T) -> Result<()>;
+    fn write_lines<T: AsRef<str>>(&mut self, data: impl Iterator<Item = T>) -> Result<()>;
+    fn read_json<T: de::DeserializeOwned>(&self) -> Result<T>;
+    fn write_json<T: Serialize>(&mut self, data: &T, pretty: Option<bool>) -> Result<()>;
+    fn create_delimited_reader(
+        &mut self,
         delimiter: Option<u8>,
         has_headers: Option<bool>,
-    ) -> csv::Reader<&'a mut std::fs::File>;
-    fn create_delimited_writer<'a>(
-        &'a mut self,
+    ) -> csv::Reader<&mut std::fs::File>;
+    fn create_delimited_writer(
+        &mut self,
         delimiter: Option<u8>,
         has_headers: Option<bool>,
-    ) -> csv::Writer<&'a mut std::fs::File>;
+    ) -> csv::Writer<&mut std::fs::File>;
 }
 
 impl FileEx for std::fs::File {
@@ -109,10 +109,10 @@ impl FileEx for std::fs::File {
             .filter(|line| !line.is_empty()))
     }
 
-    fn read_filtered<'a, F: Fn(&str) -> bool + 'static>(
-        &'a self,
+    fn read_filtered<F: Fn(&str) -> bool + 'static>(
+        &self,
         filter: F,
-    ) -> Result<impl Iterator<Item = String> + 'a> {
+    ) -> Result<impl Iterator<Item = String>> {
         let reader = BufReader::new(self);
         Ok(reader
             .lines()
@@ -120,8 +120,8 @@ impl FileEx for std::fs::File {
             .filter(move |line| !line.is_empty() && filter(line)))
     }
 
-    fn read_batch<'a, R: Fn(u32, Vec<String>) -> bool + 'static>(
-        &'a self,
+    fn read_batch<R: Fn(u32, Vec<String>) -> bool + 'static>(
+        &self,
         batch: usize,
         callback: R,
     ) -> Result<u32> {
@@ -171,11 +171,10 @@ impl FileEx for std::fs::File {
     }
 
     fn read_batch_filtered<
-        'a,
         F: Fn(&str) -> bool + 'static,
         R: Fn(u32, Vec<String>) -> bool + 'static,
     >(
-        &'a self,
+        &self,
         batch: usize,
         filter: F,
         callback: R,
@@ -225,11 +224,11 @@ impl FileEx for std::fs::File {
         Ok(batch_number)
     }
 
-    fn write<'a, T: AsRef<str>>(&'a mut self, data: &'a T) -> Result<()> {
+    fn write<T: AsRef<str>>(&mut self, data: &T) -> Result<()> {
         writeln!(self, "{}", data.as_ref()).map_err(Into::into)
     }
 
-    fn write_lines<'a, T: AsRef<str>>(&'a mut self, data: impl Iterator<Item = T>) -> Result<()> {
+    fn write_lines<T: AsRef<str>>(&mut self, data: impl Iterator<Item = T>) -> Result<()> {
         for line in data.into_iter() {
             writeln!(self, "{}", line.as_ref())?;
         }
@@ -237,13 +236,13 @@ impl FileEx for std::fs::File {
         Ok(())
     }
 
-    fn read_json<'a, T: de::DeserializeOwned>(&'a self) -> Result<T> {
+    fn read_json<T: de::DeserializeOwned>(&self) -> Result<T> {
         let reader = BufReader::new(self);
         let data: T = serde_json::from_reader(reader)?;
         Ok(data)
     }
 
-    fn write_json<'a, T: Serialize>(&'a mut self, data: &'a T, pretty: Option<bool>) -> Result<()> {
+    fn write_json<T: Serialize>(&mut self, data: &T, pretty: Option<bool>) -> Result<()> {
         let serialize = match pretty {
             Some(true) => serde_json::to_string_pretty,
             _ => serde_json::to_string,
@@ -253,11 +252,11 @@ impl FileEx for std::fs::File {
         Ok(())
     }
 
-    fn create_delimited_reader<'a>(
-        &'a mut self,
+    fn create_delimited_reader(
+        &mut self,
         delimiter: Option<u8>,
         has_headers: Option<bool>,
-    ) -> csv::Reader<&'a mut std::fs::File> {
+    ) -> csv::Reader<&mut std::fs::File> {
         let delimiter = delimiter.unwrap_or(b',');
         let has_headers = has_headers.unwrap_or(false);
         ReaderBuilder::new()
@@ -266,11 +265,11 @@ impl FileEx for std::fs::File {
             .from_reader(self)
     }
 
-    fn create_delimited_writer<'a>(
-        &'a mut self,
+    fn create_delimited_writer(
+        &mut self,
         delimiter: Option<u8>,
         has_headers: Option<bool>,
-    ) -> csv::Writer<&'a mut std::fs::File> {
+    ) -> csv::Writer<&mut std::fs::File> {
         let delimiter = delimiter.unwrap_or(b',');
         let has_headers = has_headers.unwrap_or(false);
         WriterBuilder::new()

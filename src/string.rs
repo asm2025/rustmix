@@ -1,16 +1,16 @@
 pub trait StringEx {
-    fn trim<'a>(&'a self, ch: &'a char) -> &str;
-    fn trim_start<'a>(&'a self, ch: &'a char) -> &str;
-    fn trim_end<'a>(&'a self, ch: &'a char) -> &str;
-    fn trim_many<'a>(&'a self, ch: &'a [char]) -> &str;
-    fn trim_start_many<'a>(&'a self, ch: &'a [char]) -> &str;
-    fn trim_end_many<'a>(&'a self, ch: &'a [char]) -> &str;
-    fn prefix<'a>(&'a self, ch: char) -> String;
-    fn suffix<'a>(&'a self, ch: char) -> String;
+    fn trim(&self, ch: &char) -> &str;
+    fn trim_start(&self, ch: &char) -> &str;
+    fn trim_end(&self, ch: &char) -> &str;
+    fn trim_many(&self, ch: &[char]) -> &str;
+    fn trim_start_many(&self, ch: &[char]) -> &str;
+    fn trim_end_many(&self, ch: &[char]) -> &str;
+    fn prefix(&self, ch: char) -> String;
+    fn suffix(&self, ch: char) -> String;
 }
 
 impl StringEx for str {
-    fn trim<'a>(&'a self, ch: &'a char) -> &str {
+    fn trim(&self, ch: &char) -> &str {
         if self.is_empty() {
             return self;
         }
@@ -35,7 +35,7 @@ impl StringEx for str {
         &self[start..end]
     }
 
-    fn trim_start<'a>(&'a self, ch: &'a char) -> &str {
+    fn trim_start(&self, ch: &char) -> &str {
         if self.is_empty() {
             return self;
         }
@@ -52,7 +52,7 @@ impl StringEx for str {
         &self[start..]
     }
 
-    fn trim_end<'a>(&'a self, ch: &'a char) -> &str {
+    fn trim_end(&self, ch: &char) -> &str {
         if self.is_empty() {
             return self;
         }
@@ -69,7 +69,7 @@ impl StringEx for str {
         &self[..end]
     }
 
-    fn trim_many<'a>(&'a self, ch: &'a [char]) -> &str {
+    fn trim_many(&self, ch: &[char]) -> &str {
         if self.is_empty() {
             return self;
         }
@@ -94,7 +94,7 @@ impl StringEx for str {
         &self[start..end]
     }
 
-    fn trim_start_many<'a>(&'a self, ch: &'a [char]) -> &str {
+    fn trim_start_many(&self, ch: &[char]) -> &str {
         if self.is_empty() {
             return self;
         }
@@ -111,7 +111,7 @@ impl StringEx for str {
         &self[start..]
     }
 
-    fn trim_end_many<'a>(&'a self, ch: &'a [char]) -> &str {
+    fn trim_end_many(&self, ch: &[char]) -> &str {
         if self.is_empty() {
             return self;
         }
@@ -128,7 +128,7 @@ impl StringEx for str {
         &self[..end]
     }
 
-    fn prefix<'a>(&'a self, ch: char) -> String {
+    fn prefix(&self, ch: char) -> String {
         if !self.starts_with(ch) {
             format!("{}{}", ch, self)
         } else {
@@ -136,7 +136,7 @@ impl StringEx for str {
         }
     }
 
-    fn suffix<'a>(&'a self, ch: char) -> String {
+    fn suffix(&self, ch: char) -> String {
         if !self.ends_with(ch) {
             format!("{}{}", self, ch)
         } else {

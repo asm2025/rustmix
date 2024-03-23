@@ -13,8 +13,8 @@ use tokio::sync::Notify;
 use super::*;
 
 pub trait ProducerConsumerDelegation<T: Send + Clone + 'static> {
-    fn process(&self, pc: &ProducerConsumer<T>, item: &T) -> Result<TaskResult>;
     fn on_started(&self, pc: &ProducerConsumer<T>);
+    fn process(&self, pc: &ProducerConsumer<T>, item: &T) -> Result<TaskResult>;
     fn on_completed(&self, pc: &ProducerConsumer<T>, item: &T, result: TaskResult) -> bool;
     fn on_finished(&self, pc: &ProducerConsumer<T>);
 }

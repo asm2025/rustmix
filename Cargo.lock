@@ -3052,6 +3052,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f518f335dce6725a761382244631d86cf0ccb2863413590b31338feb467f9c3"
 
 [[package]]
+name = "is-terminal"
+version = "0.4.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f23ff5ef2b80d608d61efee834934d862cd92461afc0560dedf493e4c033738b"
+dependencies = [
+ "hermit-abi",
+ "libc",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "itertools"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5316,11 +5327,8 @@ version = "0.11.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c6920094eb85afde5e4a138be3f2de8bbdf28000f0029e72c45025a56b042251"
 dependencies = [
- "async-compression",
  "base64 0.21.7",
  "bytes",
- "cookie",
- "cookie_store",
  "encoding_rs",
  "futures-core",
  "futures-util",
@@ -5350,7 +5358,6 @@ dependencies = [
  "tokio",
  "tokio-native-tls",
  "tokio-rustls",
- "tokio-socks",
  "tokio-util",
  "tower-service",
  "url",
@@ -5368,9 +5375,13 @@ version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e333b1eb9fe677f6893a9efcb0d277a2d3edd83f358a236b657c32301dc6e5f6"
 dependencies = [
+ "async-compression",
  "base64 0.21.7",
  "bytes",
+ "cookie",
+ "cookie_store",
  "encoding_rs",
+ "futures-channel",
  "futures-core",
  "futures-util",
  "h2 0.4.3",
@@ -5384,6 +5395,7 @@ dependencies = [
  "js-sys",
  "log",
  "mime",
+ "mime_guess",
  "native-tls",
  "once_cell",
  "percent-encoding",
@@ -5396,10 +5408,13 @@ dependencies = [
  "system-configuration",
  "tokio",
  "tokio-native-tls",
+ "tokio-socks",
+ "tokio-util",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wasm-streams",
  "web-sys",
  "winreg 0.50.0",
 ]
@@ -5793,14 +5808,22 @@ dependencies = [
  "html-entities",
  "kalosm",
  "lettre",
+ "log",
  "once_cell",
  "pyo3",
  "rand 0.8.5",
  "rayon",
  "regex",
- "reqwest 0.11.24",
+ "reqwest 0.12.1",
  "serde",
  "serde_json",
+ "slog",
+ "slog-async",
+ "slog-envlogger",
+ "slog-json",
+ "slog-scope",
+ "slog-stdlog",
+ "slog-term",
  "tempmail",
  "tokio",
  "ua_generator",
@@ -6264,6 +6287,86 @@ checksum = "8f92a496fb766b417c996b9c5e57daf2f7ad3b0bebe1ccfca4856390e3d3bb67"
 dependencies = [
  "autocfg",
  "serde",
+]
+
+[[package]]
+name = "slog"
+version = "2.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8347046d4ebd943127157b94d63abb990fcf729dc4e9978927fdf4ac3c998d06"
+
+[[package]]
+name = "slog-async"
+version = "2.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72c8038f898a2c79507940990f05386455b3a317d8f18d4caea7cbc3d5096b84"
+dependencies = [
+ "crossbeam-channel",
+ "slog",
+ "take_mut",
+ "thread_local",
+]
+
+[[package]]
+name = "slog-envlogger"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "906a1a0bc43fed692df4b82a5e2fbfc3733db8dad8bb514ab27a4f23ad04f5c0"
+dependencies = [
+ "log",
+ "regex",
+ "slog",
+ "slog-async",
+ "slog-scope",
+ "slog-stdlog",
+ "slog-term",
+]
+
+[[package]]
+name = "slog-json"
+version = "2.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e1e53f61af1e3c8b852eef0a9dee29008f55d6dd63794f3f12cef786cf0f219"
+dependencies = [
+ "serde",
+ "serde_json",
+ "slog",
+ "time 0.3.34",
+]
+
+[[package]]
+name = "slog-scope"
+version = "4.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f95a4b4c3274cd2869549da82b57ccc930859bdbf5bcea0424bc5f140b3c786"
+dependencies = [
+ "arc-swap",
+ "lazy_static 1.4.0",
+ "slog",
+]
+
+[[package]]
+name = "slog-stdlog"
+version = "4.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6706b2ace5bbae7291d3f8d2473e2bfab073ccd7d03670946197aec98471fa3e"
+dependencies = [
+ "log",
+ "slog",
+ "slog-scope",
+]
+
+[[package]]
+name = "slog-term"
+version = "2.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6e022d0b998abfe5c3782c1f03551a596269450ccd677ea51c56f8b214610e8"
+dependencies = [
+ "is-terminal",
+ "slog",
+ "term",
+ "thread_local",
+ "time 0.3.34",
 ]
 
 [[package]]
@@ -6761,6 +6864,12 @@ dependencies = [
  "core-foundation-sys",
  "libc",
 ]
+
+[[package]]
+name = "take_mut"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f764005d11ee5f36500a149ace24e00e3da98b0158b3e2d53a7495660d3f4d60"
 
 [[package]]
 name = "tantivy"

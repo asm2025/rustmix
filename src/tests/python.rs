@@ -1,12 +1,8 @@
 use anyhow::Result;
-
-#[cfg(feature = "python")]
 use pyo3::types::PyBytes;
 
-#[cfg(feature = "python")]
 use rustmix::python;
 
-#[cfg(feature = "python")]
 pub fn test_python() -> Result<()> {
     let version = python::version()?;
     let user = python::user()?;
