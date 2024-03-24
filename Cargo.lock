@@ -5028,8 +5028,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "53bdbb96d49157e65d45cc287af5f32ffadd5f4761438b527b055fb0d4bb8233"
 dependencies = [
  "cfg-if 1.0.0",
- "hashbrown 0.14.3",
- "indexmap 2.2.6",
  "indoc",
  "libc",
  "memoffset",
@@ -5038,8 +5036,6 @@ dependencies = [
  "pyo3-build-config",
  "pyo3-ffi",
  "pyo3-macros",
- "serde 1.0.197",
- "smallvec",
  "unindent",
 ]
 
@@ -8033,7 +8029,6 @@ dependencies = [
  "form_urlencoded",
  "idna 0.5.0",
  "percent-encoding",
- "serde 1.0.197",
 ]
 
 [[package]]

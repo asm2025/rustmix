@@ -1,15 +1,15 @@
 use log4rs::{
     append::{
         console::ConsoleAppender,
-        file::FileAppender,
         rolling_file::{
-            policy::compound::trigger::size::SizeTrigger, policy::compound::CompoundPolicy,
+            policy::compound::{
+                roll::fixed_window::FixedWindowRoller, trigger::size::SizeTrigger, CompoundPolicy,
+            },
             RollingFileAppender,
         },
     },
     config::{Appender, Config, Logger, Root},
     encode::pattern::PatternEncoder,
-    filter::threshold::ThresholdFilter,
     Handle,
 };
 use std::path::{PathBuf, MAIN_SEPARATOR};
@@ -21,7 +21,7 @@ pub fn init(fle_name: &str) -> Handle {
     init_with(fle_name, LogLevel::Info, None)
 }
 
-pub fn init_with(fle_name: &str, level: LogLevel, limit: Option<usize>) -> Handle {
+pub fn init_with(file_name: &str, level: LogLevel, limit: Option<usize>) -> Handle {
     if file_name.is_empty() {
         panic!("File name is empty");
     }
@@ -39,9 +39,13 @@ pub fn init_with(fle_name: &str, level: LogLevel, limit: Option<usize>) -> Handl
             LOG_DATE_FORMAT
         ))))
         .build();
-    let size_trigger = SizeTrigger::new(LOG_SIZE_MAX);
+    let size_trigger = SizeTrigger::new(
+        limit
+            .unwrap_or(LOG_SIZE_MAX)
+            .clamp(LOG_SIZE_MIN, LOG_SIZE_MAX) as u64,
+    );
     let fix_window_roller = FixedWindowRoller::builder()
-        .build(roller_pattern, 6)
+        .build(&roller_pattern, 6)
         .unwrap();
     let policy = CompoundPolicy::new(Box::new(size_trigger), Box::new(fix_window_roller));
     let file = RollingFileAppender::builder()
@@ -49,13 +53,13 @@ pub fn init_with(fle_name: &str, level: LogLevel, limit: Option<usize>) -> Handl
             "{{d({})}} | [({{l}})5.5] | {{M}} | {{m}}{{n}}{{D({{f}}:{{L}})}}",
             LOG_DATE_FORMAT
         ))))
-        .build(fle_name, Box::new(policy))
+        .build(file_name, Box::new(policy))
         .unwrap();
     let config = Config::builder()
         .appender(Appender::builder().build("console", Box::new(console)))
         .appender(Appender::builder().build("file", Box::new(file)))
         .logger(
-            logger::builder()
+            Logger::builder()
                 .appender("console")
                 .build("console", level.into()),
         )
