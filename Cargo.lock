@@ -1897,6 +1897,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "file-rotate"
+version = "0.7.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ddf221ceec4517f3cb764dae3541b2bd87666fc8832e51322fbb97250b468c71"
+dependencies = [
+ "chrono",
+ "flate2",
+]
+
+[[package]]
 name = "filetime"
 version = "0.2.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5804,6 +5814,7 @@ dependencies = [
  "crossbeam",
  "csv",
  "dotenv",
+ "file-rotate",
  "futures",
  "html-entities",
  "kalosm",
@@ -5820,7 +5831,6 @@ dependencies = [
  "slog",
  "slog-async",
  "slog-envlogger",
- "slog-json",
  "slog-scope",
  "slog-stdlog",
  "slog-term",
@@ -6320,18 +6330,6 @@ dependencies = [
  "slog-scope",
  "slog-stdlog",
  "slog-term",
-]
-
-[[package]]
-name = "slog-json"
-version = "2.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e1e53f61af1e3c8b852eef0a9dee29008f55d6dd63794f3f12cef786cf0f219"
-dependencies = [
- "serde",
- "serde_json",
- "slog",
- "time 0.3.34",
 ]
 
 [[package]]
