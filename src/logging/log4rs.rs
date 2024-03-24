@@ -1,0 +1,76 @@
+use log4rs::{
+    append::{
+        console::ConsoleAppender,
+        file::FileAppender,
+        rolling_file::{
+            policy::compound::trigger::size::SizeTrigger, policy::compound::CompoundPolicy,
+            RollingFileAppender,
+        },
+    },
+    config::{Appender, Config, Logger, Root},
+    encode::pattern::PatternEncoder,
+    filter::threshold::ThresholdFilter,
+    Handle,
+};
+use std::path::{PathBuf, MAIN_SEPARATOR};
+
+use super::{LogLevel, LOG_DATE_FORMAT, LOG_SIZE_MAX, LOG_SIZE_MIN};
+use crate::string::StringEx;
+
+pub fn init(fle_name: &str) -> Handle {
+    init_with(fle_name, LogLevel::Info, None)
+}
+
+pub fn init_with(fle_name: &str, level: LogLevel, limit: Option<usize>) -> Handle {
+    if file_name.is_empty() {
+        panic!("File name is empty");
+    }
+
+    let mut path = PathBuf::from(file_name);
+    let folder = match path.parent() {
+        Some(folder) => folder.to_str().unwrap().suffix(MAIN_SEPARATOR),
+        None => "".to_string(),
+    };
+    let base_name = path.file_stem().unwrap().to_str().unwrap().to_string();
+    let compression_pattern = format!("{}{}.{{}}.gz", folder, base_name);
+    let console = ConsoleAppender::builder()
+        .encoder(Box::new(PatternEncoder::new(&format!(
+            "{{d({})}} | [({{l}})5.5] | {{M}} | {{m}}{{n}}",
+            LOG_DATE_FORMAT
+        ))))
+        .build();
+    let size_trigger = SizeTrigger::new(LOG_SIZE_MAX);
+    let fix_window_roller = FixedWindowRoller::builder()
+        .build(compression_pattern, 6)
+        .unwrap();
+    let policy = CompoundPolicy::new(Box::new(size_trigger), Box::new(fix_window_roller));
+    let file = RollingFileAppender::builder()
+        .encoder(Box::new(PatternEncoder::new(&format!(
+            "{{d({})}} | [({{l}})5.5] | {{M}} | {{m}}{{n}}{{D({{f}}:{{L}})}}",
+            LOG_DATE_FORMAT
+        ))))
+        .build(fle_name, Box::new(policy))
+        .unwrap();
+    let config = Config::builder()
+        .appender(Appender::builder().build("console", Box::new(console)))
+        .appender(Appender::builder().build("file", Box::new(file)))
+        .logger(
+            logger::builder()
+                .appender("console")
+                .build("console", level.into()),
+        )
+        .logger(
+            Logger::builder()
+                .appender("file")
+                .additive(true)
+                .build("file", level.into()),
+        )
+        .build(
+            Root::builder()
+                .appender("console")
+                .appender("file")
+                .build(level.into()),
+        )
+        .unwrap();
+    log4rs::init_config(config).unwrap()
+}

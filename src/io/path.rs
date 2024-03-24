@@ -179,10 +179,75 @@ impl<T: AsRef<str>> AsPath<T> for Vec<T> {
     }
 }
 
-pub fn split_path<T: AsRef<str>>(path: T) -> Vec<String> {
+pub fn normalize<T: AsRef<str>>(path: T) -> String {
+    let path = PathBuf::from(path.as_ref());
+    path.to_string_lossy().to_string()
+}
+
+pub fn get_full_path<T: AsRef<str>>(path: T) -> String {
+    let path = PathBuf::from(path.as_ref());
+    path.canonicalize()
+        .unwrap_or_else(|_| path)
+        .to_string_lossy()
+        .to_string()
+}
+
+pub fn is_absolute<T: AsRef<str>>(path: T) -> bool {
+    Path::new(path.as_ref()).is_absolute()
+}
+
+pub fn is_relative<T: AsRef<str>>(path: T) -> bool {
+    Path::new(path.as_ref()).is_relative()
+}
+
+pub fn has_separator<T: AsRef<str>>(path: T) -> bool {
+    path.as_ref().contains(std::path::is_separator)
+}
+
+pub fn split<T: AsRef<str>>(path: T) -> Vec<String> {
     let path = PathBuf::from(path.as_ref());
     path.iter()
         .filter(|e| !e.is_empty())
         .map(|e| e.to_string_lossy().to_string())
         .collect()
+}
+
+pub fn parent<T: AsRef<str>>(path: T) -> String {
+    let path = PathBuf::from(path.as_ref());
+    path.parent()
+        .map(|e| e.to_string_lossy().to_string())
+        .unwrap_or_default()
+}
+
+pub fn name<T: AsRef<str>>(path: T) -> String {
+    let path = PathBuf::from(path.as_ref());
+    path.file_name()
+        .map(|e| e.to_string_lossy().to_string())
+        .unwrap_or_default()
+}
+
+pub fn base_name<T: AsRef<str>>(path: T) -> String {
+    let path = PathBuf::from(path.as_ref());
+    path.file_stem()
+        .map(|e| e.to_string_lossy().to_string())
+        .unwrap_or_default()
+}
+
+pub fn extension<T: AsRef<str>>(path: T) -> String {
+    let path = PathBuf::from(path.as_ref());
+    path.extension()
+        .map(|e| e.to_string_lossy().to_string())
+        .unwrap_or_default()
+}
+
+pub fn set_extension<T: AsRef<str>>(path: T, ext: Option<&str>) -> String {
+    let mut path = PathBuf::from(path.as_ref());
+
+    if let Some(ext) = ext {
+        path.set_extension(ext);
+    } else {
+        path.set_extension("");
+    }
+
+    path.to_string_lossy().to_string()
 }

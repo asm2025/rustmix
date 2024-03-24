@@ -69,7 +69,7 @@ pub fn test_directory() -> Result<()> {
         }
     }
 
-    let parts = path::split_path(&path.as_str());
+    let parts = path::split(&path.as_str());
 
     for part in parts {
         println!("{}", &part);

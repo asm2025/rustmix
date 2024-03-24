@@ -4,12 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-default = ["mail", "threading", "logging-slog"]
+default = ["mail", "threading", "log4rs", "slog"]
 mail = ["html-entities", "lettre", "tempmail", "once_cell", "regex"]
 python = ["pyo3"]
 whisper = ["kalosm"]
 threading = ["crossbeam", "rayon"]
-logging-slog = ["log", "slog", "slog-term", "slog-stdlog", "slog-async", "slog-scope", "file-rotate"]
+log-slog = ["log", "slog", "slog-config", "slog-term", "slog-stdlog", "slog-async", "slog-scope", "file-rotate"]
+log-log4rs = ["log", "log4rs"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -38,14 +39,17 @@ pyo3 = { version = "0", features = ["auto-initialize", "abi3", "hashbrown", "ind
 kalosm = { version = "0", optional = true }
 log = { version = "0", optional = true }
 slog = { version = "2", optional = true }
+slog-config = { version = "0", optional = true }
 slog-term = { version = "2", optional = true }
 slog-stdlog = { version = "4", optional = true }
 slog-async = { version = "2", optional = true }
 slog-scope = { version = "4", optional = true }
 file-rotate = { version = "0", optional = true }
+log4rs = { version = "1", optional = true }
 
 [package.metadata.scripts]
 run = "cargo run"
 check = "cargo check"
 build = "cargo build"
 release = "cargo build --release"
+features = "cargo tree --features"

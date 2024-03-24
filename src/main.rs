@@ -26,7 +26,8 @@ async fn main() -> Result<()> {
 
     //tests::whisper::test_whisper().await?;
 
-    //tests::loggin_slog::test_loggin_slog()?;
+    //tests::slog::test_slog()?;
+    tests::log4rs::test_log4rs()?;
 
     Ok(())
 }

@@ -1,12 +1,14 @@
 use serde::{Deserialize, Serialize};
 
 pub mod io;
-#[cfg(feature = "logging-slog")]
-pub mod loggin_slog;
+#[cfg(feature = "log4rs")]
+pub mod log4rs;
 #[cfg(feature = "mail")]
 pub mod mail;
 #[cfg(feature = "python")]
 pub mod python;
+#[cfg(feature = "slog")]
+pub mod slog;
 #[cfg(feature = "threading")]
 pub mod threading;
 pub mod web;

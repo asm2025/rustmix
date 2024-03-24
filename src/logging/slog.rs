@@ -16,10 +16,12 @@ use super::{LogLevel, LOG_DATE_FORMAT, LOG_SIZE_MAX, LOG_SIZE_MIN};
 impl From<LogLevel> for slog::Level {
     fn from(level: LogLevel) -> slog::Level {
         match level {
+            LogLevel::Off => slog::Level::Critical,
             LogLevel::Trace => slog::Level::Trace,
             LogLevel::Debug => slog::Level::Debug,
             LogLevel::Warn => slog::Level::Warning,
             LogLevel::Error => slog::Level::Error,
+            LogLevel::Critical => slog::Level::Critical,
             _ => slog::Level::Info,
         }
     }
@@ -66,14 +68,13 @@ impl Drain for TsvDrain {
         let mut logger = self.logger.lock().unwrap();
         writeln!(
             &mut logger,
-            "{}\t[{}]\t{}\t{}{}",
+            "{} | [{:5.5}] | {} | {}{}",
             Local::now().format(LOG_DATE_FORMAT),
             record.level(),
             record.tag(),
             record.msg(),
             json
         )?;
-
         Ok(())
     }
 }
@@ -83,6 +84,10 @@ pub fn init(fle_name: &str) -> GlobalLoggerGuard {
 }
 
 pub fn init_with(fle_name: &str, level: LogLevel, limit: Option<usize>) -> GlobalLoggerGuard {
+    if file_name.is_empty() {
+        panic!("File name is empty");
+    }
+
     let decorator = TermDecorator::new().build();
     let term_drain = FullFormat::new(decorator)
         .use_custom_timestamp(|w| write!(w, "{}", Local::now().format(LOG_DATE_FORMAT)))
