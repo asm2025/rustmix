@@ -9,7 +9,7 @@ mail = ["html-entities", "lettre", "tempmail", "once_cell", "regex"]
 python = ["pyo3"]
 whisper = ["kalosm"]
 threading = ["crossbeam", "rayon"]
-logging-slog = ["log", "slog", "slog-term", "slog-stdlog", "slog-async", "slog-scope", "slog-envlogger", "file-rotate"]
+logging-slog = ["log", "slog", "slog-term", "slog-stdlog", "slog-async", "slog-scope", "file-rotate"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -42,7 +42,6 @@ slog-term = { version = "2", optional = true }
 slog-stdlog = { version = "4", optional = true }
 slog-async = { version = "2", optional = true }
 slog-scope = { version = "4", optional = true }
-slog-envlogger = { version = "2", optional = true }
 file-rotate = { version = "0", optional = true }
 
 [package.metadata.scripts]
