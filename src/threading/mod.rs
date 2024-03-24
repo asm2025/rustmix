@@ -1,9 +1,9 @@
+use std::{fmt, time::Duration};
+
 pub mod consumer;
 pub mod injector_consumer;
 pub mod parallel_consumer;
 pub mod producer_consumer;
-
-use std::{fmt, time::Duration};
 
 const CAPACITY_DEF: usize = 0;
 const THREADS_DEF: usize = 1;

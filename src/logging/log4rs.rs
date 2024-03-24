@@ -32,7 +32,7 @@ pub fn init_with(fle_name: &str, level: LogLevel, limit: Option<usize>) -> Handl
         None => "".to_string(),
     };
     let base_name = path.file_stem().unwrap().to_str().unwrap().to_string();
-    let compression_pattern = format!("{}{}.{{}}.gz", folder, base_name);
+    let roller_pattern = format!("{}{}.{{}}.old", folder, base_name);
     let console = ConsoleAppender::builder()
         .encoder(Box::new(PatternEncoder::new(&format!(
             "{{d({})}} | [({{l}})5.5] | {{M}} | {{m}}{{n}}",
@@ -41,7 +41,7 @@ pub fn init_with(fle_name: &str, level: LogLevel, limit: Option<usize>) -> Handl
         .build();
     let size_trigger = SizeTrigger::new(LOG_SIZE_MAX);
     let fix_window_roller = FixedWindowRoller::builder()
-        .build(compression_pattern, 6)
+        .build(roller_pattern, 6)
         .unwrap();
     let policy = CompoundPolicy::new(Box::new(size_trigger), Box::new(fix_window_roller));
     let file = RollingFileAppender::builder()

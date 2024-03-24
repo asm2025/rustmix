@@ -1,9 +1,9 @@
+use log::LevelFilter;
+
 #[cfg(feature = "log-log4rs")]
 pub mod log4rs;
 #[cfg(feature = "log-slog")]
 pub mod slog;
-
-use log::LevelFilter;
 
 pub const LOG_DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S.%f";
 pub const LOG_SIZE_MIN: usize = 1024 * 1024 * 2;

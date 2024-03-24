@@ -1,8 +1,8 @@
-pub mod http;
-pub mod url;
-
 use reqwest::header;
 use ua_generator::ua;
+
+pub mod http;
+pub mod url;
 
 pub fn get_user_agent() -> String {
     ua::spoof_ua().to_owned()
