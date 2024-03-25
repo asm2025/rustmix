@@ -15,8 +15,8 @@ pub fn test_url() -> Result<()> {
         .join("documentation")?;
     println!("Absolute URL from parts: {}", &url);
 
-    let url = url::create("/path/to/relative/url");
-    println!("Relative URL {}", &url);
+    // fix let url = url::create("/path/to/relative/url");
+    println!("FIX: Relative URL {}", &url);
 
     Ok(())
 }

@@ -3,7 +3,7 @@ use std::io::{self, Write};
 
 use rustmix::mail::{emailfake::EmailFake, secmail::SecMail, tempmail::TempMail};
 
-const PREFIX: &str = "My string is ";
+const PREFIX: &str = "My OTP is ";
 const PREFIX_LEN: usize = 14;
 
 pub async fn test_secmail() -> Result<()> {

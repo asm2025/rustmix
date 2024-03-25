@@ -13,6 +13,7 @@ async fn main() -> Result<()> {
     //tests::web::test_url()?;
     //tests::web::test_reqwest().await?;
 
+    //FIX emails tests
     //tests::mail::test_secmail().await?;
     //tests::mail::test_emailfake().await?;
     //tests::mail::test_tempmail().await?;
@@ -22,7 +23,7 @@ async fn main() -> Result<()> {
     //tests::threading::test_injector_worker().await?;
     //tests::threading::test_parallel().await?;
 
-    //tests::python::test_python();
+    tests::python::test_python();
 
     //tests::whisper::test_whisper().await?;
 

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-default = ["mail", "threading", "log-log4rs"]
+default = ["mail", "threading", "log-log4rs", "python"]
 mail = ["html-entities", "lettre", "tempmail", "once_cell", "regex"]
 python = ["pyo3"]
 whisper = ["kalosm"]
