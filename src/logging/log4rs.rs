@@ -34,10 +34,7 @@ pub fn init_with(file_name: &str, level: LogLevel, limit: Option<usize>) -> Hand
     let base_name = path.file_stem().unwrap().to_str().unwrap().to_string();
     let roller_pattern = format!("{}{}.{{}}.old", folder, base_name);
     let console = ConsoleAppender::builder()
-        .encoder(Box::new(PatternEncoder::new(&format!(
-            "{{d({})}} | {{l:5.5}} | {{M}} | {{m}}{{n}}",
-            LOG_DATE_FORMAT
-        ))))
+        .encoder(Box::new(PatternEncoder::new("{l:5.5}| {M} | {m}{n}")))
         .build();
     let size_trigger = SizeTrigger::new(
         limit

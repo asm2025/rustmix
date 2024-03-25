@@ -90,7 +90,7 @@ pub fn init_with(fle_name: &str, level: LogLevel, limit: Option<usize>) -> Globa
 
     let decorator = TermDecorator::new().build();
     let term_drain = FullFormat::new(decorator)
-        .use_custom_timestamp(|w| write!(w, "{}", Local::now().format(LOG_DATE_FORMAT)))
+        .use_custom_timestamp(|out| {})
         .build()
         .fuse();
     let logger = FileRotate::new(
