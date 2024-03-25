@@ -1,3 +1,4 @@
+use anyhow::Result;
 use chrono::Local;
 use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit, FileRotate};
 use serde_json::json;
@@ -65,7 +66,7 @@ impl Drain for TsvDrain {
         } else {
             "".to_string()
         };
-        let mut logger = self.logger.lock().unwrap();
+        let mut logger = self.logger.lock()?;
         writeln!(
             &mut logger,
             "{} | {:5.5} | {} | {}{}",
@@ -79,11 +80,15 @@ impl Drain for TsvDrain {
     }
 }
 
-pub fn init(fle_name: &str) -> GlobalLoggerGuard {
+pub fn init(fle_name: &str) -> Result<GlobalLoggerGuard> {
     init_with(fle_name, LogLevel::Info, None)
 }
 
-pub fn init_with(fle_name: &str, level: LogLevel, limit: Option<usize>) -> GlobalLoggerGuard {
+pub fn init_with(
+    fle_name: &str,
+    level: LogLevel,
+    limit: Option<usize>,
+) -> Result<GlobalLoggerGuard> {
     if file_name.is_empty() {
         panic!("File name is empty");
     }
@@ -111,6 +116,6 @@ pub fn init_with(fle_name: &str, level: LogLevel, limit: Option<usize>) -> Globa
         .build()
         .fuse();
     let logger = Logger::root(drain, o!());
-    slog_stdlog::init().unwrap();
+    slog_stdlog::init()?;
     slog_scope::set_global_logger(logger)
 }

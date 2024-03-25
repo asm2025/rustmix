@@ -1,0 +1,42 @@
+# set a refresh rate
+refresh_rate: 30 seconds
+
+appenders:
+    # this appender will append to the console
+    console:
+        kind: console
+        encoder:
+            pattern: "{l:5.5}| {M} | {m}{n}"
+    # this appender will append to a log file
+    file:
+        kind: rolling_file
+        path: "_logs/test.log"
+        append: true
+        encoder:
+            pattern: "{d(%Y-%m-%d %H:%M:%S.%f)} | {l:5.5} | {M} | {m}{D( | {f}:{L})}{n}"
+        policy:
+            kind: compound
+            trigger:
+                kind: size
+                limit: 10mb
+            roller:
+                kind: fixed_window
+                base: 1
+                count: 6
+                pattern: "_logs/test.{}.old.log"
+# set minimum logging level - log messages below the mnimum won't be recorded
+loggers:
+    console:
+        level: info
+        appenders:
+            - console
+    file:
+        level: info
+        appenders:
+            - file
+# the root logger is the parent of all loggers
+root:
+    level: info
+    appenders:
+        - console
+        - file
