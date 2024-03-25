@@ -26,7 +26,7 @@ pub fn init_with(file_name: &str, level: LogLevel, limit: Option<usize>) -> Hand
         panic!("File name is empty");
     }
 
-    let mut path = PathBuf::from(file_name);
+    let path = PathBuf::from(file_name);
     let folder = match path.parent() {
         Some(folder) => folder.to_str().unwrap().suffix(MAIN_SEPARATOR),
         None => "".to_string(),
@@ -35,7 +35,7 @@ pub fn init_with(file_name: &str, level: LogLevel, limit: Option<usize>) -> Hand
     let roller_pattern = format!("{}{}.{{}}.old", folder, base_name);
     let console = ConsoleAppender::builder()
         .encoder(Box::new(PatternEncoder::new(&format!(
-            "{{d({})}} | [({{l}})5.5] | {{M}} | {{m}}{{n}}",
+            "{{d({})}} | {{l:5.5}} | {{M}} | {{m}}{{n}}",
             LOG_DATE_FORMAT
         ))))
         .build();
@@ -50,7 +50,7 @@ pub fn init_with(file_name: &str, level: LogLevel, limit: Option<usize>) -> Hand
     let policy = CompoundPolicy::new(Box::new(size_trigger), Box::new(fix_window_roller));
     let file = RollingFileAppender::builder()
         .encoder(Box::new(PatternEncoder::new(&format!(
-            "{{d({})}} | [({{l}})5.5] | {{M}} | {{m}}{{n}}{{D({{f}}:{{L}})}}",
+            "{{d({})}} | {{l:5.5}} | {{M}} | {{m}}{{D( | {{f}}:{{L}})}}{{n}}",
             LOG_DATE_FORMAT
         ))))
         .build(file_name, Box::new(policy))

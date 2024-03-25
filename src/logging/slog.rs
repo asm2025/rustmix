@@ -68,7 +68,7 @@ impl Drain for TsvDrain {
         let mut logger = self.logger.lock().unwrap();
         writeln!(
             &mut logger,
-            "{} | [{:5.5}] | {} | {}{}",
+            "{} | {:5.5} | {} | {}{}",
             Local::now().format(LOG_DATE_FORMAT),
             record.level(),
             record.tag(),
