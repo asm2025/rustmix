@@ -29,8 +29,7 @@ async fn main() -> Result<()> {
 
     // Cannot test building from config and code to test building loogers at the same time
     // Once logging is initialized, it cannot be reinitialized
-    //tests::slog::test_slog(true)?;
-    tests::slog::test_slog(false)?;
+    //tests::slog::test_slog()?;
     //tests::log4rs::test_log4rs(true)?;
     //tests::log4rs::test_log4rs(false)?;
 
