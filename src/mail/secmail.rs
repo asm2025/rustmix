@@ -8,6 +8,16 @@ pub struct SecMail {
 }
 
 impl SecMail {
+    const DOMAINS: [&'static str; 7] = [
+        "1secmail.com",
+        "1secmail.org",
+        "1secmail.net",
+        "wwjmp.com",
+        "esiix.com",
+        "xojxe.com",
+        "yoggm.com",
+    ];
+
     pub fn new(user_name: &str, domain: Domain) -> Self {
         if user_name.is_empty() {
             panic!("user_name is empty");
@@ -22,6 +32,10 @@ impl SecMail {
         SecMail {
             email: Tempmail::random(),
         }
+    }
+
+    pub fn generate() -> String {
+        SecMail::random().address()
     }
 
     pub fn from(email: &Tempmail) -> Self {
@@ -119,6 +133,10 @@ impl SecMail {
         }
 
         Ok("".to_string())
+    }
+
+    pub fn get_domains() -> Vec<&'static str> {
+        Self::DOMAINS.iter().copied().collect()
     }
 }
 

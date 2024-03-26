@@ -9,16 +9,19 @@ const PREFIX_LEN: usize = 14;
 pub async fn test_secmail() -> Result<()> {
     println!("\nTesting SecMail functions...");
 
-    let mut email = SecMail::random();
-    print!("Enter the email [default: {}]: ", email.address());
+    println!("The supported domains for this class are:");
+    println!("{}", SecMail::get_domains().join(", "));
+    print!("Enter the email address [ENTER to generate]: ");
     io::stdout().flush().unwrap();
     let mut input = String::new();
     io::stdin().read_line(&mut input)?;
     let input = input.trim();
 
-    if !input.is_empty() {
-        email = SecMail::parse(input);
-    }
+    let email = if input.is_empty() {
+        SecMail::random()
+    } else {
+        SecMail::parse(input)
+    };
 
     print!("Enter the sender email [default: None]: ");
     io::stdout().flush().unwrap();
