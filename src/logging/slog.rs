@@ -1,11 +1,12 @@
 use anyhow::Result;
 use chrono::Local;
 use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit, FileRotate};
-use slog::{o, Drain, FnValue, Logger};
+use slog::{o, Drain, FnValue, Logger, OwnedKVList, Record};
 use slog_async::Async;
 use slog_json::Json;
 use slog_scope::GlobalLoggerGuard;
-use slog_term::{FullFormat, TermDecorator};
+use slog_term::{Decorator, PlainSyncDecorator};
+use std::io;
 
 use super::{LogLevel, LOG_DATE_FORMAT, LOG_SIZE_MAX, LOG_SIZE_MIN};
 
@@ -23,6 +24,27 @@ impl From<LogLevel> for slog::Level {
     }
 }
 
+struct CustomDecorator<D: Decorator> {
+    decorator: D,
+}
+
+impl<D: Decorator> CustomDecorator<D> {
+    fn new(decorator: D) -> Self {
+        Self { decorator }
+    }
+}
+
+impl<D: Decorator> Drain for CustomDecorator<D> {
+    type Ok = ();
+    type Err = io::Error;
+
+    fn log(&self, record: &Record, values: &OwnedKVList) -> io::Result<()> {
+        self.decorator.with_record(record, values, |d| {
+            writeln!(d, "{}| {} | {}", record.level(), record.tag(), record.msg())
+        })
+    }
+}
+
 pub fn init(file_name: &str) -> Result<GlobalLoggerGuard> {
     init_with(file_name, LogLevel::Info, None)
 }
@@ -36,11 +58,8 @@ pub fn init_with(
         panic!("File name is empty");
     }
 
-    let decorator = TermDecorator::new().force_color().build();
-    let drain = FullFormat::new(decorator)
-        .use_custom_timestamp(|_| Ok(()))
-        .build()
-        .fuse();
+    let decorator = PlainSyncDecorator::new(io::stdout());
+    let drain = CustomDecorator::new(decorator);
     let logger = FileRotate::new(
         file_name,
         AppendCount::new(6),
@@ -68,6 +87,13 @@ pub fn init_with(
         })))
         .add_key_value(o!("arguments" => FnValue(|_| {
             None::<&str>
+        })))
+        .add_key_value(o!("location" => FnValue(|r| {
+            if cfg!(debug_assertions) {
+                Some(format!("{}:{}", &r.file(), &r.line()))
+            } else {
+                None
+            }
         })))
         .build()
         .fuse();
