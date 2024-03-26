@@ -18,8 +18,8 @@ use std::path::{PathBuf, MAIN_SEPARATOR};
 use super::{LogLevel, LOG_DATE_FORMAT, LOG_SIZE_MAX, LOG_SIZE_MIN};
 use crate::string::StringEx;
 
-pub fn init(fle_name: &str) -> Result<Handle> {
-    init_with(fle_name, LogLevel::Info, None)
+pub fn init(file_name: &str) -> Result<Handle> {
+    init_with(file_name, LogLevel::Info, None)
 }
 
 pub fn init_with(file_name: &str, level: LogLevel, limit: Option<usize>) -> Result<Handle> {

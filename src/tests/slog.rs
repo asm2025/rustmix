@@ -9,14 +9,14 @@ pub fn test_slog(from_config_file: bool) -> Result<()> {
     if from_config_file {
         println!("Building loggers from file...");
         let path = ("test", "slog.toml").as_path();
-        slog::init_file(&path)?;
+        //let _gaurd = slog::init_file(&path)?;
         println!("Logger was built");
-        log_a_few_messages("Messages configured logger from a toml file:");
+        //log_a_few_messages("Messages configured logger from a toml file:");
         println!("Check the log file at: {}", &path);
     } else {
         println!("Building loggers from code...");
         let path = ("_logs", "test.log").as_path();
-        slog::init(&path)?;
+        let _gaurd = slog::init(&path)?;
         println!("Logger was built");
         log_a_few_messages("Messages configured logger programmatically:");
         println!("Check the log file at: {}", &path);
