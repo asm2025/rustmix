@@ -13,8 +13,7 @@ async fn main() -> Result<()> {
     //tests::web::test_url()?;
     //tests::web::test_reqwest().await?;
 
-    //FIX emails tests
-    tests::mail::test_secmail().await?;
+    //tests::mail::test_secmail().await?;
     //tests::mail::test_emailfake().await?;
     //tests::mail::test_tempmail().await?;
 

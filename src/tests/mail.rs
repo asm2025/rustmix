@@ -8,7 +8,6 @@ const PREFIX_LEN: usize = 14;
 
 pub async fn test_secmail() -> Result<()> {
     println!("\nTesting SecMail functions...");
-
     println!("The supported domains for this class are:");
     println!("{}", SecMail::get_domains().join(", "));
     print!("Enter the email address [ENTER to generate]: ");
@@ -43,17 +42,17 @@ pub async fn test_secmail() -> Result<()> {
 
 pub async fn test_emailfake() -> Result<()> {
     println!("\nTesting EmailFake functions...");
-
-    let mut email = EmailFake::random().await?;
-    print!("Enter the email [default: {}]: ", email.address());
+    print!("Enter the email [ENTER to generate]: ");
     io::stdout().flush().unwrap();
     let mut input = String::new();
     io::stdin().read_line(&mut input)?;
     let input = input.trim();
 
-    if !input.is_empty() {
-        email = EmailFake::parse(input);
-    }
+    let email = if input.is_empty() {
+        EmailFake::random().await?
+    } else {
+        EmailFake::parse(input)
+    };
 
     print!("Enter the sender email [default: None]: ");
     io::stdout().flush().unwrap();
@@ -74,18 +73,18 @@ pub async fn test_emailfake() -> Result<()> {
 }
 
 pub async fn test_tempmail() -> Result<()> {
-    println!("\nTesting TempMail functions...");
-
-    let mut email = TempMail::random().await?;
-    print!("Enter the email [default: {}]: ", email.address());
+    println!("\nTesting Tempmail functions...");
+    print!("Enter the email [ENTER to generate]: ");
     io::stdout().flush().unwrap();
     let mut input = String::new();
     io::stdin().read_line(&mut input)?;
     let input = input.trim();
 
-    if !input.is_empty() {
-        email = TempMail::parse(input);
-    }
+    let email = if input.is_empty() {
+        TempMail::random().await?
+    } else {
+        TempMail::parse(input)
+    };
 
     print!("Enter the sender email [default: None]: ");
     io::stdout().flush().unwrap();
