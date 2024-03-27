@@ -2,21 +2,23 @@ use anyhow::Result;
 use std::collections::HashMap;
 
 use super::{get_employees, Employee};
-use rustmix::web::{http::Response, url, *};
+use rustmix::web::{
+    http::Response,
+    url::{self, AsUrl},
+    *,
+};
 
 pub fn test_url() -> Result<()> {
     println!("\nTesting Url functions...");
 
-    let url = url::create("https://www.rust-lang.org");
+    let url = "https://www.rust-lang.org".as_url()?;
     println!("Absolute URL: {}", &url);
 
-    let url = url::create("https://www.rust-lang.org")
-        .join("en-US")?
-        .join("documentation")?;
+    let url = ("https://www.rust-lang.org", "en-US", "documentation").as_url()?;
     println!("Absolute URL from parts: {}", &url);
 
-    // fix let url = url::create("/path/to/relative/url");
-    println!("FIX: Relative URL {}", &url);
+    let url = "/path/to/relative/url".as_url()?;
+    println!("Relative URL {}", &url);
 
     Ok(())
 }
@@ -29,13 +31,13 @@ pub async fn test_reqwest() -> Result<()> {
 
     let client = build_client().build()?;
 
-    let url = url::create(BASE_URL).join("get?p1=foo&p2=baz")?;
+    let url = (BASE_URL, "get?p1=foo&p2=baz").as_url()?;
     println!("Get: '{url}'");
     let response = client.get(url).send().await?;
     println!("response: {response:#?}");
     println!("json: {:#?}", response.json::<Response>().await?);
 
-    let url = url::create(BASE_URL).join("post")?;
+    let url = (BASE_URL, "post").as_url()?;
     let body = get_employees(3);
     println!("Post: '{url}'");
     let response = client
@@ -52,7 +54,7 @@ pub async fn test_reqwest() -> Result<()> {
         println!("employees: {:#?}", employees);
     }
 
-    let url = url::create(BASE_URL).join("ip")?;
+    let url = (BASE_URL, "ip").as_url()?;
     println!("IP: '{url}'");
     let response = client
         .get(url)
@@ -62,7 +64,7 @@ pub async fn test_reqwest() -> Result<()> {
         .await?;
     println!("response: {response:#?}");
 
-    let url = url::create(BASE_URL).join("cookies/set?freeform=test&ff=12345")?;
+    let url = (BASE_URL, "cookies/set?freeform=test&ff=12345").as_url()?;
     println!("Cookies: '{url}'");
     let response = client
         .get(url)

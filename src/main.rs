@@ -10,7 +10,7 @@ async fn main() -> Result<()> {
     //tests::io::test_directory()?;
     //tests::io::test_file()?;
 
-    //tests::web::test_url()?;
+    tests::web::test_url()?;
     //tests::web::test_reqwest().await?;
 
     //tests::mail::test_secmail().await?;
