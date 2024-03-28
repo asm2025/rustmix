@@ -1,4 +1,5 @@
-use std::{fmt, time::Duration};
+use anyhow::Result;
+use std::{fmt, future::Future, time::Duration};
 
 pub mod consumer;
 pub mod injector_consumer;
@@ -55,4 +56,12 @@ impl fmt::Display for QueueBehavior {
             QueueBehavior::LIFO => write!(f, "LIFO"),
         }
     }
+}
+
+pub trait TaskDelegation<TD: Send + Clone + 'static, T: Send + Clone + 'static> {
+    fn on_started(&self, td: &TD);
+    fn process(&self, td: &TD, item: &T) -> Result<TaskResult>;
+    fn process_async(&self, td: &TD, item: &T) -> impl Future<Output = Result<TaskResult>> + Send;
+    fn on_completed(&self, td: &TD, item: &T, result: &TaskResult) -> bool;
+    fn on_finished(&self, td: &TD);
 }

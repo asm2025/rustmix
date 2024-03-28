@@ -105,7 +105,7 @@ impl<T: AsRef<str>> IntoPath<T> for (T, T, T, T, T) {
     }
 }
 
-impl<T: AsRef<str>> IntoPath<T> for [T] {
+impl<T: AsRef<str>, const N: usize> IntoPath<T> for [T; N] {
     fn into_path(&self) -> PathBuf {
         let mut path = PathBuf::new();
 
@@ -165,7 +165,7 @@ impl<T: AsRef<str>> AsPath<T> for (T, T, T, T, T) {
     }
 }
 
-impl<T: AsRef<str>> AsPath<T> for [T] {
+impl<T: AsRef<str>, const N: usize> AsPath<T> for [T; N] {
     fn as_path(&self) -> String {
         let path = self.into_path();
         path.as_str().to_string()

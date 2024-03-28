@@ -86,7 +86,7 @@ impl<T: AsRef<str>> AsUrl<T> for (T, T, T, T, T) {
     }
 }
 
-impl<T: AsRef<str>> AsUrl<T> for [T] {
+impl<T: AsRef<str>, const N: usize> AsUrl<T> for [T; N] {
     fn as_url(&self) -> Result<Url> {
         self.iter().try_fold(create(&self[0])?, |url, component| {
             append_if_not_empty(&url, component)

@@ -7,6 +7,7 @@ use std::{
         Arc,
     },
     thread,
+    time::Instant,
 };
 
 use rustmix::threading::{
@@ -15,10 +16,9 @@ use rustmix::threading::{
 
 const THREADS: usize = 4;
 const TEST_SIZE: usize = 10000;
-const THREADS_NAME: &str = "<Uknown>";
 
 #[derive(Debug, Clone)]
-struct TaskHandler {
+pub struct TaskHandler {
     pub task_count: Arc<AtomicUsize>,
     pub done_count: Arc<AtomicUsize>,
 }
@@ -32,17 +32,34 @@ impl TaskHandler {
     }
 }
 
-impl ProducerConsumerDelegation<usize> for TaskHandler {
-    fn on_started(&self, pc: &ProducerConsumer<usize>) {
+impl TaskDelegation<ProducerConsumer<usize>, usize> for TaskHandler {
+    fn on_started(&self, _pc: &ProducerConsumer<usize>) {
         println!("Producer/Consumer started");
     }
 
     fn process(&self, _pc: &ProducerConsumer<usize>, item: &usize) -> Result<TaskResult> {
-        let thread = thread::current();
-        let thread_name = thread.name().unwrap_or(THREADS_NAME);
-
         self.task_count.fetch_add(1, Ordering::SeqCst);
-        println!("Item: {} in thread: {}", item, thread_name);
+        println!("Item: {}", item);
+
+        if item % 5 == 0 {
+            return Ok(TaskResult::Error(format!(
+                "Item {}. Multiples of 5 are not allowed",
+                item
+            )));
+        } else if item % 3 == 0 {
+            return Ok(TaskResult::TimedOut);
+        }
+
+        Ok(TaskResult::Success)
+    }
+
+    async fn process_async(
+        &self,
+        _td: &ProducerConsumer<usize>,
+        item: &usize,
+    ) -> Result<TaskResult> {
+        self.task_count.fetch_add(1, Ordering::SeqCst);
+        println!("Item: {}", item);
 
         if item % 5 == 0 {
             return Ok(TaskResult::Error(format!(
@@ -60,15 +77,10 @@ impl ProducerConsumerDelegation<usize> for TaskHandler {
         &self,
         _pc: &ProducerConsumer<usize>,
         item: &usize,
-        result: TaskResult,
+        result: &TaskResult,
     ) -> bool {
-        let thread = thread::current();
-        let thread_name = thread.name().unwrap_or(THREADS_NAME);
         self.done_count.fetch_add(1, Ordering::SeqCst);
-        println!(
-            "Result item: {}: {:?} in thread: {}",
-            item, result, thread_name
-        );
+        println!("Result item: {}: {:?}", item, result);
         true
     }
 
@@ -81,16 +93,14 @@ impl ProducerConsumerDelegation<usize> for TaskHandler {
     }
 }
 
-impl ConsumerDelegation<usize> for TaskHandler {
-    fn on_started(&self, pc: &Consumer<usize>) {
+impl TaskDelegation<Consumer<usize>, usize> for TaskHandler {
+    fn on_started(&self, _pc: &Consumer<usize>) {
         println!("Consumer started");
     }
 
     fn process(&self, _pc: &Consumer<usize>, item: &usize) -> Result<TaskResult> {
-        let thread = thread::current();
-        let thread_name = thread.name().unwrap_or(THREADS_NAME);
         self.task_count.fetch_add(1, Ordering::SeqCst);
-        println!("Item: {} in thread: {}", item, thread_name);
+        println!("Item: {}", item);
 
         if item % 5 == 0 {
             return Ok(TaskResult::Error(format!(
@@ -104,14 +114,25 @@ impl ConsumerDelegation<usize> for TaskHandler {
         Ok(TaskResult::Success)
     }
 
-    fn on_completed(&self, _pc: &Consumer<usize>, item: &usize, result: TaskResult) -> bool {
-        let thread = thread::current();
-        let thread_name = thread.name().unwrap_or(THREADS_NAME);
+    async fn process_async(&self, _td: &Consumer<usize>, item: &usize) -> Result<TaskResult> {
+        self.task_count.fetch_add(1, Ordering::SeqCst);
+        println!("Item: {}", item);
+
+        if item % 5 == 0 {
+            return Ok(TaskResult::Error(format!(
+                "Item {}. Multiples of 5 are not allowed",
+                item
+            )));
+        } else if item % 3 == 0 {
+            return Ok(TaskResult::TimedOut);
+        }
+
+        Ok(TaskResult::Success)
+    }
+
+    fn on_completed(&self, _pc: &Consumer<usize>, item: &usize, result: &TaskResult) -> bool {
         self.done_count.fetch_add(1, Ordering::SeqCst);
-        println!(
-            "Result item: {}: {:?} in thread: {}",
-            item, result, thread_name
-        );
+        println!("Result item: {}: {:?}", item, result);
         true
     }
 
@@ -124,16 +145,14 @@ impl ConsumerDelegation<usize> for TaskHandler {
     }
 }
 
-impl InjectorWorkerDelegation<usize> for TaskHandler {
-    fn on_started(&self, pc: &InjectorWorker<usize>) {
+impl TaskDelegation<InjectorWorker<usize>, usize> for TaskHandler {
+    fn on_started(&self, _pc: &InjectorWorker<usize>) {
         println!("Injector/Worker started");
     }
 
     fn process(&self, _pc: &InjectorWorker<usize>, item: &usize) -> Result<TaskResult> {
-        let thread = thread::current();
-        let thread_name = thread.name().unwrap_or(THREADS_NAME);
         self.task_count.fetch_add(1, Ordering::SeqCst);
-        println!("Item: {} in thread: {}", item, thread_name);
+        println!("Item: {}", item);
 
         if item % 5 == 0 {
             return Ok(TaskResult::Error(format!(
@@ -147,14 +166,25 @@ impl InjectorWorkerDelegation<usize> for TaskHandler {
         Ok(TaskResult::Success)
     }
 
-    fn on_completed(&self, _pc: &InjectorWorker<usize>, item: &usize, result: TaskResult) -> bool {
-        let thread = thread::current();
-        let thread_name = thread.name().unwrap_or(THREADS_NAME);
+    async fn process_async(&self, _td: &InjectorWorker<usize>, item: &usize) -> Result<TaskResult> {
+        self.task_count.fetch_add(1, Ordering::SeqCst);
+        println!("Item: {}", item);
+
+        if item % 5 == 0 {
+            return Ok(TaskResult::Error(format!(
+                "Item {}. Multiples of 5 are not allowed",
+                item
+            )));
+        } else if item % 3 == 0 {
+            return Ok(TaskResult::TimedOut);
+        }
+
+        Ok(TaskResult::Success)
+    }
+
+    fn on_completed(&self, _pc: &InjectorWorker<usize>, item: &usize, result: &TaskResult) -> bool {
         self.done_count.fetch_add(1, Ordering::SeqCst);
-        println!(
-            "Result item: {}: {:?} in thread: {}",
-            item, result, thread_name
-        );
+        println!("Result item: {}: {:?}", item, result);
         true
     }
 
@@ -167,16 +197,14 @@ impl InjectorWorkerDelegation<usize> for TaskHandler {
     }
 }
 
-impl ParallelDelegation<usize> for TaskHandler {
-    fn on_started(&self, pc: &Parallel) {
+impl TaskDelegation<Parallel<usize>, usize> for TaskHandler {
+    fn on_started(&self, _pc: &Parallel<usize>) {
         println!("Parallel started");
     }
 
-    fn process(&self, _pc: &Parallel, item: &usize) -> Result<TaskResult> {
-        let thread = thread::current();
-        let thread_name = thread.name().unwrap_or(THREADS_NAME);
+    fn process(&self, _pc: &Parallel<usize>, item: &usize) -> Result<TaskResult> {
         self.task_count.fetch_add(1, Ordering::SeqCst);
-        println!("Item: {} in thread: {}", item, thread_name);
+        println!("Item: {}", item);
 
         if item % 5 == 0 {
             return Ok(TaskResult::Error(format!(
@@ -190,18 +218,29 @@ impl ParallelDelegation<usize> for TaskHandler {
         Ok(TaskResult::Success)
     }
 
-    fn on_completed(&self, _pc: &Parallel, item: &usize, result: TaskResult) -> bool {
-        let thread = thread::current();
-        let thread_name = thread.name().unwrap_or(THREADS_NAME);
+    async fn process_async(&self, _td: &Parallel<usize>, item: &usize) -> Result<TaskResult> {
+        self.task_count.fetch_add(1, Ordering::SeqCst);
+        println!("Item: {}", item);
+
+        if item % 5 == 0 {
+            return Ok(TaskResult::Error(format!(
+                "Item {}. Multiples of 5 are not allowed",
+                item
+            )));
+        } else if item % 3 == 0 {
+            return Ok(TaskResult::TimedOut);
+        }
+
+        Ok(TaskResult::Success)
+    }
+
+    fn on_completed(&self, _pc: &Parallel<usize>, item: &usize, result: &TaskResult) -> bool {
         self.done_count.fetch_add(1, Ordering::SeqCst);
-        println!(
-            "Result item: {}: {:?} in thread: {}",
-            item, result, thread_name
-        );
+        println!("Result item: {}: {:?}", item, result);
         true
     }
 
-    fn on_finished(&self, _pc: &Parallel) {
+    fn on_finished(&self, _pc: &Parallel<usize>) {
         println!(
             "Got: {} tasks and finished {} tasks.",
             self.task_count.load(Ordering::SeqCst),
@@ -213,15 +252,14 @@ impl ParallelDelegation<usize> for TaskHandler {
 pub async fn test_producer_consumer() -> Result<()> {
     println!("\nTesting Producer/Consumer with {} threads...", THREADS);
 
-    let now = std::time::Instant::now();
+    let now = Instant::now();
     let handler = TaskHandler::new();
     let options = ProducerConsumerOptions::new();
     let prodcon = ProducerConsumer::<usize>::with_options(options);
     let unit = TEST_SIZE / THREADS;
 
     for _ in 0..THREADS {
-        let con = handler.clone();
-        prodcon.start_consumer(con);
+        prodcon.start_consumer(&handler.clone());
     }
 
     let wg = WaitGroup::new();
@@ -249,14 +287,13 @@ pub async fn test_producer_consumer() -> Result<()> {
 pub async fn test_consumer() -> Result<()> {
     println!("\nTesting Consumer with {} threads...", THREADS);
 
-    let now = std::time::Instant::now();
+    let now = Instant::now();
     let handler = TaskHandler::new();
     let options = ConsumerOptions::new();
     let consumer = Consumer::<usize>::with_options(options);
 
     for _ in 0..THREADS {
-        let con = handler.clone();
-        consumer.start(con);
+        consumer.start(&handler.clone());
     }
 
     for i in 1..=TEST_SIZE {
@@ -273,11 +310,11 @@ pub async fn test_consumer() -> Result<()> {
 pub async fn test_injector_worker() -> Result<()> {
     println!("\nTesting Injector/Worker with {} threads...", THREADS);
 
-    let now = std::time::Instant::now();
+    let now = Instant::now();
     let handler = TaskHandler::new();
     let options = InjectorWorkerOptions::new().with_threads(THREADS);
     let injwork = InjectorWorker::<usize>::with_options(options);
-    injwork.start(handler);
+    injwork.start(&handler);
 
     for i in 1..=TEST_SIZE {
         injwork.enqueue(i);
@@ -293,17 +330,17 @@ pub async fn test_injector_worker() -> Result<()> {
 pub async fn test_parallel() -> Result<()> {
     println!("\nTesting Parallel with {} threads...", THREADS);
 
-    let now = std::time::Instant::now();
+    let now = Instant::now();
     let handler = TaskHandler::new();
     let options = ParallelOptions::new().with_threads(1);
     let parallel = Parallel::with_options(options);
     let mut collection = collections::VecDeque::<usize>::with_capacity(TEST_SIZE);
 
-    for i in 1..=TEST_SIZE {
+    for i in 1..=5 {
         collection.push_back(i);
     }
 
-    parallel.start(collection, handler);
+    parallel.start(collection, &handler);
     parallel.complete();
     let _ = parallel.wait_async().await;
 

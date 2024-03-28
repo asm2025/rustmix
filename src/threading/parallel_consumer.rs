@@ -1,23 +1,79 @@
-use anyhow::Result;
+use futures::executor::block_on;
 use rayon::{prelude::*, ThreadPoolBuilder};
 use std::{
-    future::Future,
+    collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, LinkedList, VecDeque},
+    marker::PhantomData,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc, Condvar, Mutex,
+        Arc, Mutex,
     },
     thread,
     time::{Duration, Instant},
 };
-use tokio::sync::Notify;
+use tokio::{
+    select,
+    sync::Notify,
+    time::{sleep as tokio_sleep, timeout as tokio_timeout},
+};
 
 use super::*;
 
-pub trait ParallelDelegation<T: Send + 'static> {
-    fn on_started(&self, pc: &Parallel);
-    fn process(&self, pc: &Parallel, item: &T) -> Result<TaskResult>;
-    fn on_completed(&self, pc: &Parallel, item: &T, result: TaskResult) -> bool;
-    fn on_finished(&self, pc: &Parallel);
+pub trait Len {
+    fn len(&self) -> usize;
+}
+
+impl<T, const N: usize> Len for [T; N] {
+    fn len(&self) -> usize {
+        <[T]>::len(self)
+    }
+}
+
+impl<T> Len for BinaryHeap<T> {
+    fn len(&self) -> usize {
+        BinaryHeap::len(self)
+    }
+}
+
+impl<K, V> Len for BTreeMap<K, V> {
+    fn len(&self) -> usize {
+        BTreeMap::len(self)
+    }
+}
+
+impl<T> Len for BTreeSet<T> {
+    fn len(&self) -> usize {
+        BTreeSet::len(self)
+    }
+}
+
+impl<K, V> Len for HashMap<K, V> {
+    fn len(&self) -> usize {
+        HashMap::len(self)
+    }
+}
+
+impl<T> Len for HashSet<T> {
+    fn len(&self) -> usize {
+        HashSet::len(self)
+    }
+}
+
+impl<T> Len for LinkedList<T> {
+    fn len(&self) -> usize {
+        LinkedList::len(self)
+    }
+}
+
+impl<T> Len for Vec<T> {
+    fn len(&self) -> usize {
+        Vec::len(self)
+    }
+}
+
+impl<T> Len for VecDeque<T> {
+    fn len(&self) -> usize {
+        VecDeque::len(self)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -58,46 +114,53 @@ impl ParallelOptions {
 }
 
 #[derive(Clone, Debug)]
-pub struct Parallel {
+pub struct Parallel<T: Send + Sync + Clone + 'static> {
     options: ParallelOptions,
+    count: Arc<AtomicUsize>,
     started: Arc<Mutex<bool>>,
     finished: Arc<Mutex<bool>>,
-    finishedc: Arc<Condvar>,
-    finishedn: Arc<Notify>,
+    finished_noti: Arc<Notify>,
     completed: Arc<AtomicBool>,
     paused: Arc<AtomicBool>,
     cancelled: Arc<AtomicBool>,
     running: Arc<AtomicUsize>,
+    _marker: PhantomData<T>,
 }
 
-impl Parallel {
+impl<T: Send + Sync + Clone> Parallel<T> {
     pub fn new() -> Self {
         let options: ParallelOptions = Default::default();
         Parallel {
             options,
+            count: Arc::new(AtomicUsize::new(0)),
             started: Arc::new(Mutex::new(false)),
             finished: Arc::new(Mutex::new(false)),
-            finishedc: Arc::new(Condvar::new()),
-            finishedn: Arc::new(Notify::new()),
+            finished_noti: Arc::new(Notify::new()),
             completed: Arc::new(AtomicBool::new(false)),
             paused: Arc::new(AtomicBool::new(false)),
             cancelled: Arc::new(AtomicBool::new(false)),
             running: Arc::new(AtomicUsize::new(0)),
+            _marker: PhantomData,
         }
     }
 
     pub fn with_options(options: ParallelOptions) -> Self {
         Parallel {
             options,
+            count: Arc::new(AtomicUsize::new(0)),
             started: Arc::new(Mutex::new(false)),
             finished: Arc::new(Mutex::new(false)),
-            finishedc: Arc::new(Condvar::new()),
-            finishedn: Arc::new(Notify::new()),
+            finished_noti: Arc::new(Notify::new()),
             completed: Arc::new(AtomicBool::new(false)),
             paused: Arc::new(AtomicBool::new(false)),
             cancelled: Arc::new(AtomicBool::new(false)),
             running: Arc::new(AtomicUsize::new(0)),
+            _marker: PhantomData,
         }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.count() == 0
     }
 
     pub fn is_started(&self) -> bool {
@@ -127,8 +190,17 @@ impl Parallel {
         self.cancelled.load(Ordering::SeqCst)
     }
 
-    pub fn is_busy(&self) -> bool {
-        self.running.load(Ordering::SeqCst) > 0
+    pub fn count(&self) -> usize {
+        self.count.load(Ordering::SeqCst) + self.running.load(Ordering::SeqCst)
+    }
+
+    fn set_count(&self, value: usize) {
+        self.count.store(value, Ordering::SeqCst);
+    }
+
+    fn dec_count(&self, td: &impl TaskDelegation<Parallel<T>, T>) {
+        self.count.fetch_sub(1, Ordering::SeqCst);
+        self.check_finished(td);
     }
 
     pub fn running(&self) -> usize {
@@ -139,134 +211,113 @@ impl Parallel {
         self.running.fetch_add(1, Ordering::SeqCst);
     }
 
-    fn dec_running<T: Send + 'static>(&self, td: &dyn ParallelDelegation<T>) {
+    fn dec_running(&self, td: &impl TaskDelegation<Parallel<T>, T>) {
         self.running.fetch_sub(1, Ordering::SeqCst);
         self.check_finished(td);
     }
 
-    fn check_finished<T: Send + 'static>(&self, td: &dyn ParallelDelegation<T>) {
-        if self.running() == 0 {
+    fn check_finished(&self, td: &impl TaskDelegation<Parallel<T>, T>) {
+        if self.count() == 0 {
             let mut finished = self.finished.lock().unwrap();
             *finished = true;
             td.on_finished(self);
             self.set_started(false);
-            self.finishedc.notify_all();
-            self.finishedn.notify_waiters();
+            self.finished_noti.notify_waiters();
         }
     }
 
     pub fn start<
-        T: Send + 'static,
-        I: IntoParallelIterator<Item = T> + Send,
-        S: ParallelDelegation<T> + Send + Clone + Sync + 'static,
+        I: IntoParallelIterator<Item = T> + Len + Send,
+        TD: TaskDelegation<Parallel<T>, T> + Send + Sync + Clone + 'static,
     >(
         &self,
         collection: I,
-        delegate: S,
+        delegate: &TD,
     ) {
         if self.is_cancelled() {
             panic!("Queue is already cancelled.")
         }
 
         if self.set_started(true) {
+            self.set_count(collection.len());
             delegate.on_started(self);
         }
 
-        if self.options.threshold.is_zero() {
-            self.run_consumer(collection, delegate);
-        } else {
-            self.run_consumer_with_threshold(collection, delegate);
-        }
-    }
-
-    fn run_consumer<
-        T: Send + 'static,
-        I: IntoParallelIterator<Item = T> + Send,
-        S: ParallelDelegation<T> + Send + Clone + Sync + 'static,
-    >(
-        &self,
-        collection: I,
-        delegate: S,
-    ) {
         let pool = ThreadPoolBuilder::new()
             .num_threads(self.options.threads)
             .build()
             .unwrap();
-        pool.install(move || {
-            collection.into_par_iter().for_each(|item| {
-                while !self.is_cancelled() && self.is_paused() {
-                    thread::sleep(self.options.pause_timeout);
-                }
+        let delegate = delegate.clone();
+        let this = self.clone();
 
-                if self.is_cancelled() {
-                    return;
-                }
+        if self.options.threshold.is_zero() {
+            pool.install(move || {
+                collection.into_par_iter().for_each(|item| {
+                    this.inc_running();
+                    this.dec_count(&delegate);
 
-                self.inc_running();
+                    while !this.is_cancelled() && this.is_paused() {
+                        thread::sleep(this.options.pause_timeout);
+                    }
 
-                if let Ok(result) = delegate.process(self, &item) {
-                    if !delegate.on_completed(self, &item, result) {
-                        self.cancel();
+                    if this.is_cancelled() {
                         return;
                     }
-                }
 
-                self.dec_running(&delegate);
+                    if let Ok(result) = delegate.process(&this, &item) {
+                        if !delegate.on_completed(&this, &item, &result) {
+                            this.cancel();
+                            return;
+                        }
+                    }
+
+                    this.dec_running(&delegate);
+                });
+
+                drop(delegate);
+                drop(this);
             });
-        });
-    }
 
-    fn run_consumer_with_threshold<
-        T: Send + 'static,
-        I: IntoParallelIterator<Item = T> + Send,
-        S: ParallelDelegation<T> + Send + Clone + Sync + 'static,
-    >(
-        &self,
-        collection: I,
-        delegate: S,
-    ) {
-        let pool = ThreadPoolBuilder::new()
-            .num_threads(self.options.threads)
-            .build()
-            .unwrap();
+            return;
+        }
+
         pool.install(move || {
             collection.into_par_iter().for_each(|item| {
-                while !self.is_cancelled() && self.is_paused() {
-                    thread::sleep(self.options.pause_timeout);
+                while !this.is_cancelled() && this.is_paused() {
+                    thread::sleep(this.options.pause_timeout);
                 }
 
-                if self.is_cancelled() {
+                if this.is_cancelled() {
                     return;
                 }
 
-                self.inc_running();
+                this.inc_running();
 
-                if let Ok(result) = delegate.process(self, &item) {
+                if let Ok(result) = delegate.process(&this, &item) {
                     let time = Instant::now();
 
-                    if !delegate.on_completed(self, &item, result) {
-                        self.cancel();
+                    if !delegate.on_completed(&this, &item, &result) {
+                        this.cancel();
                         return;
                     }
 
-                    if !self.options.threshold.is_zero() && time.elapsed() < self.options.threshold
+                    if !this.options.threshold.is_zero() && time.elapsed() < this.options.threshold
                     {
-                        let remaining = self.options.threshold - time.elapsed();
+                        let remaining = this.options.threshold - time.elapsed();
                         thread::sleep(remaining);
                     }
                 }
 
-                self.dec_running(&delegate);
+                this.dec_running(&delegate);
             });
+
+            drop(delegate);
+            drop(this);
         });
     }
 
-    pub fn stop(&self, enforce: bool) {
-        if enforce {
-            self.cancel();
-        } else {
-            self.complete();
-        }
+    pub fn stop(&self) {
+        self.cancel();
     }
 
     pub fn complete(&self) {
@@ -286,18 +337,11 @@ impl Parallel {
     }
 
     pub fn wait(&self) {
-        let finished = self.finished.lock().unwrap();
-
-        if !*finished {
-            let _ignored = self.finishedc.wait(finished).unwrap();
-        }
+        block_on(self.finished_noti.notified());
     }
 
     pub async fn wait_async(&self) {
-        while !*self.finished.lock().unwrap() {
-            self.finishedn.notified().await;
-            thread::sleep(self.options.pause_timeout);
-        }
+        self.finished_noti.notified().await;
     }
 
     pub fn wait_for(&self, timeout: Duration) -> bool {
@@ -307,46 +351,39 @@ impl Parallel {
         }
 
         let start = Instant::now();
-        let mut finished = self.finished.lock().unwrap();
+        let finished = self.finished.lock().unwrap();
 
         while !*finished && start.elapsed() < timeout {
-            let result = self
-                .finishedc
-                .wait_timeout(finished, self.options.pause_timeout)
-                .unwrap();
-            finished = result.0;
-            thread::sleep(self.options.pause_timeout);
-
-            if result.1.timed_out() || start.elapsed() >= timeout {
-                return false;
+            let wait_timeout = timeout - start.elapsed();
+            let pause_timeout = self.options.pause_timeout.min(wait_timeout);
+            let result = block_on(tokio_timeout(pause_timeout, self.finished_noti.notified()));
+            if result.is_err() {
+                break;
             }
         }
 
         start.elapsed() < timeout
     }
 
-    pub async fn wait_for_async(&self, timeout: Duration) -> Box<dyn Future<Output = bool>> {
+    pub async fn wait_for_async(&self, timeout: Duration) -> bool {
         if timeout.is_zero() {
-            self.wait_async().await;
-            return Box::new(async { true });
+            self.wait();
+            return true;
         }
 
         let start = Instant::now();
-        let mut finished = self.finished.lock().unwrap();
+        let finished = self.finished.lock().unwrap();
 
         while !*finished && start.elapsed() < timeout {
-            let result = self
-                .finishedc
-                .wait_timeout(finished, self.options.pause_timeout)
-                .unwrap();
-            finished = result.0;
-            thread::sleep(self.options.pause_timeout);
+            let wait_timeout = timeout - start.elapsed();
+            let pause_timeout = self.options.pause_timeout.min(wait_timeout);
 
-            if result.1.timed_out() || start.elapsed() >= timeout {
-                return Box::new(async move { false });
+            select! {
+                _ = self.finished_noti.notified() => {},
+                _ = tokio_sleep(pause_timeout) => {}
             }
         }
 
-        Box::new(async move { start.elapsed() < timeout })
+        start.elapsed() < timeout
     }
 }
