@@ -1,4 +1,5 @@
 use anyhow::Result;
+use tokio::task;
 
 mod tests;
 
@@ -10,8 +11,9 @@ async fn main() -> Result<()> {
     //tests::io::test_directory()?;
     //tests::io::test_file()?;
 
-    tests::web::test_url()?;
+    //tests::web::test_url()?;
     //tests::web::test_reqwest().await?;
+    //let _ = task::spawn_blocking(move || tests::web::test_blocking_reqwest()).await?;
 
     //tests::mail::test_secmail().await?;
     //tests::mail::test_emailfake().await?;
