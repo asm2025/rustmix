@@ -204,7 +204,7 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
             *finished = true;
             td.on_finished(self);
             self.set_started(false);
-            self.finished_noti.notify_waiters();
+            self.finished_noti.notify_one();
         }
     }
 

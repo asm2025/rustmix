@@ -7,7 +7,7 @@ use std::{
         Arc,
     },
     thread,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use rustmix::threading::{
@@ -332,16 +332,15 @@ pub async fn test_parallel() -> Result<()> {
 
     let now = Instant::now();
     let handler = TaskHandler::new();
-    let options = ParallelOptions::new().with_threads(1);
+    let options = ParallelOptions::new().with_threads(THREADS);
     let parallel = Parallel::with_options(options);
     let mut collection = collections::VecDeque::<usize>::with_capacity(TEST_SIZE);
 
-    for i in 1..=5 {
+    for i in 1..=TEST_SIZE {
         collection.push_back(i);
     }
 
     parallel.start(collection, &handler);
-    parallel.complete();
     let _ = parallel.wait_async().await;
 
     println!("Elapsed time: {:?}", now.elapsed());

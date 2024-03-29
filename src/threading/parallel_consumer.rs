@@ -116,11 +116,9 @@ impl ParallelOptions {
 #[derive(Clone, Debug)]
 pub struct Parallel<T: Send + Sync + Clone + 'static> {
     options: ParallelOptions,
-    count: Arc<AtomicUsize>,
     started: Arc<Mutex<bool>>,
     finished: Arc<Mutex<bool>>,
     finished_noti: Arc<Notify>,
-    completed: Arc<AtomicBool>,
     paused: Arc<AtomicBool>,
     cancelled: Arc<AtomicBool>,
     running: Arc<AtomicUsize>,
@@ -132,11 +130,9 @@ impl<T: Send + Sync + Clone> Parallel<T> {
         let options: ParallelOptions = Default::default();
         Parallel {
             options,
-            count: Arc::new(AtomicUsize::new(0)),
             started: Arc::new(Mutex::new(false)),
             finished: Arc::new(Mutex::new(false)),
             finished_noti: Arc::new(Notify::new()),
-            completed: Arc::new(AtomicBool::new(false)),
             paused: Arc::new(AtomicBool::new(false)),
             cancelled: Arc::new(AtomicBool::new(false)),
             running: Arc::new(AtomicUsize::new(0)),
@@ -147,20 +143,14 @@ impl<T: Send + Sync + Clone> Parallel<T> {
     pub fn with_options(options: ParallelOptions) -> Self {
         Parallel {
             options,
-            count: Arc::new(AtomicUsize::new(0)),
             started: Arc::new(Mutex::new(false)),
             finished: Arc::new(Mutex::new(false)),
             finished_noti: Arc::new(Notify::new()),
-            completed: Arc::new(AtomicBool::new(false)),
             paused: Arc::new(AtomicBool::new(false)),
             cancelled: Arc::new(AtomicBool::new(false)),
             running: Arc::new(AtomicUsize::new(0)),
             _marker: PhantomData,
         }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.count() == 0
     }
 
     pub fn is_started(&self) -> bool {
@@ -178,10 +168,6 @@ impl<T: Send + Sync + Clone> Parallel<T> {
         true
     }
 
-    pub fn is_completed(&self) -> bool {
-        self.completed.load(Ordering::SeqCst)
-    }
-
     pub fn is_paused(&self) -> bool {
         self.paused.load(Ordering::SeqCst)
     }
@@ -190,25 +176,12 @@ impl<T: Send + Sync + Clone> Parallel<T> {
         self.cancelled.load(Ordering::SeqCst)
     }
 
-    pub fn count(&self) -> usize {
-        self.count.load(Ordering::SeqCst) + self.running.load(Ordering::SeqCst)
-    }
-
-    fn set_count(&self, value: usize) {
-        self.count.store(value, Ordering::SeqCst);
-    }
-
-    fn dec_count(&self, td: &impl TaskDelegation<Parallel<T>, T>) {
-        self.count.fetch_sub(1, Ordering::SeqCst);
-        self.check_finished(td);
-    }
-
     pub fn running(&self) -> usize {
         self.running.load(Ordering::SeqCst)
     }
 
-    fn inc_running(&self) {
-        self.running.fetch_add(1, Ordering::SeqCst);
+    fn set_running(&self, value: usize) {
+        self.running.store(value, Ordering::SeqCst);
     }
 
     fn dec_running(&self, td: &impl TaskDelegation<Parallel<T>, T>) {
@@ -217,12 +190,12 @@ impl<T: Send + Sync + Clone> Parallel<T> {
     }
 
     fn check_finished(&self, td: &impl TaskDelegation<Parallel<T>, T>) {
-        if self.count() == 0 {
+        if self.running() == 0 {
             let mut finished = self.finished.lock().unwrap();
             *finished = true;
             td.on_finished(self);
             self.set_started(false);
-            self.finished_noti.notify_waiters();
+            self.finished_noti.notify_one();
         }
     }
 
@@ -239,7 +212,7 @@ impl<T: Send + Sync + Clone> Parallel<T> {
         }
 
         if self.set_started(true) {
-            self.set_count(collection.len());
+            self.set_running(collection.len());
             delegate.on_started(self);
         }
 
@@ -253,14 +226,12 @@ impl<T: Send + Sync + Clone> Parallel<T> {
         if self.options.threshold.is_zero() {
             pool.install(move || {
                 collection.into_par_iter().for_each(|item| {
-                    this.inc_running();
-                    this.dec_count(&delegate);
-
                     while !this.is_cancelled() && this.is_paused() {
                         thread::sleep(this.options.pause_timeout);
                     }
 
                     if this.is_cancelled() {
+                        this.dec_running(&delegate);
                         return;
                     }
 
@@ -288,10 +259,9 @@ impl<T: Send + Sync + Clone> Parallel<T> {
                 }
 
                 if this.is_cancelled() {
+                    this.dec_running(&delegate);
                     return;
                 }
-
-                this.inc_running();
 
                 if let Ok(result) = delegate.process(&this, &item) {
                     let time = Instant::now();
@@ -318,10 +288,6 @@ impl<T: Send + Sync + Clone> Parallel<T> {
 
     pub fn stop(&self) {
         self.cancel();
-    }
-
-    pub fn complete(&self) {
-        self.completed.store(true, Ordering::SeqCst);
     }
 
     pub fn cancel(&self) {
