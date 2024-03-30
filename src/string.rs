@@ -1,3 +1,13 @@
+use anyhow::Result;
+use once_cell::sync::Lazy;
+use rand::Rng;
+
+static CHARS: Lazy<Vec<char>> = Lazy::new(|| {
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        .chars()
+        .collect()
+});
+
 pub trait StringEx {
     fn trim(&self, ch: &char) -> &str;
     fn trim_start(&self, ch: &char) -> &str;
@@ -143,4 +153,15 @@ impl StringEx for str {
             self.to_owned()
         }
     }
+}
+
+pub fn random_string(len: usize) -> String {
+    let mut rng = rand::thread_rng();
+    let chars: Vec<char> = (0..len)
+        .map(|_| {
+            let idx = rng.gen_range(0..CHARS.len());
+            CHARS[idx]
+        })
+        .collect();
+    chars.iter().collect()
 }

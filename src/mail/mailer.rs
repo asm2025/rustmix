@@ -4,6 +4,7 @@ use lettre::{
     Message, SmtpTransport, Transport,
 };
 
+#[derive(Debug, Clone)]
 pub struct Mailer {
     smtp: SmtpTransport,
 }

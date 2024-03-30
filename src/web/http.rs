@@ -2,6 +2,9 @@ use serde::Deserialize;
 use std::{collections::HashMap, net::IpAddr};
 use url::Url;
 
+pub type ReqwestError = reqwest::Error;
+pub type ReqwestResult<T> = Result<T, ReqwestError>;
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ResponseHeaders {

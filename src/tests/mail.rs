@@ -72,6 +72,38 @@ pub async fn test_emailfake() -> Result<()> {
     Ok(())
 }
 
+pub async fn test_tempmail_old() -> Result<()> {
+    println!("\nTesting Tempmail functions...");
+    print!("Enter the email [ENTER to generate]: ");
+    io::stdout().flush().unwrap();
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    let input = input.trim();
+
+    let email = if input.is_empty() {
+        TempMail::random().await?
+    } else {
+        TempMail::parse(input)
+    };
+
+    print!("Enter the sender email [default: None]: ");
+    io::stdout().flush().unwrap();
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    let input = input.trim();
+    let from = if input.is_empty() { None } else { Some(input) };
+    println!(
+        "Email: {}, from sender: {}",
+        email.address(),
+        from.unwrap_or("None")
+    );
+
+    let str = email.find_string(from, None, PREFIX, PREFIX_LEN).await?;
+    println!("My string: {}", str);
+
+    Ok(())
+}
+
 pub async fn test_tempmail() -> Result<()> {
     println!("\nTesting Tempmail functions...");
     print!("Enter the email [ENTER to generate]: ");
