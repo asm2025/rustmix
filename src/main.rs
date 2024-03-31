@@ -14,9 +14,7 @@ async fn main() -> Result<()> {
     //tests::web::test_reqwest().await?;
     //let _ = task::spawn_blocking(move || tests::web::test_blocking_reqwest()).await?;
 
-    //tests::mail::test_secmail().await?;
-    //tests::mail::test_emailfake().await?;
-    //tests::mail::test_tempmail().await?;
+    tests::mail::test_tempmail().await?;
 
     //tests::threading::test_producer_consumer().await?;
     //tests::threading::test_consumer().await?;

@@ -5,7 +5,7 @@ edition = "2021"
 
 [features]
 default = ["mail", "threading", "log-log4rs", "log-slog"]
-mail = ["html-entities", "lettre", "tempmail", "once_cell", "regex"]
+mail = ["html-entities", "lettre", "once_cell", "regex"]
 python = ["pyo3"]
 whisper = ["kalosm"]
 threading = ["crossbeam", "rayon"]
@@ -41,7 +41,6 @@ slog-scope = { version = "4", optional = true }
 slog-stdlog = { version = "4", optional = true }
 slog-term = { version = "2", optional = true }
 slog-json = { version = "2", optional = true }
-tempmail = { version = "1", optional = true }
 tokio = { version = "1.36.0", features = ["full"] }
 ua_generator = "0"
 url = { version = "2", features = ["serde"] }

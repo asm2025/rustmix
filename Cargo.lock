@@ -5885,7 +5885,6 @@ dependencies = [
  "slog-scope",
  "slog-stdlog",
  "slog-term",
- "tempmail",
  "tokio",
  "ua_generator",
  "url",
@@ -7113,20 +7112,6 @@ dependencies = [
  "fastrand",
  "rustix",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "tempmail"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40de23743d6022e9d264a4d1db6dc664a1997f024fb47ba0b5c39077d63aebd2"
-dependencies = [
- "chrono",
- "js-sys",
- "rand 0.8.5",
- "reqwest 0.12.1",
- "serde",
- "serde_json",
 ]
 
 [[package]]

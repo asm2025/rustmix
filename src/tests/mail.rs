@@ -1,136 +1,59 @@
 use anyhow::Result;
-use std::io::{self, Write};
 
-use rustmix::mail::{emailfake::EmailFake, secmail::SecMail, tempmail::TempMail};
+use rustmix::{
+    date::{parse_date_any, DATE_FORMAT, DATE_TIME_FORMAT},
+    mail::tempmail::{TempMail, TempMailProvider},
+};
+
+use super::*;
 
 const PREFIX: &str = "My search string is ";
 const PREFIX_LEN: usize = 14;
 
-pub async fn test_secmail() -> Result<()> {
-    println!("\nTesting SecMail functions...");
-    println!("The supported domains for this class are:");
-    println!("{}", SecMail::get_domains().join(", "));
-    print!("Enter the email address [ENTER to generate]: ");
-    io::stdout().flush().unwrap();
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let input = input.trim();
-
-    let email = if input.is_empty() {
-        SecMail::random()
-    } else {
-        SecMail::parse(input)
-    };
-
-    print!("Enter the sender email [default: None]: ");
-    io::stdout().flush().unwrap();
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let input = input.trim();
-    let from = if input.is_empty() { None } else { Some(input) };
-    println!(
-        "Email: {}, from sender: {}",
-        email.address(),
-        from.unwrap_or("None")
-    );
-
-    let str = email.find_string(from, None, PREFIX, PREFIX_LEN).await?;
-    println!("My string: {}", str);
-
-    Ok(())
-}
-
-pub async fn test_emailfake() -> Result<()> {
-    println!("\nTesting EmailFake functions...");
-    print!("Enter the email [ENTER to generate]: ");
-    io::stdout().flush().unwrap();
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let input = input.trim();
-
-    let email = if input.is_empty() {
-        EmailFake::random().await?
-    } else {
-        EmailFake::parse(input)
-    };
-
-    print!("Enter the sender email [default: None]: ");
-    io::stdout().flush().unwrap();
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let input = input.trim();
-    let from = if input.is_empty() { None } else { Some(input) };
-    println!(
-        "Email: {}, from sender: {}",
-        email.address(),
-        from.unwrap_or("None")
-    );
-
-    let str = email.find_string(from, None, PREFIX, PREFIX_LEN).await?;
-    println!("My string: {}", str);
-
-    Ok(())
-}
-
-pub async fn test_tempmail_old() -> Result<()> {
-    println!("\nTesting Tempmail functions...");
-    print!("Enter the email [ENTER to generate]: ");
-    io::stdout().flush().unwrap();
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let input = input.trim();
-
-    let email = if input.is_empty() {
-        TempMail::random().await?
-    } else {
-        TempMail::parse(input)
-    };
-
-    print!("Enter the sender email [default: None]: ");
-    io::stdout().flush().unwrap();
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let input = input.trim();
-    let from = if input.is_empty() { None } else { Some(input) };
-    println!(
-        "Email: {}, from sender: {}",
-        email.address(),
-        from.unwrap_or("None")
-    );
-
-    let str = email.find_string(from, None, PREFIX, PREFIX_LEN).await?;
-    println!("My string: {}", str);
-
-    Ok(())
-}
-
 pub async fn test_tempmail() -> Result<()> {
-    println!("\nTesting Tempmail functions...");
-    print!("Enter the email [ENTER to generate]: ");
-    io::stdout().flush().unwrap();
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let input = input.trim();
+    println!("\nTesting TempMail functions...");
+    let input = stdin_input("Enter the email [ENTER to generate]: ");
 
     let email = if input.is_empty() {
         TempMail::random().await?
     } else {
-        TempMail::parse(input)
+        TempMail::parse(TempMailProvider::Tempmail, &input)
     };
 
-    print!("Enter the sender email [default: None]: ");
-    io::stdout().flush().unwrap();
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let input = input.trim();
-    let from = if input.is_empty() { None } else { Some(input) };
+    let input = stdin_input("Enter the email's sender [default: None]: ");
+    let from = if input.is_empty() {
+        None
+    } else {
+        Some(input.as_str())
+    };
+
+    let input = stdin_input("Enter the email's subject [default: None]: ");
+    let subject = if input.is_empty() {
+        None
+    } else {
+        Some(input.as_str())
+    };
+
+    let input = stdin_input(&format!(
+        "Enter the email's date in either format: '{}' or '{}' [default: None]: ",
+        DATE_FORMAT, DATE_TIME_FORMAT
+    ));
+    let date = if input.is_empty() {
+        None
+    } else {
+        Some(parse_date_any(&input)?)
+    };
     println!(
-        "Email: {}, from sender: {}",
+        "Email: {}, from sender: {:?}, subject: {:?}, date: {:?}",
         email.address(),
-        from.unwrap_or("None")
+        from,
+        subject,
+        date
     );
 
-    let str = email.find_string(from, None, PREFIX, PREFIX_LEN).await?;
+    let str = email
+        .find_string(from, subject, date, PREFIX, PREFIX_LEN)
+        .await?;
     println!("My string: {}", str);
 
     Ok(())
