@@ -184,12 +184,12 @@ impl<T: Send + Sync + Clone> Parallel<T> {
         self.running.store(value, Ordering::SeqCst);
     }
 
-    fn dec_running(&self, td: &impl TaskDelegation<Parallel<T>, T>) {
+    fn dec_running(&self, td: &impl TaskDelegationBase<Parallel<T>, T>) {
         self.running.fetch_sub(1, Ordering::SeqCst);
         self.check_finished(td);
     }
 
-    fn check_finished(&self, td: &impl TaskDelegation<Parallel<T>, T>) {
+    fn check_finished(&self, td: &impl TaskDelegationBase<Parallel<T>, T>) {
         if self.running() == 0 {
             let mut finished = self.finished.lock().unwrap();
             *finished = true;

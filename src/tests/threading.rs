@@ -7,7 +7,7 @@ use std::{
         Arc,
     },
     thread,
-    time::{Duration, Instant},
+    time::Instant,
 };
 
 use rustmix::threading::{
@@ -32,45 +32,9 @@ impl TaskHandler {
     }
 }
 
-impl TaskDelegation<ProducerConsumer<usize>, usize> for TaskHandler {
+impl TaskDelegationBase<ProducerConsumer<usize>, usize> for TaskHandler {
     fn on_started(&self, _pc: &ProducerConsumer<usize>) {
         println!("Producer/Consumer started");
-    }
-
-    fn process(&self, _pc: &ProducerConsumer<usize>, item: &usize) -> Result<TaskResult> {
-        self.task_count.fetch_add(1, Ordering::SeqCst);
-        println!("Item: {}", item);
-
-        if item % 5 == 0 {
-            return Ok(TaskResult::Error(format!(
-                "Item {}. Multiples of 5 are not allowed",
-                item
-            )));
-        } else if item % 3 == 0 {
-            return Ok(TaskResult::TimedOut);
-        }
-
-        Ok(TaskResult::Success)
-    }
-
-    async fn process_async(
-        &self,
-        _td: &ProducerConsumer<usize>,
-        item: &usize,
-    ) -> Result<TaskResult> {
-        self.task_count.fetch_add(1, Ordering::SeqCst);
-        println!("Item: {}", item);
-
-        if item % 5 == 0 {
-            return Ok(TaskResult::Error(format!(
-                "Item {}. Multiples of 5 are not allowed",
-                item
-            )));
-        } else if item % 3 == 0 {
-            return Ok(TaskResult::TimedOut);
-        }
-
-        Ok(TaskResult::Success)
     }
 
     fn on_completed(
@@ -93,41 +57,27 @@ impl TaskDelegation<ProducerConsumer<usize>, usize> for TaskHandler {
     }
 }
 
-impl TaskDelegation<Consumer<usize>, usize> for TaskHandler {
+impl TaskDelegation<ProducerConsumer<usize>, usize> for TaskHandler {
+    fn process(&self, _pc: &ProducerConsumer<usize>, item: &usize) -> Result<TaskResult> {
+        self.task_count.fetch_add(1, Ordering::SeqCst);
+        println!("Item: {}", item);
+
+        if item % 5 == 0 {
+            return Ok(TaskResult::Error(format!(
+                "Item {}. Multiples of 5 are not allowed",
+                item
+            )));
+        } else if item % 3 == 0 {
+            return Ok(TaskResult::TimedOut);
+        }
+
+        Ok(TaskResult::Success)
+    }
+}
+
+impl TaskDelegationBase<Consumer<usize>, usize> for TaskHandler {
     fn on_started(&self, _pc: &Consumer<usize>) {
         println!("Consumer started");
-    }
-
-    fn process(&self, _pc: &Consumer<usize>, item: &usize) -> Result<TaskResult> {
-        self.task_count.fetch_add(1, Ordering::SeqCst);
-        println!("Item: {}", item);
-
-        if item % 5 == 0 {
-            return Ok(TaskResult::Error(format!(
-                "Item {}. Multiples of 5 are not allowed",
-                item
-            )));
-        } else if item % 3 == 0 {
-            return Ok(TaskResult::TimedOut);
-        }
-
-        Ok(TaskResult::Success)
-    }
-
-    async fn process_async(&self, _td: &Consumer<usize>, item: &usize) -> Result<TaskResult> {
-        self.task_count.fetch_add(1, Ordering::SeqCst);
-        println!("Item: {}", item);
-
-        if item % 5 == 0 {
-            return Ok(TaskResult::Error(format!(
-                "Item {}. Multiples of 5 are not allowed",
-                item
-            )));
-        } else if item % 3 == 0 {
-            return Ok(TaskResult::TimedOut);
-        }
-
-        Ok(TaskResult::Success)
     }
 
     fn on_completed(&self, _pc: &Consumer<usize>, item: &usize, result: &TaskResult) -> bool {
@@ -145,41 +95,27 @@ impl TaskDelegation<Consumer<usize>, usize> for TaskHandler {
     }
 }
 
-impl TaskDelegation<InjectorWorker<usize>, usize> for TaskHandler {
+impl TaskDelegation<Consumer<usize>, usize> for TaskHandler {
+    fn process(&self, _pc: &Consumer<usize>, item: &usize) -> Result<TaskResult> {
+        self.task_count.fetch_add(1, Ordering::SeqCst);
+        println!("Item: {}", item);
+
+        if item % 5 == 0 {
+            return Ok(TaskResult::Error(format!(
+                "Item {}. Multiples of 5 are not allowed",
+                item
+            )));
+        } else if item % 3 == 0 {
+            return Ok(TaskResult::TimedOut);
+        }
+
+        Ok(TaskResult::Success)
+    }
+}
+
+impl TaskDelegationBase<InjectorWorker<usize>, usize> for TaskHandler {
     fn on_started(&self, _pc: &InjectorWorker<usize>) {
         println!("Injector/Worker started");
-    }
-
-    fn process(&self, _pc: &InjectorWorker<usize>, item: &usize) -> Result<TaskResult> {
-        self.task_count.fetch_add(1, Ordering::SeqCst);
-        println!("Item: {}", item);
-
-        if item % 5 == 0 {
-            return Ok(TaskResult::Error(format!(
-                "Item {}. Multiples of 5 are not allowed",
-                item
-            )));
-        } else if item % 3 == 0 {
-            return Ok(TaskResult::TimedOut);
-        }
-
-        Ok(TaskResult::Success)
-    }
-
-    async fn process_async(&self, _td: &InjectorWorker<usize>, item: &usize) -> Result<TaskResult> {
-        self.task_count.fetch_add(1, Ordering::SeqCst);
-        println!("Item: {}", item);
-
-        if item % 5 == 0 {
-            return Ok(TaskResult::Error(format!(
-                "Item {}. Multiples of 5 are not allowed",
-                item
-            )));
-        } else if item % 3 == 0 {
-            return Ok(TaskResult::TimedOut);
-        }
-
-        Ok(TaskResult::Success)
     }
 
     fn on_completed(&self, _pc: &InjectorWorker<usize>, item: &usize, result: &TaskResult) -> bool {
@@ -197,41 +133,27 @@ impl TaskDelegation<InjectorWorker<usize>, usize> for TaskHandler {
     }
 }
 
-impl TaskDelegation<Parallel<usize>, usize> for TaskHandler {
+impl TaskDelegation<InjectorWorker<usize>, usize> for TaskHandler {
+    fn process(&self, _pc: &InjectorWorker<usize>, item: &usize) -> Result<TaskResult> {
+        self.task_count.fetch_add(1, Ordering::SeqCst);
+        println!("Item: {}", item);
+
+        if item % 5 == 0 {
+            return Ok(TaskResult::Error(format!(
+                "Item {}. Multiples of 5 are not allowed",
+                item
+            )));
+        } else if item % 3 == 0 {
+            return Ok(TaskResult::TimedOut);
+        }
+
+        Ok(TaskResult::Success)
+    }
+}
+
+impl TaskDelegationBase<Parallel<usize>, usize> for TaskHandler {
     fn on_started(&self, _pc: &Parallel<usize>) {
         println!("Parallel started");
-    }
-
-    fn process(&self, _pc: &Parallel<usize>, item: &usize) -> Result<TaskResult> {
-        self.task_count.fetch_add(1, Ordering::SeqCst);
-        println!("Item: {}", item);
-
-        if item % 5 == 0 {
-            return Ok(TaskResult::Error(format!(
-                "Item {}. Multiples of 5 are not allowed",
-                item
-            )));
-        } else if item % 3 == 0 {
-            return Ok(TaskResult::TimedOut);
-        }
-
-        Ok(TaskResult::Success)
-    }
-
-    async fn process_async(&self, _td: &Parallel<usize>, item: &usize) -> Result<TaskResult> {
-        self.task_count.fetch_add(1, Ordering::SeqCst);
-        println!("Item: {}", item);
-
-        if item % 5 == 0 {
-            return Ok(TaskResult::Error(format!(
-                "Item {}. Multiples of 5 are not allowed",
-                item
-            )));
-        } else if item % 3 == 0 {
-            return Ok(TaskResult::TimedOut);
-        }
-
-        Ok(TaskResult::Success)
     }
 
     fn on_completed(&self, _pc: &Parallel<usize>, item: &usize, result: &TaskResult) -> bool {
@@ -246,6 +168,24 @@ impl TaskDelegation<Parallel<usize>, usize> for TaskHandler {
             self.task_count.load(Ordering::SeqCst),
             self.done_count.load(Ordering::SeqCst)
         );
+    }
+}
+
+impl TaskDelegation<Parallel<usize>, usize> for TaskHandler {
+    fn process(&self, _pc: &Parallel<usize>, item: &usize) -> Result<TaskResult> {
+        self.task_count.fetch_add(1, Ordering::SeqCst);
+        println!("Item: {}", item);
+
+        if item % 5 == 0 {
+            return Ok(TaskResult::Error(format!(
+                "Item {}. Multiples of 5 are not allowed",
+                item
+            )));
+        } else if item % 3 == 0 {
+            return Ok(TaskResult::TimedOut);
+        }
+
+        Ok(TaskResult::Success)
     }
 }
 

@@ -158,12 +158,12 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
         self.workers.fetch_add(1, Ordering::SeqCst);
     }
 
-    fn dec_workers(&self, td: &impl TaskDelegation<InjectorWorker<T>, T>) {
+    fn dec_workers(&self, td: &impl TaskDelegationBase<InjectorWorker<T>, T>) {
         self.workers.fetch_sub(1, Ordering::SeqCst);
         self.check_finished(td);
     }
 
-    fn check_finished(&self, td: &impl TaskDelegation<InjectorWorker<T>, T>) {
+    fn check_finished(&self, td: &impl TaskDelegationBase<InjectorWorker<T>, T>) {
         if self.is_completed() && self.workers() == 0 {
             let mut finished = self.finished.lock().unwrap();
             *finished = true;
@@ -293,7 +293,7 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
     }
 
     pub async fn start_async<
-        TD: TaskDelegation<InjectorWorker<T>, T> + Send + Sync + Clone + 'static,
+        TD: AsyncTaskDelegation<InjectorWorker<T>, T> + Send + Sync + Clone + 'static,
     >(
         &self,
         delegate: &TD,
@@ -338,7 +338,7 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
                         if let Some(item) = this.find_task(&global, &local, &stealers) {
                             this.inc_running();
 
-                            if let Ok(result) = delegate.process_async(&this, &item).await {
+                            if let Ok(result) = delegate.process(&this, &item).await {
                                 if !delegate.on_completed(&this, &item, &result) {
                                     this.dec_running();
                                     break;
@@ -370,7 +370,7 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
                     if let Some(item) = this.find_task(&global, &local, &stealers) {
                         this.inc_running();
 
-                        if let Ok(result) = delegate.process_async(&this, &item).await {
+                        if let Ok(result) = delegate.process(&this, &item).await {
                             let time = Instant::now();
 
                             if !delegate.on_completed(&this, &item, &result) {

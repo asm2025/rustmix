@@ -159,12 +159,12 @@ impl<T: Send + Sync + Clone> Consumer<T> {
         self.consumers.fetch_add(1, Ordering::SeqCst);
     }
 
-    fn dec_consumers(&self, td: &impl TaskDelegation<Consumer<T>, T>) {
+    fn dec_consumers(&self, td: &impl TaskDelegationBase<Consumer<T>, T>) {
         self.consumers.fetch_sub(1, Ordering::SeqCst);
         self.check_finished(td);
     }
 
-    fn check_finished(&self, td: &impl TaskDelegation<Consumer<T>, T>) {
+    fn check_finished(&self, td: &impl TaskDelegationBase<Consumer<T>, T>) {
         if self.is_completed() && self.consumers() == 0 {
             let mut finished = self.finished.lock().unwrap();
             *finished = true;
@@ -282,7 +282,9 @@ impl<T: Send + Sync + Clone> Consumer<T> {
         });
     }
 
-    pub async fn start_async<TD: TaskDelegation<Consumer<T>, T> + Send + Sync + Clone + 'static>(
+    pub async fn start_async<
+        TD: AsyncTaskDelegation<Consumer<T>, T> + Send + Sync + Clone + 'static,
+    >(
         &self,
         delegate: &TD,
     ) {
@@ -319,7 +321,7 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                     } {
                         this.inc_running();
 
-                        if let Ok(result) = delegate.process_async(&this, &item).await {
+                        if let Ok(result) = delegate.process(&this, &item).await {
                             if !delegate.on_completed(&this, &item, &result) {
                                 this.dec_running();
                                 break;
@@ -352,7 +354,7 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                 } {
                     this.inc_running();
 
-                    if let Ok(result) = delegate.process_async(&this, &item).await {
+                    if let Ok(result) = delegate.process(&this, &item).await {
                         let time = Instant::now();
 
                         if !delegate.on_completed(&this, &item, &result) {
