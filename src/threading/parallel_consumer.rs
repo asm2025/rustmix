@@ -211,10 +211,12 @@ impl<T: Send + Sync + Clone> Parallel<T> {
             panic!("Queue is already cancelled.")
         }
 
-        if self.set_started(true) {
-            self.set_running(collection.len());
-            delegate.on_started(self);
+        if !self.set_started(true) {
+            return;
         }
+
+        self.set_running(collection.len());
+        delegate.on_started(self);
 
         let pool = ThreadPoolBuilder::new()
             .num_threads(self.options.threads)

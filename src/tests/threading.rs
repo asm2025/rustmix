@@ -194,13 +194,10 @@ pub async fn test_producer_consumer() -> Result<()> {
 
     let now = Instant::now();
     let handler = TaskHandler::new();
-    let options = ProducerConsumerOptions::new();
+    let options = ProducerConsumerOptions::new().with_threads(THREADS);
     let prodcon = ProducerConsumer::<usize>::with_options(options);
     let unit = TEST_SIZE / THREADS;
-
-    for _ in 0..THREADS {
-        prodcon.start_consumer(&handler.clone());
-    }
+    prodcon.start(&handler.clone());
 
     let wg = WaitGroup::new();
 
@@ -218,7 +215,7 @@ pub async fn test_producer_consumer() -> Result<()> {
 
     wg.wait();
     prodcon.complete();
-    let _ = prodcon.wait_async().await;
+    prodcon.wait_async().await;
 
     println!("Elapsed time: {:?}", now.elapsed());
     Ok(())

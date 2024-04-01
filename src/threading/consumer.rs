@@ -19,6 +19,7 @@ use super::*;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConsumerOptions {
     pub behavior: QueueBehavior,
+    pub threads: usize,
     pub threshold: Duration,
     pub sleep_after_send: Duration,
     pub peek_timeout: Duration,
@@ -29,6 +30,7 @@ impl Default for ConsumerOptions {
     fn default() -> Self {
         ConsumerOptions {
             behavior: QUEUE_BEHAVIOR_DEF,
+            threads: THREADS_DEF.clamp(THREADS_MIN, THREADS_MAX),
             threshold: THRESHOLD_DEF,
             sleep_after_send: SLEEP_AFTER_SEND_DEF,
             peek_timeout: PEEK_TIMEOUT_DEF.clamp(PEEK_TIMEOUT_MIN, PEEK_TIMEOUT_MAX),
@@ -40,6 +42,13 @@ impl Default for ConsumerOptions {
 impl ConsumerOptions {
     pub fn new() -> Self {
         Default::default()
+    }
+
+    pub fn with_threads(&self, threads: usize) -> Self {
+        ConsumerOptions {
+            threads: threads.clamp(THREADS_MIN, THREADS_MAX),
+            ..self.clone()
+        }
     }
 
     pub fn with_behavior(&self, behavior: QueueBehavior) -> Self {
@@ -155,8 +164,8 @@ impl<T: Send + Sync + Clone> Consumer<T> {
         self.consumers.load(Ordering::SeqCst)
     }
 
-    fn inc_consumers(&self) {
-        self.consumers.fetch_add(1, Ordering::SeqCst);
+    fn set_consumers(&self, value: usize) {
+        self.consumers.store(value, Ordering::SeqCst);
     }
 
     fn dec_consumers(&self, td: &impl TaskDelegationBase<Consumer<T>, T>) {
@@ -198,15 +207,51 @@ impl<T: Send + Sync + Clone> Consumer<T> {
             panic!("Queue is already completed.")
         }
 
-        if self.set_started(true) {
-            delegate.on_started(self);
+        if !self.set_started(true) {
+            return;
         }
 
-        self.inc_consumers();
-        let this = Arc::new(self.clone());
-        let delegate = delegate.clone();
-        thread::spawn(move || {
-            if this.options.threshold.is_zero() {
+        self.set_consumers(self.options.threads);
+        delegate.on_started(self);
+
+        for _ in 0..self.options.threads {
+            let this = Arc::new(self.clone());
+            let delegate = delegate.clone();
+            thread::spawn(move || {
+                if this.options.threshold.is_zero() {
+                    loop {
+                        if this.is_cancelled() || (this.is_empty() && this.is_completed()) {
+                            break;
+                        }
+
+                        if this.is_paused() {
+                            thread::sleep(this.options.pause_timeout);
+                            continue;
+                        }
+
+                        if let Some(item) = match this.options.behavior {
+                            QueueBehavior::FIFO => this.dequeue(),
+                            QueueBehavior::LIFO => this.pop(),
+                        } {
+                            this.inc_running();
+
+                            if let Ok(result) = delegate.process(&this, &item) {
+                                if !delegate.on_completed(&this, &item, &result) {
+                                    this.dec_running();
+                                    break;
+                                }
+                            }
+
+                            this.dec_running();
+                        }
+                    }
+
+                    this.dec_consumers(&delegate);
+                    drop(delegate);
+                    drop(this);
+                    return;
+                }
+
                 loop {
                     if this.is_cancelled() || (this.is_empty() && this.is_completed()) {
                         break;
@@ -224,9 +269,18 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                         this.inc_running();
 
                         if let Ok(result) = delegate.process(&this, &item) {
+                            let time = Instant::now();
+
                             if !delegate.on_completed(&this, &item, &result) {
                                 this.dec_running();
                                 break;
+                            }
+
+                            if !this.options.threshold.is_zero()
+                                && time.elapsed() < this.options.threshold
+                            {
+                                let remaining = this.options.threshold - time.elapsed();
+                                thread::sleep(remaining);
                             }
                         }
 
@@ -237,49 +291,8 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                 this.dec_consumers(&delegate);
                 drop(delegate);
                 drop(this);
-                return;
-            }
-
-            loop {
-                if this.is_cancelled() || (this.is_empty() && this.is_completed()) {
-                    break;
-                }
-
-                if this.is_paused() {
-                    thread::sleep(this.options.pause_timeout);
-                    continue;
-                }
-
-                if let Some(item) = match this.options.behavior {
-                    QueueBehavior::FIFO => this.dequeue(),
-                    QueueBehavior::LIFO => this.pop(),
-                } {
-                    this.inc_running();
-
-                    if let Ok(result) = delegate.process(&this, &item) {
-                        let time = Instant::now();
-
-                        if !delegate.on_completed(&this, &item, &result) {
-                            this.dec_running();
-                            break;
-                        }
-
-                        if !this.options.threshold.is_zero()
-                            && time.elapsed() < this.options.threshold
-                        {
-                            let remaining = this.options.threshold - time.elapsed();
-                            thread::sleep(remaining);
-                        }
-                    }
-
-                    this.dec_running();
-                }
-            }
-
-            this.dec_consumers(&delegate);
-            drop(delegate);
-            drop(this);
-        });
+            });
+        }
     }
 
     pub async fn start_async<
@@ -296,15 +309,51 @@ impl<T: Send + Sync + Clone> Consumer<T> {
             panic!("Queue is already completed.")
         }
 
-        if self.set_started(true) {
-            delegate.on_started(self);
+        if !self.set_started(true) {
+            return;
         }
 
-        self.inc_consumers();
-        let this = Arc::new(self.clone());
-        let delegate = delegate.clone();
-        tokio::spawn(async move {
-            if this.options.threshold.is_zero() {
+        self.set_consumers(self.options.threads);
+        delegate.on_started(self);
+
+        for _ in 0..self.options.threads {
+            let this = Arc::new(self.clone());
+            let delegate = delegate.clone();
+            tokio::spawn(async move {
+                if this.options.threshold.is_zero() {
+                    loop {
+                        if this.is_cancelled() || (this.is_empty() && this.is_completed()) {
+                            break;
+                        }
+
+                        if this.is_paused() {
+                            thread::sleep(this.options.pause_timeout);
+                            continue;
+                        }
+
+                        if let Some(item) = match this.options.behavior {
+                            QueueBehavior::FIFO => this.dequeue(),
+                            QueueBehavior::LIFO => this.pop(),
+                        } {
+                            this.inc_running();
+
+                            if let Ok(result) = delegate.process(&this, &item).await {
+                                if !delegate.on_completed(&this, &item, &result) {
+                                    this.dec_running();
+                                    break;
+                                }
+                            }
+
+                            this.dec_running();
+                        }
+                    }
+
+                    this.dec_consumers(&delegate);
+                    drop(delegate);
+                    drop(this);
+                    return;
+                }
+
                 loop {
                     if this.is_cancelled() || (this.is_empty() && this.is_completed()) {
                         break;
@@ -322,9 +371,18 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                         this.inc_running();
 
                         if let Ok(result) = delegate.process(&this, &item).await {
+                            let time = Instant::now();
+
                             if !delegate.on_completed(&this, &item, &result) {
                                 this.dec_running();
                                 break;
+                            }
+
+                            if !this.options.threshold.is_zero()
+                                && time.elapsed() < this.options.threshold
+                            {
+                                let remaining = this.options.threshold - time.elapsed();
+                                thread::sleep(remaining);
                             }
                         }
 
@@ -335,49 +393,8 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                 this.dec_consumers(&delegate);
                 drop(delegate);
                 drop(this);
-                return;
-            }
-
-            loop {
-                if this.is_cancelled() || (this.is_empty() && this.is_completed()) {
-                    break;
-                }
-
-                if this.is_paused() {
-                    thread::sleep(this.options.pause_timeout);
-                    continue;
-                }
-
-                if let Some(item) = match this.options.behavior {
-                    QueueBehavior::FIFO => this.dequeue(),
-                    QueueBehavior::LIFO => this.pop(),
-                } {
-                    this.inc_running();
-
-                    if let Ok(result) = delegate.process(&this, &item).await {
-                        let time = Instant::now();
-
-                        if !delegate.on_completed(&this, &item, &result) {
-                            this.dec_running();
-                            break;
-                        }
-
-                        if !this.options.threshold.is_zero()
-                            && time.elapsed() < this.options.threshold
-                        {
-                            let remaining = this.options.threshold - time.elapsed();
-                            thread::sleep(remaining);
-                        }
-                    }
-
-                    this.dec_running();
-                }
-            }
-
-            this.dec_consumers(&delegate);
-            drop(delegate);
-            drop(this);
-        });
+            });
+        }
     }
 
     pub fn stop(&self, enforce: bool) {

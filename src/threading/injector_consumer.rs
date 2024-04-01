@@ -18,6 +18,7 @@ use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InjectorWorkerOptions {
+    pub behavior: QueueBehavior,
     pub threads: usize,
     pub threshold: Duration,
     pub sleep_after_send: Duration,
@@ -27,6 +28,7 @@ pub struct InjectorWorkerOptions {
 impl Default for InjectorWorkerOptions {
     fn default() -> Self {
         InjectorWorkerOptions {
+            behavior: QUEUE_BEHAVIOR_DEF,
             threads: THREADS_DEF.clamp(THREADS_MIN, THREADS_MAX),
             threshold: THRESHOLD_DEF,
             sleep_after_send: SLEEP_AFTER_SEND_DEF,
@@ -38,6 +40,13 @@ impl Default for InjectorWorkerOptions {
 impl InjectorWorkerOptions {
     pub fn new() -> Self {
         Default::default()
+    }
+
+    pub fn with_behavior(&self, behavior: QueueBehavior) -> Self {
+        InjectorWorkerOptions {
+            behavior,
+            ..self.clone()
+        }
     }
 
     pub fn with_threads(&self, threads: usize) -> Self {
@@ -154,8 +163,8 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
         self.workers.load(Ordering::SeqCst)
     }
 
-    fn inc_workers(&self) {
-        self.workers.fetch_add(1, Ordering::SeqCst);
+    fn set_workers(&self, value: usize) {
+        self.workers.store(value, Ordering::SeqCst);
     }
 
     fn dec_workers(&self, td: &impl TaskDelegationBase<InjectorWorker<T>, T>) {
@@ -201,14 +210,18 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
             return;
         }
 
+        self.set_workers(self.options.threads);
         delegate.on_started(self);
         let mut mutstealers = self.stealers.lock().unwrap();
 
         for _ in 0..self.options.threads {
-            let worker = Worker::<T>::new_fifo();
+            let worker = if self.options.behavior == QueueBehavior::LIFO {
+                Worker::<T>::new_lifo()
+            } else {
+                Worker::<T>::new_fifo()
+            };
             let stealer = worker.stealer();
             mutstealers.push(stealer);
-            self.inc_workers();
             let this = self.clone();
             let global = self.injector.clone();
             let local = Arc::new(Mutex::new(worker));
@@ -310,14 +323,18 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
             return;
         }
 
+        self.set_workers(self.options.threads);
         delegate.on_started(self);
         let mut mutstealers = self.stealers.lock().unwrap();
 
         for _ in 0..self.options.threads {
-            let worker = Worker::<T>::new_fifo();
+            let worker = if self.options.behavior == QueueBehavior::LIFO {
+                Worker::<T>::new_lifo()
+            } else {
+                Worker::<T>::new_fifo()
+            };
             let stealer = worker.stealer();
             mutstealers.push(stealer);
-            self.inc_workers();
             let this = self.clone();
             let global = self.injector.clone();
             let local = Arc::new(Mutex::new(worker));
