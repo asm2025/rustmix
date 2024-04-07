@@ -19,16 +19,24 @@ const TEST_SIZE: usize = 10000;
 
 #[derive(Debug, Clone)]
 pub struct TaskHandler {
-    pub task_count: Arc<AtomicUsize>,
-    pub done_count: Arc<AtomicUsize>,
+    pub tasks: Arc<AtomicUsize>,
+    pub done: Arc<AtomicUsize>,
 }
 
 impl TaskHandler {
     pub fn new() -> Self {
         TaskHandler {
-            task_count: Arc::new(AtomicUsize::new(0)),
-            done_count: Arc::new(AtomicUsize::new(0)),
+            tasks: Arc::new(AtomicUsize::new(0)),
+            done: Arc::new(AtomicUsize::new(0)),
         }
+    }
+
+    pub fn tasks(&self) -> usize {
+        self.tasks.load(Ordering::SeqCst)
+    }
+
+    pub fn done(&self) -> usize {
+        self.done.load(Ordering::SeqCst)
     }
 }
 
@@ -43,7 +51,7 @@ impl TaskDelegationBase<ProducerConsumer<usize>, usize> for TaskHandler {
         item: &usize,
         result: &TaskResult,
     ) -> bool {
-        self.done_count.fetch_add(1, Ordering::SeqCst);
+        self.done.fetch_add(1, Ordering::SeqCst);
         println!("Result item: {}: {:?}", item, result);
         true
     }
@@ -55,15 +63,15 @@ impl TaskDelegationBase<ProducerConsumer<usize>, usize> for TaskHandler {
     fn on_finished(&self, _pc: &ProducerConsumer<usize>) {
         println!(
             "Got: {} tasks and finished {} tasks.",
-            self.task_count.load(Ordering::SeqCst),
-            self.done_count.load(Ordering::SeqCst)
+            self.tasks(),
+            self.done()
         );
     }
 }
 
 impl TaskDelegation<ProducerConsumer<usize>, usize> for TaskHandler {
     fn process(&self, _pc: &ProducerConsumer<usize>, item: &usize) -> Result<TaskResult> {
-        self.task_count.fetch_add(1, Ordering::SeqCst);
+        self.tasks.fetch_add(1, Ordering::SeqCst);
         println!("Item: {}", item);
 
         if item % 5 == 0 {
@@ -85,7 +93,7 @@ impl TaskDelegationBase<Consumer<usize>, usize> for TaskHandler {
     }
 
     fn on_completed(&self, _pc: &Consumer<usize>, item: &usize, result: &TaskResult) -> bool {
-        self.done_count.fetch_add(1, Ordering::SeqCst);
+        self.done.fetch_add(1, Ordering::SeqCst);
         println!("Result item: {}: {:?}", item, result);
         true
     }
@@ -97,15 +105,15 @@ impl TaskDelegationBase<Consumer<usize>, usize> for TaskHandler {
     fn on_finished(&self, _pc: &Consumer<usize>) {
         println!(
             "Got: {} tasks and finished {} tasks.",
-            self.task_count.load(Ordering::SeqCst),
-            self.done_count.load(Ordering::SeqCst)
+            self.tasks(),
+            self.done()
         );
     }
 }
 
 impl TaskDelegation<Consumer<usize>, usize> for TaskHandler {
     fn process(&self, _pc: &Consumer<usize>, item: &usize) -> Result<TaskResult> {
-        self.task_count.fetch_add(1, Ordering::SeqCst);
+        self.tasks.fetch_add(1, Ordering::SeqCst);
         println!("Item: {}", item);
 
         if item % 5 == 0 {
@@ -127,7 +135,7 @@ impl TaskDelegationBase<InjectorWorker<usize>, usize> for TaskHandler {
     }
 
     fn on_completed(&self, _pc: &InjectorWorker<usize>, item: &usize, result: &TaskResult) -> bool {
-        self.done_count.fetch_add(1, Ordering::SeqCst);
+        self.done.fetch_add(1, Ordering::SeqCst);
         println!("Result item: {}: {:?}", item, result);
         true
     }
@@ -139,15 +147,15 @@ impl TaskDelegationBase<InjectorWorker<usize>, usize> for TaskHandler {
     fn on_finished(&self, _pc: &InjectorWorker<usize>) {
         println!(
             "Got: {} tasks and finished {} tasks.",
-            self.task_count.load(Ordering::SeqCst),
-            self.done_count.load(Ordering::SeqCst)
+            self.tasks(),
+            self.done()
         );
     }
 }
 
 impl TaskDelegation<InjectorWorker<usize>, usize> for TaskHandler {
     fn process(&self, _pc: &InjectorWorker<usize>, item: &usize) -> Result<TaskResult> {
-        self.task_count.fetch_add(1, Ordering::SeqCst);
+        self.tasks.fetch_add(1, Ordering::SeqCst);
         println!("Item: {}", item);
 
         if item % 5 == 0 {
@@ -169,7 +177,7 @@ impl TaskDelegationBase<Parallel<usize>, usize> for TaskHandler {
     }
 
     fn on_completed(&self, _pc: &Parallel<usize>, item: &usize, result: &TaskResult) -> bool {
-        self.done_count.fetch_add(1, Ordering::SeqCst);
+        self.done.fetch_add(1, Ordering::SeqCst);
         println!("Result item: {}: {:?}", item, result);
         true
     }
@@ -181,15 +189,15 @@ impl TaskDelegationBase<Parallel<usize>, usize> for TaskHandler {
     fn on_finished(&self, _pc: &Parallel<usize>) {
         println!(
             "Got: {} tasks and finished {} tasks.",
-            self.task_count.load(Ordering::SeqCst),
-            self.done_count.load(Ordering::SeqCst)
+            self.tasks(),
+            self.done()
         );
     }
 }
 
 impl TaskDelegation<Parallel<usize>, usize> for TaskHandler {
     fn process(&self, _pc: &Parallel<usize>, item: &usize) -> Result<TaskResult> {
-        self.task_count.fetch_add(1, Ordering::SeqCst);
+        self.tasks.fetch_add(1, Ordering::SeqCst);
         println!("Item: {}", item);
 
         if item % 5 == 0 {
@@ -221,15 +229,14 @@ pub async fn test_producer_consumer(cancel_after: Duration) -> Result<()> {
         let h = handler.clone();
         thread::spawn(move || {
             for i in 1..=unit {
-                if pc.is_completed() || pc.is_cancelled() {
+                if let Err(e) = p.enqueue(i + unit * n) {
+                    println!("Enqueue error: {:?}", e);
                     break;
                 }
 
-                p.enqueue(i + (unit * n));
-            }
-
-            if h.task_count.load(Ordering::SeqCst) == TEST_SIZE {
-                pc.complete();
+                if h.tasks() == TEST_SIZE {
+                    pc.complete();
+                }
             }
 
             drop(pc);
@@ -271,7 +278,10 @@ pub async fn test_consumer(cancel_after: Duration) -> Result<()> {
     }
 
     for i in 1..=TEST_SIZE {
-        consumer.enqueue(i);
+        if let Err(e) = consumer.enqueue(i) {
+            println!("Enqueue error: {:?}", e);
+            break;
+        }
     }
 
     consumer.complete();
@@ -307,7 +317,10 @@ pub async fn test_injector_worker(cancel_after: Duration) -> Result<()> {
     injwork.start(&handler);
 
     for i in 1..=TEST_SIZE {
-        injwork.enqueue(i);
+        if let Err(e) = injwork.enqueue(i) {
+            println!("Enqueue error: {:?}", e);
+            break;
+        }
     }
 
     injwork.complete();

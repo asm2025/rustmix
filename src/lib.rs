@@ -1,5 +1,5 @@
 pub mod ai;
-pub mod app_info;
+pub mod app;
 pub mod date;
 pub mod error;
 pub mod io;

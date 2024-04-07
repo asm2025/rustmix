@@ -1,4 +1,4 @@
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use html_entities::decode_html_entities;
 use once_cell::sync::Lazy;
@@ -203,22 +203,22 @@ impl TempMail {
         let body = Self::email_fake_get_content(URL_EMAIL_FAKE).await?;
 
         if body.is_empty() {
-            return Err(Error::msg("Failed to get email-fake.com"));
+            return Err(anyhow!("Failed to get email-fake.com"));
         }
 
         let start = match body.find("fem coserch") {
             Some(index) => index,
-            None => return Err(Error::msg("Failed to find coserch")),
+            None => return Err(anyhow!("Failed to find coserch")),
         };
         let body = &body[start..];
         let end = match body.find("fem dropselect") {
             Some(index) => index,
-            None => return Err(Error::msg("Failed to find dropselect")),
+            None => return Err(anyhow!("Failed to find dropselect")),
         };
         let body = &body[..end];
         let captures = match RGX_EMAIL_FAKE_GENERATE.captures(&body) {
             Some(captures) => captures,
-            None => return Err(Error::msg("Failed to find username and domain")),
+            None => return Err(anyhow!("Failed to find username and domain")),
         };
         let username = captures.get(1).unwrap().as_str();
         let domain = captures.get(2).unwrap().as_str();
@@ -412,10 +412,7 @@ impl TempMail {
 
         let body = match decode_html_entities(&body) {
             Ok(text) => text,
-            Err(_) => Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "Failed to decode html entities",
-            )))?,
+            Err(_) => Err(anyhow!("Failed to decode html entities"))?,
         };
 
         if let Some(matches) = RGX_EMAIL_FAKE_MESSAGE.captures(&body) {
@@ -441,7 +438,7 @@ impl TempMail {
         let response = __HTTP.get(url).send().await?;
 
         if response.status() != 200 {
-            return Err(Error::msg(format!(
+            return Err(anyhow!(format!(
                 "Failed to get email-fake.com. {}",
                 response.status()
             )));

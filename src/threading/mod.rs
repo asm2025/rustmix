@@ -1,14 +1,16 @@
-use anyhow::{Error, Result};
-use futures::executor::block_on;
-use std::{fmt, future::Future, sync::Arc};
+use anyhow::{anyhow, Result};
+use futures::Future;
+use std::{fmt, sync::Arc, time::Instant};
 use tokio::{
     select,
     sync::Notify,
-    time::{sleep as tokio_sleep, timeout as tokio_timeout, Duration, Instant},
+    time::{sleep, Duration},
 };
 
+use self::cond::Mutcond;
 use super::error;
 
+pub mod cond;
 pub mod consumer;
 pub mod injector_consumer;
 pub mod parallel_consumer;
@@ -27,6 +29,7 @@ const PEEK_TIMEOUT_MAX: Duration = Duration::from_secs(5);
 const PAUSE_TIMEOUT_DEF: Duration = Duration::from_millis(50);
 const PAUSE_TIMEOUT_MIN: Duration = Duration::from_millis(10);
 const PAUSE_TIMEOUT_MAX: Duration = Duration::from_secs(5);
+const SELECT_TIMEOUT: Duration = Duration::from_secs(60);
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TaskResult {
@@ -90,47 +93,46 @@ pub trait AwaitableConsumer {
     fn is_finished(&self) -> bool;
 }
 
-fn wait(
-    this: &impl AwaitableConsumer,
-    pause_timeout: Duration,
-    finished: &Arc<Notify>,
-) -> Result<()> {
+fn wait(this: &impl AwaitableConsumer, finished: &Arc<Mutcond>) -> Result<()> {
     if this.is_cancelled() {
-        return Err(Error::new(error::CancelledError));
+        return Err(anyhow!(error::CancelledError));
     }
 
-    while !this.is_finished() {
-        let result = block_on(tokio_timeout(pause_timeout, finished.notified()));
-        if result.is_err() {
-            break;
-        }
+    if this.is_finished() {
+        return Ok(());
     }
 
-    if this.is_cancelled() {
-        return Err(Error::new(error::CancelledError));
+    match finished.wait_while(|| !this.is_cancelled() && !this.is_finished()) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(anyhow!(error::CancelledError)),
     }
-
-    Ok(())
 }
 
-async fn wait_async(
-    this: &impl AwaitableConsumer,
-    pause_timeout: Duration,
-    finished: &Arc<Notify>,
-) -> Result<()> {
+async fn wait_async(this: &impl AwaitableConsumer, finished: &Arc<Notify>) -> Result<()> {
     if this.is_cancelled() {
-        return Err(Error::new(error::CancelledError));
+        return Err(anyhow!(error::CancelledError));
     }
 
-    while !this.is_finished() {
+    if this.is_finished() {
+        return Ok(());
+    }
+
+    let start = Instant::now();
+
+    while !this.is_finished() && !this.is_cancelled() {
         select! {
             _ = finished.notified() => {},
-            _ = tokio_sleep(pause_timeout) => {}
+            _ = sleep(PAUSE_TIMEOUT_DEF) => {},
+            _ = sleep(SELECT_TIMEOUT) => {}
+        }
+
+        if start.elapsed() > SELECT_TIMEOUT {
+            return Err(anyhow!(error::TimedoutError));
         }
     }
 
     if this.is_cancelled() {
-        return Err(Error::new(error::CancelledError));
+        return Err(anyhow!(error::CancelledError));
     }
 
     Ok(())
@@ -139,11 +141,14 @@ async fn wait_async(
 fn wait_for(
     this: &impl AwaitableConsumer,
     timeout: Duration,
-    pause_timeout: Duration,
-    finished: &Arc<Notify>,
+    finished: &Arc<Mutcond>,
 ) -> Result<bool> {
     if this.is_cancelled() {
-        return Err(Error::new(error::CancelledError));
+        return Err(anyhow!(error::CancelledError));
+    }
+
+    if this.is_finished() {
+        return Ok(true);
     }
 
     if timeout.is_zero() {
@@ -151,39 +156,36 @@ fn wait_for(
             return Ok(true);
         }
 
-        return Err(Error::new(error::TimedoutError));
+        return Err(anyhow!(error::TimedoutError));
     }
 
-    let start = Instant::now();
+    match finished.wait_timeout_while(|| !this.is_cancelled() && !this.is_finished(), timeout) {
+        Ok(_) => {
+            if this.is_cancelled() {
+                return Err(anyhow!(error::CancelledError));
+            }
 
-    while !this.is_finished() && start.elapsed() < timeout {
-        let wait_timeout = timeout - start.elapsed();
-        let pause_timeout = pause_timeout.min(wait_timeout);
-        let result = block_on(tokio_timeout(pause_timeout, finished.notified()));
-        if result.is_err() {
-            break;
+            if this.is_finished() {
+                return Ok(true);
+            }
+
+            Err(anyhow!(error::TimedoutError))
         }
-    }
-
-    if this.is_cancelled() {
-        return Err(Error::new(error::CancelledError));
-    }
-
-    if start.elapsed() <= timeout {
-        Ok(true)
-    } else {
-        Err(Error::new(error::TimedoutError))
+        Err(_) => Err(anyhow!(error::TimedoutError)),
     }
 }
 
 async fn wait_for_async(
     this: &impl AwaitableConsumer,
     timeout: Duration,
-    pause_timeout: Duration,
     finished: &Arc<Notify>,
 ) -> Result<bool> {
     if this.is_cancelled() {
-        return Err(Error::new(error::CancelledError));
+        return Err(anyhow!(error::CancelledError));
+    }
+
+    if this.is_finished() {
+        return Ok(true);
     }
 
     if timeout.is_zero() {
@@ -191,28 +193,30 @@ async fn wait_for_async(
             return Ok(true);
         }
 
-        return Err(Error::new(error::TimedoutError));
+        return Err(anyhow!(error::TimedoutError));
     }
 
     let start = Instant::now();
 
-    while !this.is_finished() && start.elapsed() < timeout {
-        let wait_timeout = timeout - start.elapsed();
-        let pause_timeout = pause_timeout.min(wait_timeout);
-
+    while !this.is_finished() && !this.is_cancelled() && start.elapsed() < timeout {
         select! {
             _ = finished.notified() => {},
-            _ = tokio_sleep(pause_timeout) => {}
+            _ = sleep(PAUSE_TIMEOUT_DEF) => {},
+            _ = sleep(timeout) => {}
+        }
+
+        if start.elapsed() > timeout {
+            return Err(anyhow!(error::TimedoutError));
         }
     }
 
     if this.is_cancelled() {
-        return Err(Error::new(error::CancelledError));
+        return Err(anyhow!(error::CancelledError));
     }
 
     if start.elapsed() <= timeout {
         Ok(true)
     } else {
-        Err(Error::new(error::TimedoutError))
+        Err(anyhow!(error::TimedoutError))
     }
 }

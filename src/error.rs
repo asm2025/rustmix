@@ -12,6 +12,17 @@ impl fmt::Display for CancelledError {
 impl Error for CancelledError {}
 
 #[derive(Debug)]
+pub struct QueueCompletedError;
+
+impl fmt::Display for QueueCompletedError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Queue is already completed")
+    }
+}
+
+impl Error for QueueCompletedError {}
+
+#[derive(Debug)]
 pub struct TimedoutError;
 
 impl fmt::Display for TimedoutError {

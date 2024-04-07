@@ -14,7 +14,7 @@ use tokio::{
     time::{Duration, Instant},
 };
 
-use super::*;
+use super::{cond::Mutcond, *};
 
 pub trait Len {
     fn len(&self) -> usize;
@@ -116,6 +116,7 @@ pub struct Parallel<T: Send + Sync + Clone + 'static> {
     options: ParallelOptions,
     started: Arc<Mutex<bool>>,
     finished: Arc<AtomicBool>,
+    finished_cond: Arc<Mutcond>,
     finished_noti: Arc<Notify>,
     paused: Arc<AtomicBool>,
     cancelled: Arc<AtomicBool>,
@@ -130,6 +131,7 @@ impl<T: Send + Sync + Clone> Parallel<T> {
             options,
             started: Arc::new(Mutex::new(false)),
             finished: Arc::new(AtomicBool::new(false)),
+            finished_cond: Arc::new(Mutcond::new()),
             finished_noti: Arc::new(Notify::new()),
             paused: Arc::new(AtomicBool::new(false)),
             cancelled: Arc::new(AtomicBool::new(false)),
@@ -143,6 +145,7 @@ impl<T: Send + Sync + Clone> Parallel<T> {
             options,
             started: Arc::new(Mutex::new(false)),
             finished: Arc::new(AtomicBool::new(false)),
+            finished_cond: Arc::new(Mutcond::new()),
             finished_noti: Arc::new(Notify::new()),
             paused: Arc::new(AtomicBool::new(false)),
             cancelled: Arc::new(AtomicBool::new(false)),
@@ -202,6 +205,7 @@ impl<T: Send + Sync + Clone> Parallel<T> {
             }
 
             self.set_started(false);
+            self.finished_cond.notify_one();
             self.finished_noti.notify_one();
         }
     }
@@ -314,30 +318,19 @@ impl<T: Send + Sync + Clone> Parallel<T> {
     }
 
     pub fn wait(&self) -> Result<()> {
-        wait(self, self.options.pause_timeout, &self.finished_noti)
+        wait(self, &self.finished_cond)
     }
 
     pub async fn wait_async(&self) -> Result<()> {
-        wait_async(self, self.options.pause_timeout, &self.finished_noti).await
+        wait_async(self, &self.finished_noti).await
     }
 
     pub fn wait_for(&self, timeout: Duration) -> Result<bool> {
-        wait_for(
-            self,
-            timeout,
-            self.options.pause_timeout,
-            &self.finished_noti,
-        )
+        wait_for(self, timeout, &self.finished_cond)
     }
 
     pub async fn wait_for_async(&self, timeout: Duration) -> Result<bool> {
-        wait_for_async(
-            self,
-            timeout,
-            self.options.pause_timeout,
-            &self.finished_noti,
-        )
-        .await
+        wait_for_async(self, timeout, &self.finished_noti).await
     }
 }
 

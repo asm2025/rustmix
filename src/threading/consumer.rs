@@ -1,9 +1,9 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use std::{
     collections::LinkedList,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc, Condvar, Mutex,
+        Arc, Mutex,
     },
     thread,
 };
@@ -12,7 +12,7 @@ use tokio::{
     time::{Duration, Instant},
 };
 
-use super::*;
+use super::{cond::Mutcond, *};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConsumerOptions {
@@ -75,9 +75,10 @@ impl ConsumerOptions {
 pub struct Consumer<T: Send + Sync + Clone + 'static> {
     options: ConsumerOptions,
     items: Arc<Mutex<LinkedList<T>>>,
-    items_cond: Arc<Condvar>,
+    items_cond: Arc<Mutcond>,
     started: Arc<Mutex<bool>>,
     finished: Arc<AtomicBool>,
+    finished_cond: Arc<Mutcond>,
     finished_noti: Arc<Notify>,
     completed: Arc<AtomicBool>,
     paused: Arc<AtomicBool>,
@@ -91,9 +92,10 @@ impl<T: Send + Sync + Clone> Consumer<T> {
         Consumer {
             options: Default::default(),
             items: Arc::new(Mutex::new(LinkedList::new())),
-            items_cond: Arc::new(Condvar::new()),
+            items_cond: Arc::new(Mutcond::new()),
             started: Arc::new(Mutex::new(false)),
             finished: Arc::new(AtomicBool::new(false)),
+            finished_cond: Arc::new(Mutcond::new()),
             finished_noti: Arc::new(Notify::new()),
             completed: Arc::new(AtomicBool::new(false)),
             paused: Arc::new(AtomicBool::new(false)),
@@ -107,9 +109,10 @@ impl<T: Send + Sync + Clone> Consumer<T> {
         Consumer {
             options,
             items: Arc::new(Mutex::new(LinkedList::new())),
-            items_cond: Arc::new(Condvar::new()),
+            items_cond: Arc::new(Mutcond::new()),
             started: Arc::new(Mutex::new(false)),
             finished: Arc::new(AtomicBool::new(false)),
+            finished_cond: Arc::new(Mutcond::new()),
             finished_noti: Arc::new(Notify::new()),
             completed: Arc::new(AtomicBool::new(false)),
             paused: Arc::new(AtomicBool::new(false)),
@@ -187,6 +190,7 @@ impl<T: Send + Sync + Clone> Consumer<T> {
             }
 
             self.set_started(false);
+            self.finished_cond.notify_one();
             self.finished_noti.notify_one();
         }
     }
@@ -437,13 +441,13 @@ impl<T: Send + Sync + Clone> Consumer<T> {
         }
     }
 
-    pub fn enqueue(&self, item: T) {
+    pub fn enqueue(&self, item: T) -> Result<()> {
         if self.is_cancelled() {
-            return;
+            return Err(anyhow!(error::CancelledError));
         }
 
         if self.is_completed() {
-            panic!("Queue is already completed.")
+            return Err(anyhow!(error::QueueCompletedError));
         }
 
         let mut items = self.items.lock().unwrap();
@@ -454,19 +458,18 @@ impl<T: Send + Sync + Clone> Consumer<T> {
         }
 
         self.items_cond.notify_one();
+        Ok(())
     }
 
     fn dequeue(&self) -> Option<T> {
         let mut items = self.items.lock().unwrap();
 
         while items.is_empty() && !self.is_cancelled() && !self.is_completed() {
-            let result = self
+            if !self
                 .items_cond
-                .wait_timeout(items, self.options.peek_timeout)
-                .unwrap();
-            items = result.0;
-
-            if result.1.timed_out() {
+                .wait_timeout(self.options.peek_timeout)
+                .unwrap()
+            {
                 continue;
             }
 
@@ -488,13 +491,11 @@ impl<T: Send + Sync + Clone> Consumer<T> {
         let mut items = self.items.lock().unwrap();
 
         while items.is_empty() && !self.is_cancelled() && !self.is_completed() {
-            let result = self
+            if !self
                 .items_cond
-                .wait_timeout(items, self.options.peek_timeout)
-                .unwrap();
-            items = result.0;
-
-            if result.1.timed_out() {
+                .wait_timeout(self.options.peek_timeout)
+                .unwrap()
+            {
                 continue;
             }
 
@@ -554,30 +555,19 @@ impl<T: Send + Sync + Clone> Consumer<T> {
     }
 
     pub fn wait(&self) -> Result<()> {
-        wait(self, self.options.pause_timeout, &self.finished_noti)
+        wait(self, &self.finished_cond)
     }
 
     pub async fn wait_async(&self) -> Result<()> {
-        wait_async(self, self.options.pause_timeout, &self.finished_noti).await
+        wait_async(self, &self.finished_noti).await
     }
 
     pub fn wait_for(&self, timeout: Duration) -> Result<bool> {
-        wait_for(
-            self,
-            timeout,
-            self.options.pause_timeout,
-            &self.finished_noti,
-        )
+        wait_for(self, timeout, &self.finished_cond)
     }
 
     pub async fn wait_for_async(&self, timeout: Duration) -> Result<bool> {
-        wait_for_async(
-            self,
-            timeout,
-            self.options.pause_timeout,
-            &self.finished_noti,
-        )
-        .await
+        wait_for_async(self, timeout, &self.finished_noti).await
     }
 }
 

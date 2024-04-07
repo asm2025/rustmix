@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use crossbeam::deque::{Injector, Steal, Stealer, Worker};
 use std::{
     sync::{
@@ -12,7 +12,7 @@ use tokio::{
     time::{Duration, Instant},
 };
 
-use super::*;
+use super::{cond::Mutcond, *};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InjectorWorkerOptions {
@@ -76,6 +76,7 @@ pub struct InjectorWorker<T: Send + Sync + Clone + 'static> {
     stealers: Arc<Mutex<Vec<Stealer<T>>>>,
     started: Arc<Mutex<bool>>,
     finished: Arc<AtomicBool>,
+    finished_cond: Arc<Mutcond>,
     finished_noti: Arc<Notify>,
     completed: Arc<AtomicBool>,
     paused: Arc<AtomicBool>,
@@ -93,6 +94,7 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
             stealers: Arc::new(Mutex::new(Vec::new())),
             started: Arc::new(Mutex::new(false)),
             finished: Arc::new(AtomicBool::new(false)),
+            finished_cond: Arc::new(Mutcond::new()),
             finished_noti: Arc::new(Notify::new()),
             completed: Arc::new(AtomicBool::new(false)),
             paused: Arc::new(AtomicBool::new(false)),
@@ -109,6 +111,7 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
             stealers: Arc::new(Mutex::new(Vec::new())),
             started: Arc::new(Mutex::new(false)),
             finished: Arc::new(AtomicBool::new(false)),
+            finished_cond: Arc::new(Mutcond::new()),
             finished_noti: Arc::new(Notify::new()),
             completed: Arc::new(AtomicBool::new(false)),
             paused: Arc::new(AtomicBool::new(false)),
@@ -186,6 +189,7 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
             }
 
             self.set_started(false);
+            self.finished_cond.notify_one();
             self.finished_noti.notify_one();
         }
     }
@@ -468,16 +472,22 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
         }
     }
 
-    pub fn enqueue(&self, item: T) {
+    pub fn enqueue(&self, item: T) -> Result<()> {
         if self.is_cancelled() {
-            return;
+            return Err(anyhow!(error::CancelledError));
         }
 
         if self.is_completed() {
-            panic!("Queue is already completed.")
+            return Err(anyhow!(error::QueueCompletedError));
         }
 
         self.injector.push(item);
+
+        if !self.options.sleep_after_send.is_zero() {
+            thread::sleep(self.options.sleep_after_send);
+        }
+
+        Ok(())
     }
 
     pub fn complete(&self) {
@@ -497,30 +507,19 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
     }
 
     pub fn wait(&self) -> Result<()> {
-        wait(self, self.options.pause_timeout, &self.finished_noti)
+        wait(self, &self.finished_cond)
     }
 
     pub async fn wait_async(&self) -> Result<()> {
-        wait_async(self, self.options.pause_timeout, &self.finished_noti).await
+        wait_async(self, &self.finished_noti).await
     }
 
     pub fn wait_for(&self, timeout: Duration) -> Result<bool> {
-        wait_for(
-            self,
-            timeout,
-            self.options.pause_timeout,
-            &self.finished_noti,
-        )
+        wait_for(self, timeout, &self.finished_cond)
     }
 
     pub async fn wait_for_async(&self, timeout: Duration) -> Result<bool> {
-        wait_for_async(
-            self,
-            timeout,
-            self.options.pause_timeout,
-            &self.finished_noti,
-        )
-        .await
+        wait_for_async(self, timeout, &self.finished_noti).await
     }
 }
 
