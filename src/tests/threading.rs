@@ -1,5 +1,4 @@
 use anyhow::Result;
-use crossbeam::sync::WaitGroup;
 use std::{
     collections,
     sync::{
@@ -216,31 +215,31 @@ pub async fn test_producer_consumer(cancel_after: Duration) -> Result<()> {
     let unit = TEST_SIZE / THREADS;
     prodcon.start(&handler.clone());
 
-    let wg = WaitGroup::new();
-
     for n in 0..THREADS {
-        let wgc = wg.clone();
         let pc = prodcon.clone();
         let p = prodcon.new_producer();
+        let h = handler.clone();
         thread::spawn(move || {
             for i in 1..=unit {
-                if pc.is_completed() {
+                if pc.is_completed() || pc.is_cancelled() {
                     break;
                 }
 
                 p.enqueue(i + (unit * n));
             }
 
+            if h.task_count.load(Ordering::SeqCst) == TEST_SIZE {
+                pc.complete();
+            }
+
             drop(pc);
-            drop(wgc);
+            drop(h);
         });
     }
 
     if !cancel_after.is_zero() {
-        let wgc = wg.clone();
         let ptr = prodcon.clone();
         thread::spawn(move || {
-            drop(wgc);
             thread::sleep(cancel_after);
 
             if ptr.is_finished() {
@@ -251,8 +250,6 @@ pub async fn test_producer_consumer(cancel_after: Duration) -> Result<()> {
         });
     }
 
-    wg.wait();
-    prodcon.complete();
     match prodcon.wait_async().await {
         Ok(_) => println!("Producer/Consumer finished"),
         Err(e) => println!("Producer/Consumer error: {:?}", e),

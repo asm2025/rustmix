@@ -18,7 +18,7 @@ async fn main() -> Result<()> {
     //tests::mail::test_tempmail().await?;
 
     //tests::threading::test_producer_consumer(Duration::ZERO).await?;
-    tests::threading::test_producer_consumer(Duration::from_millis(150)).await?;
+    //tests::threading::test_producer_consumer(Duration::from_millis(150)).await?;
     //tests::threading::test_consumer(Duration::ZERO).await?;
     //tests::threading::test_consumer(Duration::from_millis(150)).await?;
     //tests::threading::test_injector_worker(Duration::ZERO).await?;
