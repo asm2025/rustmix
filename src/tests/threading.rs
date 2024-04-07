@@ -9,6 +9,7 @@ use std::{
     thread,
     time::Instant,
 };
+use tokio::time::Duration;
 
 use rustmix::threading::{
     consumer::*, injector_consumer::*, parallel_consumer::*, producer_consumer::*, *,
@@ -46,6 +47,10 @@ impl TaskDelegationBase<ProducerConsumer<usize>, usize> for TaskHandler {
         self.done_count.fetch_add(1, Ordering::SeqCst);
         println!("Result item: {}: {:?}", item, result);
         true
+    }
+
+    fn on_cancelled(&self, _td: &ProducerConsumer<usize>) {
+        println!("Processing tasks was cancelled");
     }
 
     fn on_finished(&self, _pc: &ProducerConsumer<usize>) {
@@ -86,6 +91,10 @@ impl TaskDelegationBase<Consumer<usize>, usize> for TaskHandler {
         true
     }
 
+    fn on_cancelled(&self, _td: &Consumer<usize>) {
+        println!("Processing tasks was cancelled");
+    }
+
     fn on_finished(&self, _pc: &Consumer<usize>) {
         println!(
             "Got: {} tasks and finished {} tasks.",
@@ -122,6 +131,10 @@ impl TaskDelegationBase<InjectorWorker<usize>, usize> for TaskHandler {
         self.done_count.fetch_add(1, Ordering::SeqCst);
         println!("Result item: {}: {:?}", item, result);
         true
+    }
+
+    fn on_cancelled(&self, _td: &InjectorWorker<usize>) {
+        println!("Processing tasks was cancelled");
     }
 
     fn on_finished(&self, _pc: &InjectorWorker<usize>) {
@@ -162,6 +175,10 @@ impl TaskDelegationBase<Parallel<usize>, usize> for TaskHandler {
         true
     }
 
+    fn on_cancelled(&self, _td: &Parallel<usize>) {
+        println!("Processing tasks was cancelled");
+    }
+
     fn on_finished(&self, _pc: &Parallel<usize>) {
         println!(
             "Got: {} tasks and finished {} tasks.",
@@ -189,7 +206,7 @@ impl TaskDelegation<Parallel<usize>, usize> for TaskHandler {
     }
 }
 
-pub async fn test_producer_consumer() -> Result<()> {
+pub async fn test_producer_consumer(cancel_after: Duration) -> Result<()> {
     println!("\nTesting Producer/Consumer with {} threads...", THREADS);
 
     let now = Instant::now();
@@ -203,25 +220,48 @@ pub async fn test_producer_consumer() -> Result<()> {
 
     for n in 0..THREADS {
         let wgc = wg.clone();
+        let pc = prodcon.clone();
         let p = prodcon.new_producer();
         thread::spawn(move || {
             for i in 1..=unit {
+                if pc.is_completed() {
+                    break;
+                }
+
                 p.enqueue(i + (unit * n));
             }
 
+            drop(pc);
             drop(wgc);
+        });
+    }
+
+    if !cancel_after.is_zero() {
+        let wgc = wg.clone();
+        let ptr = prodcon.clone();
+        thread::spawn(move || {
+            drop(wgc);
+            thread::sleep(cancel_after);
+
+            if ptr.is_finished() {
+                return;
+            }
+
+            ptr.cancel();
         });
     }
 
     wg.wait();
     prodcon.complete();
-    prodcon.wait_async().await;
-
+    match prodcon.wait_async().await {
+        Ok(_) => println!("Producer/Consumer finished"),
+        Err(e) => println!("Producer/Consumer error: {:?}", e),
+    }
     println!("Elapsed time: {:?}", now.elapsed());
     Ok(())
 }
 
-pub async fn test_consumer() -> Result<()> {
+pub async fn test_consumer(cancel_after: Duration) -> Result<()> {
     println!("\nTesting Consumer with {} threads...", THREADS);
 
     let now = Instant::now();
@@ -238,13 +278,29 @@ pub async fn test_consumer() -> Result<()> {
     }
 
     consumer.complete();
-    let _ = consumer.wait_async().await;
 
+    if !cancel_after.is_zero() {
+        let ptr = consumer.clone();
+        thread::spawn(move || {
+            thread::sleep(cancel_after);
+
+            if ptr.is_finished() {
+                return;
+            }
+
+            ptr.cancel();
+        });
+    }
+
+    match consumer.wait_async().await {
+        Ok(_) => println!("Consumer finished"),
+        Err(e) => println!("Consumer error: {:?}", e),
+    }
     println!("Elapsed time: {:?}", now.elapsed());
     Ok(())
 }
 
-pub async fn test_injector_worker() -> Result<()> {
+pub async fn test_injector_worker(cancel_after: Duration) -> Result<()> {
     println!("\nTesting Injector/Worker with {} threads...", THREADS);
 
     let now = Instant::now();
@@ -258,13 +314,29 @@ pub async fn test_injector_worker() -> Result<()> {
     }
 
     injwork.complete();
-    let _ = injwork.wait_async().await;
 
+    if !cancel_after.is_zero() {
+        let ptr = injwork.clone();
+        thread::spawn(move || {
+            thread::sleep(cancel_after);
+
+            if ptr.is_finished() {
+                return;
+            }
+
+            ptr.cancel();
+        });
+    }
+
+    match injwork.wait_async().await {
+        Ok(_) => println!("Injector/Worker finished"),
+        Err(e) => println!("Injector/Worker error: {:?}", e),
+    }
     println!("Elapsed time: {:?}", now.elapsed());
     Ok(())
 }
 
-pub async fn test_parallel() -> Result<()> {
+pub async fn test_parallel(cancel_after: Duration) -> Result<()> {
     println!("\nTesting Parallel with {} threads...", THREADS);
 
     let now = Instant::now();
@@ -278,8 +350,24 @@ pub async fn test_parallel() -> Result<()> {
     }
 
     parallel.start(collection, &handler);
-    let _ = parallel.wait_async().await;
 
+    if !cancel_after.is_zero() {
+        let ptr = parallel.clone();
+        thread::spawn(move || {
+            thread::sleep(cancel_after);
+
+            if ptr.is_finished() {
+                return;
+            }
+
+            ptr.cancel();
+        });
+    }
+
+    match parallel.wait_async().await {
+        Ok(_) => println!("Parallel finished"),
+        Err(e) => println!("Parallel error: {:?}", e),
+    }
     println!("Elapsed time: {:?}", now.elapsed());
     Ok(())
 }

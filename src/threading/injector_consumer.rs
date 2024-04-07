@@ -1,17 +1,15 @@
+use anyhow::Result;
 use crossbeam::deque::{Injector, Steal, Stealer, Worker};
-use futures::executor::block_on;
 use std::{
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Mutex,
     },
     thread,
-    time::{Duration, Instant},
 };
 use tokio::{
-    select,
     sync::Notify,
-    time::{sleep as tokio_sleep, timeout as tokio_timeout},
+    time::{Duration, Instant},
 };
 
 use super::*;
@@ -77,7 +75,7 @@ pub struct InjectorWorker<T: Send + Sync + Clone + 'static> {
     injector: Arc<Injector<T>>,
     stealers: Arc<Mutex<Vec<Stealer<T>>>>,
     started: Arc<Mutex<bool>>,
-    finished: Arc<Mutex<bool>>,
+    finished: Arc<AtomicBool>,
     finished_noti: Arc<Notify>,
     completed: Arc<AtomicBool>,
     paused: Arc<AtomicBool>,
@@ -94,7 +92,7 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
             injector: Arc::new(Injector::new()),
             stealers: Arc::new(Mutex::new(Vec::new())),
             started: Arc::new(Mutex::new(false)),
-            finished: Arc::new(Mutex::new(false)),
+            finished: Arc::new(AtomicBool::new(false)),
             finished_noti: Arc::new(Notify::new()),
             completed: Arc::new(AtomicBool::new(false)),
             paused: Arc::new(AtomicBool::new(false)),
@@ -110,7 +108,7 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
             injector: Arc::new(Injector::new()),
             stealers: Arc::new(Mutex::new(Vec::new())),
             started: Arc::new(Mutex::new(false)),
-            finished: Arc::new(Mutex::new(false)),
+            finished: Arc::new(AtomicBool::new(false)),
             finished_noti: Arc::new(Notify::new()),
             completed: Arc::new(AtomicBool::new(false)),
             paused: Arc::new(AtomicBool::new(false)),
@@ -151,6 +149,10 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
         self.cancelled.load(Ordering::SeqCst)
     }
 
+    pub fn is_finished(&self) -> bool {
+        self.finished.load(Ordering::SeqCst)
+    }
+
     pub fn is_busy(&self) -> bool {
         self.count() > 0
     }
@@ -173,10 +175,16 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
     }
 
     fn check_finished(&self, td: &impl TaskDelegationBase<InjectorWorker<T>, T>) {
-        if self.is_completed() && self.workers() == 0 {
-            let mut finished = self.finished.lock().unwrap();
-            *finished = true;
-            td.on_finished(self);
+        if self.workers() == 0 && (self.is_completed() || self.is_cancelled()) {
+            self.completed.store(true, Ordering::SeqCst);
+            self.finished.store(true, Ordering::SeqCst);
+
+            if self.is_cancelled() {
+                td.on_cancelled(self);
+            } else {
+                td.on_finished(self);
+            }
+
             self.set_started(false);
             self.finished_noti.notify_one();
         }
@@ -462,7 +470,7 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
 
     pub fn enqueue(&self, item: T) {
         if self.is_cancelled() {
-            panic!("Queue is already cancelled.")
+            return;
         }
 
         if self.is_completed() {
@@ -488,54 +496,40 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
         self.paused.store(false, Ordering::SeqCst);
     }
 
-    pub fn wait(&self) {
-        block_on(self.finished_noti.notified());
+    pub fn wait(&self) -> Result<()> {
+        wait(self, self.options.pause_timeout, &self.finished_noti)
     }
 
-    pub async fn wait_async(&self) {
-        self.finished_noti.notified().await;
+    pub async fn wait_async(&self) -> Result<()> {
+        wait_async(self, self.options.pause_timeout, &self.finished_noti).await
     }
 
-    pub fn wait_for(&self, timeout: Duration) -> bool {
-        if timeout.is_zero() {
-            self.wait();
-            return true;
-        }
-
-        let start = Instant::now();
-        let finished = self.finished.lock().unwrap();
-
-        while !*finished && start.elapsed() < timeout {
-            let wait_timeout = timeout - start.elapsed();
-            let pause_timeout = self.options.pause_timeout.min(wait_timeout);
-            let result = block_on(tokio_timeout(pause_timeout, self.finished_noti.notified()));
-            if result.is_err() {
-                break;
-            }
-        }
-
-        start.elapsed() < timeout
+    pub fn wait_for(&self, timeout: Duration) -> Result<bool> {
+        wait_for(
+            self,
+            timeout,
+            self.options.pause_timeout,
+            &self.finished_noti,
+        )
     }
 
-    pub async fn wait_for_async(&self, timeout: Duration) -> bool {
-        if timeout.is_zero() {
-            self.wait_async().await;
-            return true;
-        }
+    pub async fn wait_for_async(&self, timeout: Duration) -> Result<bool> {
+        wait_for_async(
+            self,
+            timeout,
+            self.options.pause_timeout,
+            &self.finished_noti,
+        )
+        .await
+    }
+}
 
-        let start = Instant::now();
-        let finished = self.finished.lock().unwrap();
+impl<T: Send + Sync + Clone> AwaitableConsumer for InjectorWorker<T> {
+    fn is_cancelled(&self) -> bool {
+        self.is_cancelled()
+    }
 
-        while !*finished && start.elapsed() < timeout {
-            let wait_timeout = timeout - start.elapsed();
-            let pause_timeout = self.options.pause_timeout.min(wait_timeout);
-
-            select! {
-                _ = self.finished_noti.notified() => {},
-                _ = tokio_sleep(pause_timeout) => {}
-            }
-        }
-
-        start.elapsed() < timeout
+    fn is_finished(&self) -> bool {
+        self.is_finished()
     }
 }

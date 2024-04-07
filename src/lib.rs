@@ -1,5 +1,7 @@
 pub mod ai;
+pub mod app_info;
 pub mod date;
+pub mod error;
 pub mod io;
 pub mod logging;
 #[cfg(feature = "mail")]

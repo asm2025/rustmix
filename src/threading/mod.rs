@@ -1,5 +1,13 @@
-use anyhow::Result;
-use std::{fmt, future::Future, time::Duration};
+use anyhow::{Error, Result};
+use futures::executor::block_on;
+use std::{fmt, future::Future, sync::Arc};
+use tokio::{
+    select,
+    sync::Notify,
+    time::{sleep as tokio_sleep, timeout as tokio_timeout, Duration, Instant},
+};
+
+use super::error;
 
 pub mod consumer;
 pub mod injector_consumer;
@@ -61,6 +69,7 @@ impl fmt::Display for QueueBehavior {
 pub trait TaskDelegationBase<TD: Send + Clone + 'static, T: Send + Clone + 'static> {
     fn on_started(&self, td: &TD);
     fn on_completed(&self, td: &TD, item: &T, result: &TaskResult) -> bool;
+    fn on_cancelled(&self, td: &TD);
     fn on_finished(&self, td: &TD);
 }
 
@@ -74,4 +83,136 @@ pub trait AsyncTaskDelegation<TD: Send + Clone + 'static, T: Send + Clone + 'sta
     TaskDelegationBase<TD, T>
 {
     fn process(&self, td: &TD, item: &T) -> impl Future<Output = Result<TaskResult>> + Send;
+}
+
+pub trait AwaitableConsumer {
+    fn is_cancelled(&self) -> bool;
+    fn is_finished(&self) -> bool;
+}
+
+fn wait(
+    this: &impl AwaitableConsumer,
+    pause_timeout: Duration,
+    finished: &Arc<Notify>,
+) -> Result<()> {
+    if this.is_cancelled() {
+        return Err(Error::new(error::CancelledError));
+    }
+
+    while !this.is_finished() {
+        let result = block_on(tokio_timeout(pause_timeout, finished.notified()));
+        if result.is_err() {
+            break;
+        }
+    }
+
+    if this.is_cancelled() {
+        return Err(Error::new(error::CancelledError));
+    }
+
+    Ok(())
+}
+
+async fn wait_async(
+    this: &impl AwaitableConsumer,
+    pause_timeout: Duration,
+    finished: &Arc<Notify>,
+) -> Result<()> {
+    if this.is_cancelled() {
+        return Err(Error::new(error::CancelledError));
+    }
+
+    while !this.is_finished() {
+        select! {
+            _ = finished.notified() => {},
+            _ = tokio_sleep(pause_timeout) => {}
+        }
+    }
+
+    if this.is_cancelled() {
+        return Err(Error::new(error::CancelledError));
+    }
+
+    Ok(())
+}
+
+fn wait_for(
+    this: &impl AwaitableConsumer,
+    timeout: Duration,
+    pause_timeout: Duration,
+    finished: &Arc<Notify>,
+) -> Result<bool> {
+    if this.is_cancelled() {
+        return Err(Error::new(error::CancelledError));
+    }
+
+    if timeout.is_zero() {
+        if this.is_finished() {
+            return Ok(true);
+        }
+
+        return Err(Error::new(error::TimedoutError));
+    }
+
+    let start = Instant::now();
+
+    while !this.is_finished() && start.elapsed() < timeout {
+        let wait_timeout = timeout - start.elapsed();
+        let pause_timeout = pause_timeout.min(wait_timeout);
+        let result = block_on(tokio_timeout(pause_timeout, finished.notified()));
+        if result.is_err() {
+            break;
+        }
+    }
+
+    if this.is_cancelled() {
+        return Err(Error::new(error::CancelledError));
+    }
+
+    if start.elapsed() <= timeout {
+        Ok(true)
+    } else {
+        Err(Error::new(error::TimedoutError))
+    }
+}
+
+async fn wait_for_async(
+    this: &impl AwaitableConsumer,
+    timeout: Duration,
+    pause_timeout: Duration,
+    finished: &Arc<Notify>,
+) -> Result<bool> {
+    if this.is_cancelled() {
+        return Err(Error::new(error::CancelledError));
+    }
+
+    if timeout.is_zero() {
+        if this.is_finished() {
+            return Ok(true);
+        }
+
+        return Err(Error::new(error::TimedoutError));
+    }
+
+    let start = Instant::now();
+
+    while !this.is_finished() && start.elapsed() < timeout {
+        let wait_timeout = timeout - start.elapsed();
+        let pause_timeout = pause_timeout.min(wait_timeout);
+
+        select! {
+            _ = finished.notified() => {},
+            _ = tokio_sleep(pause_timeout) => {}
+        }
+    }
+
+    if this.is_cancelled() {
+        return Err(Error::new(error::CancelledError));
+    }
+
+    if start.elapsed() <= timeout {
+        Ok(true)
+    } else {
+        Err(Error::new(error::TimedoutError))
+    }
 }

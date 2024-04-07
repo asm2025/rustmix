@@ -1,6 +1,9 @@
 [package]
 name = "rustmix"
 version = "0.1.0"
+description = "RustMix is a Rust library that has some basic utility functions and components."
+authors = ["asm"]
+license = "MIT"
 edition = "2021"
 
 [features]

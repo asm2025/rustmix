@@ -1,4 +1,4 @@
-use futures::executor::block_on;
+use anyhow::Result;
 use rayon::{prelude::*, ThreadPoolBuilder};
 use std::{
     collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, LinkedList, VecDeque},
@@ -8,12 +8,10 @@ use std::{
         Arc, Mutex,
     },
     thread,
-    time::{Duration, Instant},
 };
 use tokio::{
-    select,
     sync::Notify,
-    time::{sleep as tokio_sleep, timeout as tokio_timeout},
+    time::{Duration, Instant},
 };
 
 use super::*;
@@ -117,7 +115,7 @@ impl ParallelOptions {
 pub struct Parallel<T: Send + Sync + Clone + 'static> {
     options: ParallelOptions,
     started: Arc<Mutex<bool>>,
-    finished: Arc<Mutex<bool>>,
+    finished: Arc<AtomicBool>,
     finished_noti: Arc<Notify>,
     paused: Arc<AtomicBool>,
     cancelled: Arc<AtomicBool>,
@@ -131,7 +129,7 @@ impl<T: Send + Sync + Clone> Parallel<T> {
         Parallel {
             options,
             started: Arc::new(Mutex::new(false)),
-            finished: Arc::new(Mutex::new(false)),
+            finished: Arc::new(AtomicBool::new(false)),
             finished_noti: Arc::new(Notify::new()),
             paused: Arc::new(AtomicBool::new(false)),
             cancelled: Arc::new(AtomicBool::new(false)),
@@ -144,7 +142,7 @@ impl<T: Send + Sync + Clone> Parallel<T> {
         Parallel {
             options,
             started: Arc::new(Mutex::new(false)),
-            finished: Arc::new(Mutex::new(false)),
+            finished: Arc::new(AtomicBool::new(false)),
             finished_noti: Arc::new(Notify::new()),
             paused: Arc::new(AtomicBool::new(false)),
             cancelled: Arc::new(AtomicBool::new(false)),
@@ -176,6 +174,10 @@ impl<T: Send + Sync + Clone> Parallel<T> {
         self.cancelled.load(Ordering::SeqCst)
     }
 
+    pub fn is_finished(&self) -> bool {
+        self.finished.load(Ordering::SeqCst)
+    }
+
     pub fn running(&self) -> usize {
         self.running.load(Ordering::SeqCst)
     }
@@ -191,16 +193,21 @@ impl<T: Send + Sync + Clone> Parallel<T> {
 
     fn check_finished(&self, td: &impl TaskDelegationBase<Parallel<T>, T>) {
         if self.running() == 0 {
-            let mut finished = self.finished.lock().unwrap();
-            *finished = true;
-            td.on_finished(self);
+            self.finished.store(true, Ordering::SeqCst);
+
+            if self.is_cancelled() {
+                td.on_cancelled(self);
+            } else {
+                td.on_finished(self);
+            }
+
             self.set_started(false);
             self.finished_noti.notify_one();
         }
     }
 
     pub fn start<
-        I: IntoParallelIterator<Item = T> + Len + Send,
+        I: IntoParallelIterator<Item = T> + Len + Send + 'static,
         TD: TaskDelegation<Parallel<T>, T> + Send + Sync + Clone + 'static,
     >(
         &self,
@@ -224,8 +231,36 @@ impl<T: Send + Sync + Clone> Parallel<T> {
             .unwrap();
         let delegate = delegate.clone();
         let this = self.clone();
+        thread::spawn(move || {
+            if this.options.threshold.is_zero() {
+                pool.install(move || {
+                    collection.into_par_iter().for_each(|item| {
+                        while !this.is_cancelled() && this.is_paused() {
+                            thread::sleep(this.options.pause_timeout);
+                        }
 
-        if self.options.threshold.is_zero() {
+                        if this.is_cancelled() {
+                            this.dec_running(&delegate);
+                            return;
+                        }
+
+                        if let Ok(result) = delegate.process(&this, &item) {
+                            if !delegate.on_completed(&this, &item, &result) {
+                                this.cancel();
+                                return;
+                            }
+                        }
+
+                        this.dec_running(&delegate);
+                    });
+
+                    drop(delegate);
+                    drop(this);
+                });
+
+                return;
+            }
+
             pool.install(move || {
                 collection.into_par_iter().for_each(|item| {
                     while !this.is_cancelled() && this.is_paused() {
@@ -238,9 +273,18 @@ impl<T: Send + Sync + Clone> Parallel<T> {
                     }
 
                     if let Ok(result) = delegate.process(&this, &item) {
+                        let time = Instant::now();
+
                         if !delegate.on_completed(&this, &item, &result) {
                             this.cancel();
                             return;
+                        }
+
+                        if !this.options.threshold.is_zero()
+                            && time.elapsed() < this.options.threshold
+                        {
+                            let remaining = this.options.threshold - time.elapsed();
+                            thread::sleep(remaining);
                         }
                     }
 
@@ -250,41 +294,6 @@ impl<T: Send + Sync + Clone> Parallel<T> {
                 drop(delegate);
                 drop(this);
             });
-
-            return;
-        }
-
-        pool.install(move || {
-            collection.into_par_iter().for_each(|item| {
-                while !this.is_cancelled() && this.is_paused() {
-                    thread::sleep(this.options.pause_timeout);
-                }
-
-                if this.is_cancelled() {
-                    this.dec_running(&delegate);
-                    return;
-                }
-
-                if let Ok(result) = delegate.process(&this, &item) {
-                    let time = Instant::now();
-
-                    if !delegate.on_completed(&this, &item, &result) {
-                        this.cancel();
-                        return;
-                    }
-
-                    if !this.options.threshold.is_zero() && time.elapsed() < this.options.threshold
-                    {
-                        let remaining = this.options.threshold - time.elapsed();
-                        thread::sleep(remaining);
-                    }
-                }
-
-                this.dec_running(&delegate);
-            });
-
-            drop(delegate);
-            drop(this);
         });
     }
 
@@ -304,54 +313,40 @@ impl<T: Send + Sync + Clone> Parallel<T> {
         self.paused.store(false, Ordering::SeqCst);
     }
 
-    pub fn wait(&self) {
-        block_on(self.finished_noti.notified());
+    pub fn wait(&self) -> Result<()> {
+        wait(self, self.options.pause_timeout, &self.finished_noti)
     }
 
-    pub async fn wait_async(&self) {
-        self.finished_noti.notified().await;
+    pub async fn wait_async(&self) -> Result<()> {
+        wait_async(self, self.options.pause_timeout, &self.finished_noti).await
     }
 
-    pub fn wait_for(&self, timeout: Duration) -> bool {
-        if timeout.is_zero() {
-            self.wait();
-            return true;
-        }
-
-        let start = Instant::now();
-        let finished = self.finished.lock().unwrap();
-
-        while !*finished && start.elapsed() < timeout {
-            let wait_timeout = timeout - start.elapsed();
-            let pause_timeout = self.options.pause_timeout.min(wait_timeout);
-            let result = block_on(tokio_timeout(pause_timeout, self.finished_noti.notified()));
-            if result.is_err() {
-                break;
-            }
-        }
-
-        start.elapsed() < timeout
+    pub fn wait_for(&self, timeout: Duration) -> Result<bool> {
+        wait_for(
+            self,
+            timeout,
+            self.options.pause_timeout,
+            &self.finished_noti,
+        )
     }
 
-    pub async fn wait_for_async(&self, timeout: Duration) -> bool {
-        if timeout.is_zero() {
-            self.wait();
-            return true;
-        }
+    pub async fn wait_for_async(&self, timeout: Duration) -> Result<bool> {
+        wait_for_async(
+            self,
+            timeout,
+            self.options.pause_timeout,
+            &self.finished_noti,
+        )
+        .await
+    }
+}
 
-        let start = Instant::now();
-        let finished = self.finished.lock().unwrap();
+impl<T: Send + Sync + Clone> AwaitableConsumer for Parallel<T> {
+    fn is_cancelled(&self) -> bool {
+        Parallel::is_cancelled(self)
+    }
 
-        while !*finished && start.elapsed() < timeout {
-            let wait_timeout = timeout - start.elapsed();
-            let pause_timeout = self.options.pause_timeout.min(wait_timeout);
-
-            select! {
-                _ = self.finished_noti.notified() => {},
-                _ = tokio_sleep(pause_timeout) => {}
-            }
-        }
-
-        start.elapsed() < timeout
+    fn is_finished(&self) -> bool {
+        Parallel::is_finished(self)
     }
 }

@@ -2,6 +2,7 @@ use std::io::Write;
 
 use serde::{Deserialize, Serialize};
 
+pub mod app;
 pub mod io;
 #[cfg(feature = "log4rs")]
 pub mod log4rs;

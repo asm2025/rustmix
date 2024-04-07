@@ -1,4 +1,5 @@
 use anyhow::Result;
+use tokio::{task, time::Duration};
 
 mod tests;
 
@@ -12,14 +13,18 @@ async fn main() -> Result<()> {
 
     //tests::web::test_url()?;
     //tests::web::test_reqwest().await?;
-    //let _ = task::spawn_blocking(move || tests::web::test_blocking_reqwest()).await?;
+    //task::spawn_blocking(move || tests::web::test_blocking_reqwest().unwrap()).await?;
 
     //tests::mail::test_tempmail().await?;
 
-    //tests::threading::test_producer_consumer().await?;
-    //tests::threading::test_consumer().await?;
-    //tests::threading::test_injector_worker().await?;
-    //tests::threading::test_parallel().await?;
+    //tests::threading::test_producer_consumer(Duration::ZERO).await?;
+    tests::threading::test_producer_consumer(Duration::from_millis(150)).await?;
+    //tests::threading::test_consumer(Duration::ZERO).await?;
+    //tests::threading::test_consumer(Duration::from_millis(150)).await?;
+    //tests::threading::test_injector_worker(Duration::ZERO).await?;
+    //tests::threading::test_injector_worker(Duration::from_millis(150)).await?;
+    //tests::threading::test_parallel(Duration::ZERO).await?;
+    //tests::threading::test_parallel(Duration::from_millis(150)).await?;
 
     //tests::python::test_python();
 
@@ -30,6 +35,8 @@ async fn main() -> Result<()> {
     //tests::slog::test_slog()?;
     //tests::log4rs::test_log4rs(true)?;
     //tests::log4rs::test_log4rs(false)?;
+
+    //tests::app::test_app_info();
 
     Ok(())
 }

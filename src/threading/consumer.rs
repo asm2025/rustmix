@@ -1,4 +1,4 @@
-use futures::executor::block_on;
+use anyhow::Result;
 use std::{
     collections::LinkedList,
     sync::{
@@ -6,12 +6,10 @@ use std::{
         Arc, Condvar, Mutex,
     },
     thread,
-    time::{Duration, Instant},
 };
 use tokio::{
-    select,
     sync::Notify,
-    time::{sleep as tokio_sleep, timeout as tokio_timeout},
+    time::{Duration, Instant},
 };
 
 use super::*;
@@ -79,7 +77,7 @@ pub struct Consumer<T: Send + Sync + Clone + 'static> {
     items: Arc<Mutex<LinkedList<T>>>,
     items_cond: Arc<Condvar>,
     started: Arc<Mutex<bool>>,
-    finished: Arc<Mutex<bool>>,
+    finished: Arc<AtomicBool>,
     finished_noti: Arc<Notify>,
     completed: Arc<AtomicBool>,
     paused: Arc<AtomicBool>,
@@ -95,7 +93,7 @@ impl<T: Send + Sync + Clone> Consumer<T> {
             items: Arc::new(Mutex::new(LinkedList::new())),
             items_cond: Arc::new(Condvar::new()),
             started: Arc::new(Mutex::new(false)),
-            finished: Arc::new(Mutex::new(false)),
+            finished: Arc::new(AtomicBool::new(false)),
             finished_noti: Arc::new(Notify::new()),
             completed: Arc::new(AtomicBool::new(false)),
             paused: Arc::new(AtomicBool::new(false)),
@@ -111,7 +109,7 @@ impl<T: Send + Sync + Clone> Consumer<T> {
             items: Arc::new(Mutex::new(LinkedList::new())),
             items_cond: Arc::new(Condvar::new()),
             started: Arc::new(Mutex::new(false)),
-            finished: Arc::new(Mutex::new(false)),
+            finished: Arc::new(AtomicBool::new(false)),
             finished_noti: Arc::new(Notify::new()),
             completed: Arc::new(AtomicBool::new(false)),
             paused: Arc::new(AtomicBool::new(false)),
@@ -152,6 +150,10 @@ impl<T: Send + Sync + Clone> Consumer<T> {
         self.cancelled.load(Ordering::SeqCst)
     }
 
+    pub fn is_finished(&self) -> bool {
+        self.finished.load(Ordering::SeqCst)
+    }
+
     pub fn is_busy(&self) -> bool {
         self.count() > 0
     }
@@ -174,10 +176,16 @@ impl<T: Send + Sync + Clone> Consumer<T> {
     }
 
     fn check_finished(&self, td: &impl TaskDelegationBase<Consumer<T>, T>) {
-        if self.is_completed() && self.consumers() == 0 {
-            let mut finished = self.finished.lock().unwrap();
-            *finished = true;
-            td.on_finished(self);
+        if self.consumers() == 0 && (self.is_completed() || self.is_cancelled()) {
+            self.completed.store(true, Ordering::SeqCst);
+            self.finished.store(true, Ordering::SeqCst);
+
+            if self.is_cancelled() {
+                td.on_cancelled(self);
+            } else {
+                td.on_finished(self);
+            }
+
             self.set_started(false);
             self.finished_noti.notify_one();
         }
@@ -235,10 +243,22 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                         } {
                             this.inc_running();
 
-                            if let Ok(result) = delegate.process(&this, &item) {
-                                if !delegate.on_completed(&this, &item, &result) {
-                                    this.dec_running();
-                                    break;
+                            match delegate.process(&this, &item) {
+                                Ok(result) => {
+                                    if !delegate.on_completed(&this, &item, &result) {
+                                        this.dec_running();
+                                        break;
+                                    }
+                                }
+                                Err(e) => {
+                                    if !delegate.on_completed(
+                                        &this,
+                                        &item,
+                                        &TaskResult::Error(e.to_string()),
+                                    ) {
+                                        this.dec_running();
+                                        break;
+                                    }
                                 }
                             }
 
@@ -268,19 +288,31 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                     } {
                         this.inc_running();
 
-                        if let Ok(result) = delegate.process(&this, &item) {
-                            let time = Instant::now();
+                        match delegate.process(&this, &item) {
+                            Ok(result) => {
+                                let time = Instant::now();
 
-                            if !delegate.on_completed(&this, &item, &result) {
-                                this.dec_running();
-                                break;
+                                if !delegate.on_completed(&this, &item, &result) {
+                                    this.dec_running();
+                                    break;
+                                }
+
+                                if !this.options.threshold.is_zero()
+                                    && time.elapsed() < this.options.threshold
+                                {
+                                    let remaining = this.options.threshold - time.elapsed();
+                                    thread::sleep(remaining);
+                                }
                             }
-
-                            if !this.options.threshold.is_zero()
-                                && time.elapsed() < this.options.threshold
-                            {
-                                let remaining = this.options.threshold - time.elapsed();
-                                thread::sleep(remaining);
+                            Err(e) => {
+                                if !delegate.on_completed(
+                                    &this,
+                                    &item,
+                                    &TaskResult::Error(e.to_string()),
+                                ) {
+                                    this.dec_running();
+                                    break;
+                                }
                             }
                         }
 
@@ -407,7 +439,7 @@ impl<T: Send + Sync + Clone> Consumer<T> {
 
     pub fn enqueue(&self, item: T) {
         if self.is_cancelled() {
-            panic!("Queue is already cancelled.")
+            return;
         }
 
         if self.is_completed() {
@@ -521,54 +553,40 @@ impl<T: Send + Sync + Clone> Consumer<T> {
         self.items_cond.notify_all();
     }
 
-    pub fn wait(&self) {
-        block_on(self.finished_noti.notified());
+    pub fn wait(&self) -> Result<()> {
+        wait(self, self.options.pause_timeout, &self.finished_noti)
     }
 
-    pub async fn wait_async(&self) {
-        self.finished_noti.notified().await;
+    pub async fn wait_async(&self) -> Result<()> {
+        wait_async(self, self.options.pause_timeout, &self.finished_noti).await
     }
 
-    pub fn wait_for(&self, timeout: Duration) -> bool {
-        if timeout.is_zero() {
-            self.wait();
-            return true;
-        }
-
-        let start = Instant::now();
-        let finished = self.finished.lock().unwrap();
-
-        while !*finished && start.elapsed() < timeout {
-            let wait_timeout = timeout - start.elapsed();
-            let pause_timeout = self.options.pause_timeout.min(wait_timeout);
-            let result = block_on(tokio_timeout(pause_timeout, self.finished_noti.notified()));
-            if result.is_err() {
-                break;
-            }
-        }
-
-        start.elapsed() < timeout
+    pub fn wait_for(&self, timeout: Duration) -> Result<bool> {
+        wait_for(
+            self,
+            timeout,
+            self.options.pause_timeout,
+            &self.finished_noti,
+        )
     }
 
-    pub async fn wait_for_async(&self, timeout: Duration) -> bool {
-        if timeout.is_zero() {
-            self.wait();
-            return true;
-        }
+    pub async fn wait_for_async(&self, timeout: Duration) -> Result<bool> {
+        wait_for_async(
+            self,
+            timeout,
+            self.options.pause_timeout,
+            &self.finished_noti,
+        )
+        .await
+    }
+}
 
-        let start = Instant::now();
-        let finished = self.finished.lock().unwrap();
+impl<T: Send + Sync + Clone> AwaitableConsumer for Consumer<T> {
+    fn is_cancelled(&self) -> bool {
+        Consumer::is_cancelled(self)
+    }
 
-        while !*finished && start.elapsed() < timeout {
-            let wait_timeout = timeout - start.elapsed();
-            let pause_timeout = self.options.pause_timeout.min(wait_timeout);
-
-            select! {
-                _ = self.finished_noti.notified() => {},
-                _ = tokio_sleep(pause_timeout) => {}
-            }
-        }
-
-        start.elapsed() < timeout
+    fn is_finished(&self) -> bool {
+        Consumer::is_finished(self)
     }
 }
