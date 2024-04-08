@@ -14,6 +14,7 @@ pub use self::parallel_consumer::*;
 pub use self::producer_consumer::*;
 
 use super::error;
+use crate::{ThreadClonable, ThreadStatic};
 
 mod cond;
 mod consumer;
@@ -74,20 +75,18 @@ impl fmt::Display for QueueBehavior {
     }
 }
 
-pub trait TaskDelegationBase<TD: Send + Clone + 'static, T: Send + Clone + 'static> {
+pub trait TaskDelegationBase<TD: ThreadStatic, T: ThreadStatic> {
     fn on_started(&self, td: &TD);
     fn on_completed(&self, td: &TD, item: &T, result: &TaskResult) -> bool;
     fn on_cancelled(&self, td: &TD);
     fn on_finished(&self, td: &TD);
 }
 
-pub trait TaskDelegation<TD: Send + Clone + 'static, T: Send + Clone + 'static>:
-    TaskDelegationBase<TD, T>
-{
+pub trait TaskDelegation<TD: ThreadStatic, T: ThreadStatic>: TaskDelegationBase<TD, T> {
     fn process(&self, td: &TD, item: &T) -> Result<TaskResult>;
 }
 
-pub trait AsyncTaskDelegation<TD: Send + Clone + 'static, T: Send + Clone + 'static>:
+pub trait AsyncTaskDelegation<TD: ThreadStatic, T: ThreadStatic>:
     TaskDelegationBase<TD, T>
 {
     fn process(&self, td: &TD, item: &T) -> impl Future<Output = Result<TaskResult>> + Send;

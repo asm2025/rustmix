@@ -72,12 +72,12 @@ impl ProducerConsumerOptions {
 }
 
 #[derive(Clone, Debug)]
-pub struct Producer<T: Send + Sync + Clone + 'static> {
+pub struct Producer<T: ThreadStatic> {
     pc: Arc<ProducerConsumer<T>>,
     sender: Arc<channel::Sender<T>>,
 }
 
-impl<T: Send + Sync + Clone> Producer<T> {
+impl<T: ThreadClonable> Producer<T> {
     fn new(pc: &ProducerConsumer<T>, sender: &channel::Sender<T>) -> Self {
         Producer {
             pc: Arc::new(pc.clone()),
@@ -105,7 +105,7 @@ impl<T: Send + Sync + Clone> Producer<T> {
 }
 
 #[derive(Clone, Debug)]
-pub struct ProducerConsumer<T: Send + Sync + Clone + 'static> {
+pub struct ProducerConsumer<T: ThreadStatic> {
     options: ProducerConsumerOptions,
     started: Arc<Mutex<bool>>,
     finished: Arc<AtomicBool>,
@@ -120,7 +120,7 @@ pub struct ProducerConsumer<T: Send + Sync + Clone + 'static> {
     receiver: channel::Receiver<T>,
 }
 
-impl<T: Send + Sync + Clone> ProducerConsumer<T> {
+impl<T: ThreadClonable> ProducerConsumer<T> {
     pub fn new() -> Self {
         let options: ProducerConsumerOptions = Default::default();
         let (sender, receiver) = channel::bounded::<T>(options.capacity);
@@ -255,10 +255,7 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
         Producer::new(self, &self.sender)
     }
 
-    pub fn start<TD: TaskDelegation<ProducerConsumer<T>, T> + Send + Sync + Clone + 'static>(
-        &self,
-        delegate: &TD,
-    ) {
+    pub fn start<TD: TaskDelegation<ProducerConsumer<T>, T> + ThreadStatic>(&self, delegate: &TD) {
         if self.is_cancelled() {
             panic!("Queue is already cancelled.")
         }
@@ -375,9 +372,7 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
         }
     }
 
-    pub async fn start_async<
-        TD: AsyncTaskDelegation<ProducerConsumer<T>, T> + Send + Sync + Clone + 'static,
-    >(
+    pub async fn start_async<TD: AsyncTaskDelegation<ProducerConsumer<T>, T> + ThreadStatic>(
         &self,
         delegate: &TD,
     ) {
@@ -538,7 +533,7 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
     }
 }
 
-impl<T: Send + Sync + Clone> AwaitableConsumer for ProducerConsumer<T> {
+impl<T: ThreadClonable> AwaitableConsumer for ProducerConsumer<T> {
     fn is_cancelled(&self) -> bool {
         ProducerConsumer::is_cancelled(self)
     }

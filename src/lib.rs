@@ -15,3 +15,7 @@ pub mod web;
 pub use self::app::*;
 
 mod app;
+
+pub(crate) trait ThreadSafe: Send + Sync {}
+pub(crate) trait ThreadClonable: ThreadSafe + Clone {}
+pub(crate) trait ThreadStatic: ThreadClonable + 'static {}

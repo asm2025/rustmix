@@ -112,7 +112,7 @@ impl ParallelOptions {
 }
 
 #[derive(Clone, Debug)]
-pub struct Parallel<T: Send + Sync + Clone + 'static> {
+pub struct Parallel<T: ThreadStatic> {
     options: ParallelOptions,
     started: Arc<Mutex<bool>>,
     finished: Arc<AtomicBool>,
@@ -124,7 +124,7 @@ pub struct Parallel<T: Send + Sync + Clone + 'static> {
     _marker: PhantomData<T>,
 }
 
-impl<T: Send + Sync + Clone> Parallel<T> {
+impl<T: ThreadClonable> Parallel<T> {
     pub fn new() -> Self {
         let options: ParallelOptions = Default::default();
         Parallel {
@@ -212,7 +212,7 @@ impl<T: Send + Sync + Clone> Parallel<T> {
 
     pub fn start<
         I: IntoParallelIterator<Item = T> + Len + Send + 'static,
-        TD: TaskDelegation<Parallel<T>, T> + Send + Sync + Clone + 'static,
+        TD: TaskDelegation<Parallel<T>, T> + ThreadStatic,
     >(
         &self,
         collection: I,
@@ -334,7 +334,7 @@ impl<T: Send + Sync + Clone> Parallel<T> {
     }
 }
 
-impl<T: Send + Sync + Clone> AwaitableConsumer for Parallel<T> {
+impl<T: ThreadClonable> AwaitableConsumer for Parallel<T> {
     fn is_cancelled(&self) -> bool {
         Parallel::is_cancelled(self)
     }
