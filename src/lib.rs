@@ -1,5 +1,4 @@
 pub mod ai;
-pub mod app;
 pub mod date;
 pub mod error;
 pub mod io;
@@ -12,3 +11,7 @@ pub mod python;
 pub mod string;
 pub mod threading;
 pub mod web;
+
+pub use self::app::*;
+
+mod app;

@@ -5,6 +5,7 @@ mod tests;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // **** Make sure the feature is enabled in Cargo.toml before tsting ****
     dotenv::dotenv().ok();
 
     //tests::io::test_path()?;
@@ -28,10 +29,14 @@ async fn main() -> Result<()> {
 
     //tests::python::test_python();
 
-    //tests::whisper::test_whisper().await?;
+    //tests::kalosm::test_whisper().await?;
+    //tests::kalosm::test_phi().await?;
 
-    // Cannot test building from config and code to test building loogers at the same time
-    // Once logging is initialized, it cannot be reinitialized
+    /*
+     Once logging is initialized, it cannot be reinitialized.
+     Therefore, to test configuring log from a configuration file and code at the same time is not possible.
+     It has to be done seperately.
+    */
     //tests::slog::test_slog()?;
     //tests::log4rs::test_log4rs(true)?;
     //tests::log4rs::test_log4rs(false)?;

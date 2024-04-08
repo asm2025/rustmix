@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::collections::HashMap;
 
-use rustmix::web::{http::Response, url::AsUrl, *};
+use ::web::*;
 
 use super::{get_employees, Employee};
 

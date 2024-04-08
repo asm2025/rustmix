@@ -1,2 +1,2 @@
-#[cfg(feature = "whisper")]
-pub mod whisper;
+#[cfg(feature = "ai-kalosm")]
+pub mod kalosm;

@@ -10,9 +10,7 @@ use std::{
 };
 use tokio::time::Duration;
 
-use rustmix::threading::{
-    consumer::*, injector_consumer::*, parallel_consumer::*, producer_consumer::*, *,
-};
+use ::threading::*;
 
 const THREADS: usize = 4;
 const TEST_SIZE: usize = 10000;

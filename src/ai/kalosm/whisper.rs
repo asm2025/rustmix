@@ -1,33 +1,21 @@
 use anyhow::Result;
+use futures_util::stream::StreamExt;
 use kalosm::{
     audio::{
         rodio::{buffer::SamplesBuffer, Decoder, Source},
         *,
     },
-    language::TextStream,
+    language::*,
 };
-use std::{fs::File, io::BufReader};
+use std::{
+    fs::File,
+    io::{BufReader, Write},
+};
 
 pub struct Whisper {
     model: kalosm::audio::Whisper,
 }
 
-/*
-This needs the following dependencies:
-Debian:
-    sudo apt-get install libasound2-dev
-    sudo apt-get update
-    sudo apt-get install -y build-essential libgflags-dev libsnappy-dev zlib1g-dev libbz2-dev liblz4-dev libzstd-dev
-    sudo apt install clang
-Fedora:
-    sudo dnf install alsa-lib-devel
-
-Then do:
-    git clone https://github.com/facebook/rocksdb.git
-    cd rocksdb
-    make shared_lib
-    sudo make install
-*/
 impl Whisper {
     pub fn new() -> Self {
         let model = WhisperBuilder::default()

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use pyo3::types::PyBytes;
 
-use rustmix::python;
+use ::python;
 
 pub fn test_python() -> Result<()> {
     let version = python::version()?;

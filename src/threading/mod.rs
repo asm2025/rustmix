@@ -7,14 +7,19 @@ use tokio::{
     time::{sleep, Duration},
 };
 
-use self::cond::Mutcond;
+pub use self::cond::Mutcond;
+pub use self::consumer::*;
+pub use self::injector_consumer::*;
+pub use self::parallel_consumer::*;
+pub use self::producer_consumer::*;
+
 use super::error;
 
-pub mod cond;
-pub mod consumer;
-pub mod injector_consumer;
-pub mod parallel_consumer;
-pub mod producer_consumer;
+mod cond;
+mod consumer;
+mod injector_consumer;
+mod parallel_consumer;
+mod producer_consumer;
 
 const CAPACITY_DEF: usize = 0;
 const THREADS_DEF: usize = 1;

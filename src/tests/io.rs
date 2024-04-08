@@ -5,13 +5,13 @@ use std::{
     path::PathBuf,
 };
 
-use rustmix::io::{
+use ::io::{
     directory,
     file::{self, FileEx},
     path::{self, IntoPath, PathExt},
 };
 
-use super::{get_employees, print_batch, Employee};
+use super::*;
 
 pub fn test_path() -> Result<()> {
     println!("\nTesting path functions...");

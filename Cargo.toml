@@ -1,19 +1,19 @@
 [package]
 name = "rustmix"
 version = "0.1.0"
-description = "RustMix is a Rust library that has some basic utility functions and components."
-authors = ["asm"]
-license = "MIT"
 edition = "2021"
+description = "RustMix is a Rust library that has some basic utility functions and components."
+authors = ["asm <asm2025@outlook.com>"]
+license = "MIT"
 
 [features]
 default = ["mail", "threading", "log-log4rs"]
+ai-kalosm = ["kalosm"]
+log-log4rs = ["log4rs"]
+log-slog = ["slog", "slog-async", "slog-scope", "slog-stdlog", "slog-term", "slog-json", "file-rotate"]
 mail = ["html-entities", "lettre", "once_cell", "regex"]
 python = ["pyo3"]
-whisper = ["kalosm"]
 threading = ["crossbeam", "rayon"]
-log-slog = ["slog", "slog-async", "slog-scope", "slog-stdlog", "slog-term", "slog-json", "file-rotate"]
-log-log4rs = ["log4rs"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -44,7 +44,7 @@ slog-scope = { version = "4", optional = true }
 slog-stdlog = { version = "4", optional = true }
 slog-term = { version = "2", optional = true }
 slog-json = { version = "2", optional = true }
-tokio = { version = "1.36.0", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
 ua_generator = "0"
 url = { version = "2", features = ["serde"] }
 urlencoding = "2"

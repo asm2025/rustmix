@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 
 pub mod app;
 pub mod io;
+#[cfg(feature = "kalosm")]
+pub mod kalosm;
 #[cfg(feature = "log4rs")]
 pub mod log4rs;
 #[cfg(feature = "mail")]
@@ -15,8 +17,6 @@ pub mod slog;
 #[cfg(feature = "threading")]
 pub mod threading;
 pub mod web;
-#[cfg(feature = "whisper")]
-pub mod whisper;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Employee {
