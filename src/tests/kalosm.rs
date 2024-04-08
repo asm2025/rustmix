@@ -1,7 +1,7 @@
 use anyhow::Result;
 use kalosm::language::TextStream;
 
-use ::ai::kalosm::*;
+use rustmix::ai::kalosm::*;
 
 use super::*;
 
