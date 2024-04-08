@@ -7,7 +7,7 @@ license = "MIT"
 edition = "2021"
 
 [features]
-default = ["mail", "threading", "log-log4rs", "log-slog"]
+default = ["mail", "threading", "log-log4rs"]
 mail = ["html-entities", "lettre", "once_cell", "regex"]
 python = ["pyo3"]
 whisper = ["kalosm"]
