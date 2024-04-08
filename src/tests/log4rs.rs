@@ -1,7 +1,7 @@
 use anyhow::Result;
 use log::{debug, error, info, trace, warn};
 
-use ::{io::path::AsPath, logging::log4rs};
+use rustmix::{io::path::AsPath, logging::log4rs};
 
 pub fn test_log4rs(from_config_file: bool) -> Result<()> {
     println!("\nTesting log4rs functions...");

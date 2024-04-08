@@ -1,4 +1,4 @@
-use ::AppInfo;
+use rustmix::AppInfo;
 
 pub fn test_app_info() {
     let app_info = AppInfo::new();

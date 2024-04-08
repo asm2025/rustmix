@@ -5,7 +5,7 @@ use std::{
     path::PathBuf,
 };
 
-use ::io::{
+use rustmix::io::{
     directory,
     file::{self, FileEx},
     path::{self, IntoPath, PathExt},

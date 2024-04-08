@@ -7,7 +7,7 @@ authors = ["asm <asm2025@outlook.com>"]
 license = "MIT"
 
 [features]
-default = ["mail", "threading", "log-log4rs"]
+default = ["mail", "threading", "log-log4rs", "ai-kalosm"]
 ai-kalosm = ["kalosm"]
 log-log4rs = ["log4rs"]
 log-slog = ["slog", "slog-async", "slog-scope", "slog-stdlog", "slog-term", "slog-json", "file-rotate"]
@@ -26,7 +26,7 @@ dotenv = "0"
 file-rotate = { version = "0", optional = true }
 futures = "0"
 html-entities = { version = "0", optional = true }
-kalosm = { version = "0", optional = true }
+kalosm = { version = "0", default-features = false, features = ["language", "sound"], optional = true }
 lettre = { version = "0", optional = true }
 log = "0"
 log4rs = { version = "1", optional = true }
