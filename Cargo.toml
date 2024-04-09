@@ -6,15 +6,6 @@ description = "RustMix is a Rust library that has some basic utility functions a
 authors = ["asm <asm2025@outlook.com>"]
 license = "MIT"
 
-[features]
-default = ["mail", "threading", "log-log4rs", "ai-whisper"]
-ai-whisper = ["rwhisper", "rodio"]
-log-log4rs = ["log4rs"]
-log-slog = ["slog", "slog-async", "slog-scope", "slog-stdlog", "slog-term", "slog-json", "file-rotate"]
-mail = ["html-entities", "lettre", "once_cell", "regex"]
-python = ["pyo3"]
-threading = ["crossbeam", "rayon"]
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -49,6 +40,15 @@ tokio = { version = "1", features = ["full"] }
 ua_generator = "0"
 url = { version = "2", features = ["serde"] }
 urlencoding = "2"
+
+[features]
+default = ["mail", "threading", "log-log4rs", "ai-whisper"]
+ai-whisper = ["rwhisper", "rodio"]
+log-log4rs = ["log4rs"]
+log-slog = ["slog", "slog-async", "slog-scope", "slog-stdlog", "slog-term", "slog-json", "file-rotate"]
+mail = ["html-entities", "lettre", "once_cell", "regex"]
+python = ["pyo3"]
+threading = ["crossbeam", "rayon"]
 
 [package.metadata.scripts]
 run = "cargo run"

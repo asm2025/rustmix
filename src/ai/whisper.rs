@@ -1,10 +1,10 @@
 use anyhow::{Ok, Result};
 use futures::stream::StreamExt;
 use rodio::Decoder;
-use rwhisper::{Segment, WhisperBuilder};
-pub use rwhisper::{WhisperLanguage, WhisperSource};
+use rwhisper::WhisperBuilder;
+pub use rwhisper::{Segment, WhisperLanguage, WhisperSource};
 use std::{fs::File, io::BufReader};
-use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
+use tokio::sync::mpsc::UnboundedSender;
 
 pub struct Whisper {
     model: rwhisper::Whisper,
@@ -13,7 +13,7 @@ pub struct Whisper {
 impl Whisper {
     pub fn new() -> Self {
         let model = WhisperBuilder::default()
-            .with_source(WhisperSource::Tiny)
+            .with_source(WhisperSource::TinyEn)
             .build()
             .unwrap();
         Whisper { model }
@@ -42,20 +42,29 @@ impl Whisper {
         Ok(text)
     }
 
-    pub async fn transcribe_stream(
+    pub async fn transcribe_file_callback(
         &self,
         file_name: &str,
-        sender: UnboundedSender<String>,
+        callback: impl Fn(&str) -> (),
     ) -> Result<()> {
         let file = File::open(file_name)?;
         let source = Decoder::new(BufReader::new(file))?;
-        let (tx, mut rx) = unbounded_channel::<Segment>();
-        tokio::spawn(async move {
-            while let Some(result) = rx.recv().await {
-                sender.send(result.text().to_owned()).unwrap();
-            }
-        });
+        let mut stream = self.model.transcribe(source)?;
 
-        self.model.transcribe_into(source, tx)
+        while let Some(result) = stream.next().await {
+            callback(result.text());
+        }
+
+        Ok(())
+    }
+
+    pub async fn transcribe_stream(
+        &self,
+        file_name: &str,
+        sender: UnboundedSender<Segment>,
+    ) -> Result<()> {
+        let file = File::open(file_name)?;
+        let source = Decoder::new(BufReader::new(file))?;
+        self.model.transcribe_into(source, sender)
     }
 }
