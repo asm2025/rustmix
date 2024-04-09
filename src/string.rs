@@ -1,11 +1,6 @@
-use once_cell::sync::Lazy;
-use rand::Rng;
+use rand::{rngs::ThreadRng, Rng};
 
-static CHARS: Lazy<Vec<char>> = Lazy::new(|| {
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        .chars()
-        .collect()
-});
+pub const SPECIAL_CHARS: [char; 10] = ['!', '@', '#', '$', '%', '^', '&', '*', '(', ')'];
 
 pub trait StringEx {
     fn trim(&self, ch: &char) -> &str;
@@ -155,12 +150,38 @@ impl StringEx for str {
 }
 
 pub fn random_string(len: usize) -> String {
-    let mut rng = rand::thread_rng();
-    let chars: Vec<char> = (0..len)
-        .map(|_| {
-            let idx = rng.gen_range(0..CHARS.len());
-            CHARS[idx]
-        })
-        .collect();
-    chars.iter().collect()
+    let mut s = String::with_capacity(len);
+
+    for _ in 0..len {
+        s.push(random_alphanum());
+    }
+
+    s
+}
+
+pub fn random_alphanum() -> char {
+    let c = rand::thread_rng().gen_range(0..62);
+
+    if c < 10 {
+        (char::from_digit(c, 10).unwrap() as u8 + 48) as char
+    } else if c < 36 {
+        (char::from_digit(c - 10, 10).unwrap() as u8 + 65) as char
+    } else {
+        (char::from_digit(c - 36, 10).unwrap() as u8 + 97) as char
+    }
+}
+
+pub fn random_char() -> char {
+    let mut rnd = rand::thread_rng();
+    let c = rnd.gen_range(0..62);
+
+    if c < 10 {
+        (char::from_digit(c, 10).unwrap() as u8 + 48) as char
+    } else if c < 36 {
+        (char::from_digit(c - 10, 10).unwrap() as u8 + 65) as char
+    } else if c < 62 {
+        (char::from_digit(c - 36, 10).unwrap() as u8 + 97) as char
+    } else {
+        SPECIAL_CHARS[rnd.gen_range(0..10)]
+    }
 }

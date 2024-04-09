@@ -13,7 +13,6 @@ use tokio::{
 };
 
 use super::{cond::Mutcond, *};
-use crate::{ThreadClonable, ThreadStatic};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InjectorWorkerOptions {
@@ -71,7 +70,7 @@ impl InjectorWorkerOptions {
 }
 
 #[derive(Debug, Clone)]
-pub struct InjectorWorker<T: ThreadStatic> {
+pub struct InjectorWorker<T: Send + Sync + Clone + 'static> {
     options: InjectorWorkerOptions,
     injector: Arc<Injector<T>>,
     stealers: Arc<Mutex<Vec<Stealer<T>>>>,
@@ -86,7 +85,7 @@ pub struct InjectorWorker<T: ThreadStatic> {
     running: Arc<AtomicUsize>,
 }
 
-impl<T: ThreadClonable> InjectorWorker<T> {
+impl<T: Send + Sync + Clone> InjectorWorker<T> {
     pub fn new() -> Self {
         let options: InjectorWorkerOptions = Default::default();
         InjectorWorker {
@@ -207,7 +206,10 @@ impl<T: ThreadClonable> InjectorWorker<T> {
         self.running.fetch_sub(1, Ordering::SeqCst);
     }
 
-    pub fn start<TD: TaskDelegation<InjectorWorker<T>, T> + ThreadStatic>(&self, delegate: &TD) {
+    pub fn start<TD: TaskDelegation<InjectorWorker<T>, T> + Send + Sync + Clone + 'static>(
+        &self,
+        delegate: &TD,
+    ) {
         if self.is_cancelled() {
             panic!("Queue is already cancelled.")
         }
@@ -315,7 +317,9 @@ impl<T: ThreadClonable> InjectorWorker<T> {
         }
     }
 
-    pub async fn start_async<TD: AsyncTaskDelegation<InjectorWorker<T>, T> + ThreadStatic>(
+    pub async fn start_async<
+        TD: AsyncTaskDelegation<InjectorWorker<T>, T> + Send + Sync + Clone + 'static,
+    >(
         &self,
         delegate: &TD,
     ) {
@@ -519,7 +523,7 @@ impl<T: ThreadClonable> InjectorWorker<T> {
     }
 }
 
-impl<T: ThreadClonable> AwaitableConsumer for InjectorWorker<T> {
+impl<T: Send + Sync + Clone> AwaitableConsumer for InjectorWorker<T> {
     fn is_cancelled(&self) -> bool {
         self.is_cancelled()
     }

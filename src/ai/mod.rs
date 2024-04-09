@@ -1,2 +1,3 @@
-#[cfg(feature = "ai-kalosm")]
-pub mod kalosm;
+mod whisper;
+#[cfg(feature = "ai-whisper")]
+pub use self::whisper::Whisper;

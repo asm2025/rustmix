@@ -7,8 +7,8 @@ authors = ["asm <asm2025@outlook.com>"]
 license = "MIT"
 
 [features]
-default = ["mail", "threading", "log-log4rs", "ai-kalosm"]
-ai-kalosm = ["kalosm"]
+default = ["mail", "threading", "log-log4rs", "ai-whisper"]
+ai-whisper = ["rwhisper", "rodio"]
 log-log4rs = ["log4rs"]
 log-slog = ["slog", "slog-async", "slog-scope", "slog-stdlog", "slog-term", "slog-json", "file-rotate"]
 mail = ["html-entities", "lettre", "once_cell", "regex"]
@@ -26,7 +26,7 @@ dotenv = "0"
 file-rotate = { version = "0", optional = true }
 futures = "0"
 html-entities = { version = "0", optional = true }
-kalosm = { version = "0", default-features = false, features = ["language", "sound"], optional = true }
+rwhisper = { version = "0", optional = true }
 lettre = { version = "0", optional = true }
 log = "0"
 log4rs = { version = "1", optional = true }
@@ -36,6 +36,7 @@ rand = "0"
 rayon = { version = "1", optional = true }
 regex = { version = "1", optional = true }
 reqwest = { version = "0", features = ["blocking", "cookies", "json", "gzip", "deflate", "multipart", "socks", "stream"] }
+rodio = { version = "0", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 slog = { version = "2", optional = true }

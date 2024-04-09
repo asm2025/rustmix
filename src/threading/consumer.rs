@@ -13,7 +13,6 @@ use tokio::{
 };
 
 use super::{cond::Mutcond, *};
-use crate::{ThreadClonable, ThreadStatic};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConsumerOptions {
@@ -73,7 +72,7 @@ impl ConsumerOptions {
 }
 
 #[derive(Clone, Debug)]
-pub struct Consumer<T: ThreadStatic> {
+pub struct Consumer<T: Send + Sync + Clone + 'static> {
     options: ConsumerOptions,
     items: Arc<Mutex<LinkedList<T>>>,
     items_cond: Arc<Mutcond>,
@@ -88,7 +87,7 @@ pub struct Consumer<T: ThreadStatic> {
     running: Arc<AtomicUsize>,
 }
 
-impl<T: ThreadClonable> Consumer<T> {
+impl<T: Send + Sync + Clone> Consumer<T> {
     pub fn new() -> Self {
         Consumer {
             options: Default::default(),
@@ -208,7 +207,10 @@ impl<T: ThreadClonable> Consumer<T> {
         self.running.fetch_sub(1, Ordering::SeqCst);
     }
 
-    pub fn start<TD: TaskDelegation<Consumer<T>, T> + ThreadStatic>(&self, delegate: &TD) {
+    pub fn start<TD: TaskDelegation<Consumer<T>, T> + Send + Sync + Clone + 'static>(
+        &self,
+        delegate: &TD,
+    ) {
         if self.is_cancelled() {
             panic!("Queue is already cancelled.")
         }
@@ -329,7 +331,9 @@ impl<T: ThreadClonable> Consumer<T> {
         }
     }
 
-    pub async fn start_async<TD: AsyncTaskDelegation<Consumer<T>, T> + ThreadStatic>(
+    pub async fn start_async<
+        TD: AsyncTaskDelegation<Consumer<T>, T> + Send + Sync + Clone + 'static,
+    >(
         &self,
         delegate: &TD,
     ) {
@@ -567,7 +571,7 @@ impl<T: ThreadClonable> Consumer<T> {
     }
 }
 
-impl<T: ThreadClonable> AwaitableConsumer for Consumer<T> {
+impl<T: Send + Sync + Clone> AwaitableConsumer for Consumer<T> {
     fn is_cancelled(&self) -> bool {
         Consumer::is_cancelled(self)
     }

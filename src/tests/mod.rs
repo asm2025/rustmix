@@ -1,22 +1,38 @@
-use std::io::Write;
+#![allow(unused_imports)]
 
 use serde::{Deserialize, Serialize};
+use std::io::Write;
 
-pub mod app;
-pub mod io;
-#[cfg(feature = "kalosm")]
-pub mod kalosm;
+mod app;
+pub(crate) use self::app::*;
+mod io;
+pub(crate) use self::io::*;
 #[cfg(feature = "log4rs")]
-pub mod log4rs;
+mod log4rs;
+#[cfg(feature = "log4rs")]
+pub(crate) use self::log4rs::*;
 #[cfg(feature = "mail")]
-pub mod mail;
+mod mail;
+#[cfg(feature = "mail")]
+pub(crate) use self::mail::*;
 #[cfg(feature = "python")]
-pub mod python;
+mod python;
+#[cfg(feature = "python")]
+pub(crate) use self::python::*;
 #[cfg(feature = "slog")]
-pub mod slog;
+mod slog;
+#[cfg(feature = "slog")]
+pub(crate) use self::slog::*;
 #[cfg(feature = "threading")]
-pub mod threading;
-pub mod web;
+mod threading;
+#[cfg(feature = "threading")]
+pub(crate) use self::threading::*;
+mod web;
+pub(crate) use self::web::*;
+#[cfg(feature = "ai-whisper")]
+mod whisper;
+#[cfg(feature = "ai-whisper")]
+pub(crate) use self::whisper::*;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Employee {

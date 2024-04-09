@@ -8,7 +8,7 @@ pub fn test_log4rs(from_config_file: bool) -> Result<()> {
 
     if from_config_file {
         println!("Building loggers from file...");
-        let path = ("test", "log4rs.yaml").as_path();
+        let path = ("test", "log", "log4rs.yaml").as_path();
         log4rs::init_file(&path)?;
         println!("Logger was built");
         log_a_few_messages("Messages configured logger from a yaml file:");

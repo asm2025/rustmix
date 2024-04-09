@@ -1,11 +1,10 @@
 use reqwest::header;
 use ua_generator::ua;
 
-pub use self::http::*;
-pub use self::url::*;
-
 mod http;
+pub use self::http::*;
 mod url;
+pub use self::url::*;
 
 pub fn get_user_agent() -> String {
     ua::spoof_ua().to_owned()
