@@ -1,0 +1,16 @@
+[package]
+name = "kalosm-streams"
+version = "0.2.1"
+edition = "2021"
+description = "A set of streams for pretrained models in Kalosm"
+license = "MIT/Apache-2.0"
+repository = "https://github.com/floneum/floneum"
+authors = ["Evan Almloff"]
+
+[dependencies]
+futures-util = "0"
+anyhow = "1"
+tracing = "0"
+pin-project = "1"
+tokio = { version = "1", features = ["full"] }
+image = "0"

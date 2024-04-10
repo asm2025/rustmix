@@ -1,0 +1,16 @@
+[package]
+name = "kalosm-common"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1"
+candle-core.workspace = true
+hf-hub = { version = "0" }
+reqwest = "0"
+tokio = { version = "1", features = ["full"] }
+dirs = "5"
+tracing = "0"
+httpdate = "1"

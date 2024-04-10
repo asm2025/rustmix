@@ -2,11 +2,20 @@
 name = "rustmix"
 version = "0.1.0"
 edition = "2021"
-description = "RustMix is a Rust library that has some basic utility functions and components."
+description = "rustmix is a Rust library that has some basic utility functions and components."
 authors = ["asm <asm2025@outlook.com>"]
 license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["mail", "threading", "log-log4rs", "ai-whisper"]
+ai-whisper = ["kalosm-sound", "rwhisper", "rodio"]
+log-log4rs = ["log4rs"]
+log-slog = ["slog", "slog-async", "slog-scope", "slog-stdlog", "slog-term", "slog-json", "file-rotate"]
+mail = ["html-entities", "lettre", "once_cell", "regex"]
+python = ["pyo3"]
+threading = ["crossbeam", "rayon"]
 
 [dependencies]
 anyhow = "1"
@@ -17,7 +26,6 @@ dotenv = "0"
 file-rotate = { version = "0", optional = true }
 futures = "0"
 html-entities = { version = "0", optional = true }
-rwhisper = { version = "0", optional = true }
 lettre = { version = "0", optional = true }
 log = "0"
 log4rs = { version = "1", optional = true }
@@ -27,6 +35,8 @@ rand = "0"
 rayon = { version = "1", optional = true }
 regex = { version = "1", optional = true }
 reqwest = { version = "0", features = ["blocking", "cookies", "json", "gzip", "deflate", "multipart", "socks", "stream"] }
+kalosm-sound = { workspace = true, optional = true }
+rwhisper = { workspace = true, optional = true }
 rodio = { version = "0", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -41,14 +51,41 @@ ua_generator = "0"
 url = { version = "2", features = ["serde"] }
 urlencoding = "2"
 
-[features]
-default = ["mail", "threading", "log-log4rs", "ai-whisper"]
-ai-whisper = ["rwhisper", "rodio"]
-log-log4rs = ["log4rs"]
-log-slog = ["slog", "slog-async", "slog-scope", "slog-stdlog", "slog-term", "slog-json", "file-rotate"]
-mail = ["html-entities", "lettre", "once_cell", "regex"]
-python = ["pyo3"]
-threading = ["crossbeam", "rayon"]
+[workspace]
+members = [
+	"models/rwhisper",
+    "interfaces/kalosm-common",
+	"interfaces/language-model",
+    "interfaces/kalosm-sample",
+	"interfaces/kalosm-sound",
+	"interfaces/kalosm-streams",
+]
+
+[workspace.dependencies]
+candle-core = { git = "https://github.com/huggingface/candle", rev = "cdc8b57b5cf28ad92642b076d67e610bdb958b2d" }
+candle-nn = { git = "https://github.com/huggingface/candle", rev = "cdc8b57b5cf28ad92642b076d67e610bdb958b2d" }
+candle-transformers = { git = "https://github.com/huggingface/candle", rev = "cdc8b57b5cf28ad92642b076d67e610bdb958b2d" }
+candle-datasets = { git = "https://github.com/huggingface/candle", rev = "cdc8b57b5cf28ad92642b076d67e610bdb958b2d" }
+kalosm-sample = { path = "./interfaces/kalosm-sample", version = "0.2.1" }
+kalosm-common = { path = "./interfaces/kalosm-common", version = "0.1.0" }
+kalosm-language-model = { path = "./interfaces/language-model", version = "0.2.1" }
+kalosm-streams = { path = "./interfaces/kalosm-streams", version = "0.2.1" }
+kalosm-sound = { path = "./interfaces/kalosm-sound", version = "0.2.1" }
+rwhisper = { path = "./models/rwhisper", version = "0.2.1" }
+llm-samplers = "=0.0.7"
+
+[profile.dist]
+inherits = "release"
+lto = "thin"
+
+[profile.release]
+lto = true
+opt-level = 3
+debug = false
+codegen-units = 1
+
+[profile.dev.package."*"]
+opt-level = 3
 
 [package.metadata.scripts]
 run = "cargo run"

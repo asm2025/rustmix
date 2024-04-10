@@ -1,0 +1,38 @@
+[package]
+name = "kalosm-sound"
+version = "0.2.1"
+edition = "2021"
+description = "A set of pretrained audio models "
+license = "MIT/Apache-2.0"
+repository = "https://github.com/floneum/floneum"
+authors = ["Evan Almloff"]
+keywords = ["ai", "whisper"]
+
+[dependencies]
+anyhow = "1"
+cpal = "0"
+itertools = "0"
+rand = "0"
+ringbuf = "0"
+webrtc-vad = "0"
+candle-core.workspace = true
+candle-nn.workspace = true
+candle-transformers.workspace = true
+byteorder = "1"
+hf-hub = "0"
+tokenizers = "0"
+serde_json = "1"
+hound = "3"
+rodio = "0"
+tokio = { version = "1", features = ["full"] }
+tracing = "0"
+ringbuffer = "0"
+futures-util = "0"
+async-trait = "0"
+kalosm-streams.workspace = true
+rwhisper.workspace = true
+
+[features]
+metal = ["candle-core/metal", "rwhisper/accelerate", "rwhisper/metal"]
+cuda = ["candle-core/cuda", "rwhisper/cuda", "rwhisper/cudnn"]
+mkl = ["candle-core/mkl", "rwhisper/mkl"]

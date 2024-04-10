@@ -11,22 +11,21 @@ pub struct Whisper {
 }
 
 impl Whisper {
-    pub fn new() -> Self {
+    pub async fn init() -> Result<Self> {
         let model = WhisperBuilder::default()
             .with_source(WhisperSource::TinyEn)
             .build()
-            .unwrap();
-        Whisper { model }
+            .await?;
+        Ok(Whisper { model })
     }
 
-    pub fn with(source: WhisperSource, language: WhisperLanguage, cpu_only: bool) -> Self {
+    pub async fn with(source: WhisperSource, language: WhisperLanguage) -> Result<Self> {
         let model = WhisperBuilder::default()
             .with_source(source)
             .with_language(Some(language))
-            .with_cpu(cpu_only)
             .build()
-            .unwrap();
-        Whisper { model }
+            .await?;
+        Ok(Whisper { model })
     }
 
     pub async fn transcribe_file(&self, file_name: &str) -> Result<String> {

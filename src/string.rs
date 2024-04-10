@@ -1,4 +1,4 @@
-use rand::{rngs::ThreadRng, Rng};
+use rand::Rng;
 
 pub const SPECIAL_CHARS: [char; 10] = ['!', '@', '#', '$', '%', '^', '&', '*', '(', ')'];
 
