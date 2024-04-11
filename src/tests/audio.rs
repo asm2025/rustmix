@@ -1,11 +1,11 @@
 use anyhow::Result;
-use rwhisper::Segment;
+use kalosm::audio::Segment;
 use std::io::Write;
 
 use rustmix::{ai::Whisper, io::path::AsPath};
 
 pub async fn test_whisper() -> Result<()> {
-    let whisper = Whisper::init().await?;
+    let whisper = Whisper::new().await?;
     let file_name = ("test", "audio", "captcha", "fb1.mp3").as_path();
     println!("Transcribing file [text]: {}", file_name);
     let result = whisper.transcribe_file(&file_name).await?;

@@ -26,8 +26,7 @@ rand = "0"
 rayon = { version = "1", optional = true }
 regex = { version = "1", optional = true }
 reqwest = { version = "0", features = ["blocking", "cookies", "json", "gzip", "deflate", "multipart", "socks", "stream"] }
-kalosm-sound = { workspace = true, optional = true }
-rwhisper = { workspace = true, optional = true }
+kalosm = { version = "0", workspace = true, default-features = false, optional = true }
 rodio = { version = "0", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -42,14 +41,30 @@ ua_generator = "0"
 url = { version = "2", features = ["serde"] }
 urlencoding = "2"
 
+[patch.crates-io]
+dioxus-core = { git = "https://github.com/ealmloff/dioxus", branch = "improved-signals" }
+dioxus-rsx = { git = "https://github.com/ealmloff/dioxus", branch = "improved-signals" }
+dioxus = { git = "https://github.com/ealmloff/dioxus", branch = "improved-signals" }
+
 [workspace]
 members = [
-	"models/rwhisper",
+    "models/rbert",
+    "models/kalosm-llama",
+    "models/rphi",
+    "models/rwhisper",
+    "models/rwuerstchen",
+    "models/segment-anything-rs",
+    "models/kalosm-ocr",
+    "interfaces/kalosm",
     "interfaces/kalosm-common",
-	"interfaces/language-model",
+    # "interfaces/kalosm-language",
+    "interfaces/language-model",
     "interfaces/kalosm-sample",
-	"interfaces/kalosm-sound",
-	"interfaces/kalosm-streams",
+    "interfaces/kalosm-vision",
+    "interfaces/kalosm-sound",
+    "interfaces/kalosm-streams",
+    "interfaces/kalosm-learning",
+    "interfaces/kalosm-learning-macro",
 ]
 
 [workspace.dependencies]
@@ -57,12 +72,23 @@ candle-core = { git = "https://github.com/huggingface/candle", rev = "cdc8b57b5c
 candle-nn = { git = "https://github.com/huggingface/candle", rev = "cdc8b57b5cf28ad92642b076d67e610bdb958b2d" }
 candle-transformers = { git = "https://github.com/huggingface/candle", rev = "cdc8b57b5cf28ad92642b076d67e610bdb958b2d" }
 candle-datasets = { git = "https://github.com/huggingface/candle", rev = "cdc8b57b5cf28ad92642b076d67e610bdb958b2d" }
-kalosm-sample = { path = "./interfaces/kalosm-sample", version = "0.2.1" }
-kalosm-common = { path = "./interfaces/kalosm-common", version = "0.1.0" }
-kalosm-language-model = { path = "./interfaces/language-model", version = "0.2.1" }
-kalosm-streams = { path = "./interfaces/kalosm-streams", version = "0.2.1" }
-kalosm-sound = { path = "./interfaces/kalosm-sound", version = "0.2.1" }
-rwhisper = { path = "./models/rwhisper", version = "0.2.1" }
+kalosm = { path = "./interfaces/kalosm", version = "0" }
+kalosm-sample = { path = "./interfaces/kalosm-sample", version = "0" }
+kalosm-common = { path = "./interfaces/kalosm-common", version = "0" }
+kalosm-language-model = { path = "./interfaces/language-model", version = "0" }
+kalosm-streams = { path = "./interfaces/kalosm-streams", version = "0" }
+# kalosm-language = { path = "./interfaces/kalosm-language", version = "0" }
+kalosm-sound = { path = "./interfaces/kalosm-sound", version = "0" }
+kalosm-vision = { path = "./interfaces/kalosm-vision", version = "0" }
+kalosm-learning = { path = "./interfaces/kalosm-learning", version = "0" }
+kalosm-learning-macro = { path = "./interfaces/kalosm-learning-macro", version = "0" }
+rphi = { path = "./models/rphi", version = "0" }
+rbert = { path = "./models/rbert", version = "0" }
+kalosm-llama = { path = "./models/kalosm-llama", version = "0" }
+rwhisper = { path = "./models/rwhisper", version = "0" }
+rwuerstchen = { path = "./models/rwuerstchen", version = "0" }
+segment-anything-rs = { path = "./models/segment-anything-rs", version = "0" }
+kalosm-ocr = { path = "./models/kalosm-ocr", version = "0" }
 llm-samplers = "=0.0.7"
 
 [profile.dist]
@@ -79,14 +105,14 @@ codegen-units = 1
 opt-level = 3
 
 [features]
-default = ["mail", "threading", "log-log4rs", "ai-whisper"]
-ai-whisper = ["kalosm-sound", "rwhisper", "rodio"]
-accelerate = ["rwhisper/accelerate"]
-cuda = ["kalosm-sound/cuda", "rwhisper/cuda"]
-cudnn = ["rwhisper/cudnn"]
-mkl = ["kalosm-sound/mkl", "rwhisper/mkl"]
-nccl = ["rwhisper/nccl"]
-metal = ["kalosm-sound/metal", "rwhisper/metal"]
+default = ["mail", "threading", "log-log4rs", "audio", "vision"]
+llamacpp = ["kalosm/llamacpp"]
+metal = ["kalosm/metal"]
+cublas = ["kalosm/cublas"]
+mkl = ["kalosm/mkl"]
+# language = ["kalosm/language"]
+audio = ["kalosm/sound", "rodio"]
+vision = ["kalosm/vision"]
 log-log4rs = ["log4rs"]
 log-slog = ["slog", "slog-async", "slog-scope", "slog-stdlog", "slog-term", "slog-json", "file-rotate"]
 mail = ["html-entities", "lettre", "once_cell", "regex"]

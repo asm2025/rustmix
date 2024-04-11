@@ -1,21 +1,18 @@
 use anyhow::{Ok, Result};
 use futures::stream::StreamExt;
+use kalosm::audio::*;
+pub use kalosm::audio::{Segment, WhisperLanguage, WhisperSource};
 use rodio::Decoder;
-use rwhisper::WhisperBuilder;
-pub use rwhisper::{Segment, WhisperLanguage, WhisperSource};
 use std::{fs::File, io::BufReader};
 use tokio::sync::mpsc::UnboundedSender;
 
 pub struct Whisper {
-    model: rwhisper::Whisper,
+    model: kalosm::audio::Whisper,
 }
 
 impl Whisper {
-    pub async fn init() -> Result<Self> {
-        let model = WhisperBuilder::default()
-            .with_source(WhisperSource::TinyEn)
-            .build()
-            .await?;
+    pub async fn new() -> Result<Self> {
+        let model = kalosm::audio::Whisper::new().await?;
         Ok(Whisper { model })
     }
 

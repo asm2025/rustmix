@@ -29,10 +29,10 @@ mod threading;
 pub(crate) use self::threading::*;
 mod web;
 pub(crate) use self::web::*;
-#[cfg(feature = "ai-whisper")]
-mod whisper;
-#[cfg(feature = "ai-whisper")]
-pub(crate) use self::whisper::*;
+#[cfg(feature = "audio")]
+mod audio;
+#[cfg(feature = "audio")]
+pub(crate) use self::audio::*;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Employee {
