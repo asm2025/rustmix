@@ -1,5 +1,3 @@
-use rand::Rng;
-
 pub const SPECIAL_CHARS: [char; 10] = ['!', '@', '#', '$', '%', '^', '&', '*', '(', ')'];
 
 pub trait StringEx {
@@ -146,42 +144,5 @@ impl StringEx for str {
         } else {
             self.to_owned()
         }
-    }
-}
-
-pub fn random_string(len: usize) -> String {
-    let mut s = String::with_capacity(len);
-
-    for _ in 0..len {
-        s.push(random_alphanum());
-    }
-
-    s
-}
-
-pub fn random_alphanum() -> char {
-    let c = rand::thread_rng().gen_range(0..62);
-
-    if c < 10 {
-        (char::from_digit(c, 10).unwrap() as u8 + 48) as char
-    } else if c < 36 {
-        (char::from_digit(c - 10, 10).unwrap() as u8 + 65) as char
-    } else {
-        (char::from_digit(c - 36, 10).unwrap() as u8 + 97) as char
-    }
-}
-
-pub fn random_char() -> char {
-    let mut rnd = rand::thread_rng();
-    let c = rnd.gen_range(0..62);
-
-    if c < 10 {
-        (char::from_digit(c, 10).unwrap() as u8 + 48) as char
-    } else if c < 36 {
-        (char::from_digit(c - 10, 10).unwrap() as u8 + 65) as char
-    } else if c < 62 {
-        (char::from_digit(c - 36, 10).unwrap() as u8 + 97) as char
-    } else {
-        SPECIAL_CHARS[rnd.gen_range(0..10)]
     }
 }

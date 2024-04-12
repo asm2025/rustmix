@@ -7,9 +7,9 @@ pub mod io;
 pub mod logging;
 #[cfg(feature = "mail")]
 pub mod mail;
-pub mod numeric;
 #[cfg(feature = "python")]
 pub mod python;
+pub mod random;
 pub mod string;
 pub mod threading;
 pub mod web;

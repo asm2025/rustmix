@@ -13,6 +13,10 @@ async fn main() -> Result<()> {
     */
     dotenv::dotenv().ok();
 
+    tests::test_random();
+
+    //tests::test_path()?;
+
     //tests::test_path()?;
     //tests::test_directory()?;
     //tests::test_file()?;

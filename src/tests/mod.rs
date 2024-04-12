@@ -21,6 +21,8 @@ mod audio;
 pub(crate) use self::audio::*;
 mod vision;
 pub(crate) use self::vision::*;
+mod random;
+pub(crate) use self::random::*;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Employee {
