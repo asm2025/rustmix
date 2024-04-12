@@ -9,7 +9,7 @@ use rustmix::{
 use std::io::Write;
 
 pub async fn test_sound() -> Result<()> {
-    let sound = Audio::new().await?;
+    let sound = Audio::quick().await?;
     let curdir = (directory::current().as_str(), "..", "files", "audio").as_full_path();
     let file_name = (curdir.as_str(), "captcha", "fb1.mp3").as_path();
     println!("Transcribing file [text]: {}", file_name);

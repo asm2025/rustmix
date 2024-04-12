@@ -11,6 +11,17 @@ pub struct Audio {
 }
 
 impl Audio {
+    /// Creates a new `Audio` instance with the Whisper source set to TinyEn and the language set to English.
+    /// DO NOT USE THIS FUNCTION IF YOU WANT ACCURATE RESULT.
+    pub async fn quick() -> Result<Self> {
+        let model = WhisperBuilder::default()
+            .with_source(WhisperSource::TinyEn)
+            .with_language(Some(WhisperLanguage::English))
+            .build()
+            .await?;
+        Ok(Audio { model })
+    }
+
     pub async fn new() -> Result<Self> {
         let model = WhisperBuilder::default()
             .with_language(Some(WhisperLanguage::English))
