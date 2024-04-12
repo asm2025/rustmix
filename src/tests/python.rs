@@ -1,6 +1,5 @@
 use anyhow::Result;
 use pyo3::types::PyBytes;
-
 use rustmix::python;
 
 pub fn test_python() -> Result<()> {

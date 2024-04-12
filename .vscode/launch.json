@@ -7,11 +7,11 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'rustmix'",
+            "name": "Debug executable 'rustmixapp'",
             "cargo": {
-                "args": ["build", "--bin=rustmix"],
+                "args": ["build", "--bin=rustmixapp"],
                 "filter": {
-                    "name": "rustmix",
+                    "name": "rustmixapp",
                     "kind": "bin"
                 }
             },
@@ -30,21 +30,7 @@
                 }
             },
             "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug unit tests in executable 'rustmix'",
-            "cargo": {
-                "args": ["test", "--no-run", "--bin=rustmix"],
-                "filter": {
-                    "name": "rustmix",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
+            "cwd": "${workspaceFolder}/lib"
         }
     ]
 }

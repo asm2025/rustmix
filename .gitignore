@@ -2,3 +2,4 @@ cargo.lock
 /target
 /_logs
 /logs
+/out

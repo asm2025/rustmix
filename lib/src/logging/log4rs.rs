@@ -18,11 +18,11 @@ use std::path::{PathBuf, MAIN_SEPARATOR};
 use super::{LogLevel, LOG_DATE_FORMAT, LOG_SIZE_MAX, LOG_SIZE_MIN};
 use crate::string::StringEx;
 
-pub fn init(file_name: &str) -> Result<Handle> {
-    init_with(file_name, LogLevel::Info, None)
+pub fn configure(file_name: &str) -> Result<Handle> {
+    configure_with(file_name, LogLevel::Info, None)
 }
 
-pub fn init_with(file_name: &str, level: LogLevel, limit: Option<usize>) -> Result<Handle> {
+pub fn configure_with(file_name: &str, level: LogLevel, limit: Option<usize>) -> Result<Handle> {
     if file_name.is_empty() {
         panic!("File name is empty");
     }
@@ -74,7 +74,7 @@ pub fn init_with(file_name: &str, level: LogLevel, limit: Option<usize>) -> Resu
     log4rs::init_config(config).map_err(Into::into)
 }
 
-pub fn init_file(yaml_file_name: &str) -> Result<()> {
+pub fn configure_from_file(yaml_file_name: &str) -> Result<()> {
     if yaml_file_name.is_empty() {
         panic!("File name is empty");
     }

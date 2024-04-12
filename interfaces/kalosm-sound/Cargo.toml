@@ -15,9 +15,9 @@ itertools = "0"
 rand = "0"
 ringbuf = "0"
 webrtc-vad = "0"
-candle-core.workspace = true
-candle-nn.workspace = true
-candle-transformers.workspace = true
+candle-core = { workspace = true }
+candle-nn = { workspace = true }
+candle-transformers = { workspace = true }
 byteorder = "1"
 hf-hub = "0"
 tokenizers = "0"
@@ -29,8 +29,8 @@ tracing = "0"
 ringbuffer = "0"
 futures-util = "0"
 async-trait = "0"
-kalosm-streams.workspace = true
-rwhisper.workspace = true
+kalosm-streams = { workspace = true }
+rwhisper = { workspace = true }
 
 [features]
 metal = ["candle-core/metal", "rwhisper/accelerate", "rwhisper/metal"]

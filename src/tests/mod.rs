@@ -1,5 +1,3 @@
-#![allow(unused_imports)]
-
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 
@@ -7,32 +5,22 @@ mod app;
 pub(crate) use self::app::*;
 mod io;
 pub(crate) use self::io::*;
-#[cfg(feature = "log4rs")]
 mod log4rs;
-#[cfg(feature = "log4rs")]
 pub(crate) use self::log4rs::*;
-#[cfg(feature = "mail")]
 mod mail;
-#[cfg(feature = "mail")]
 pub(crate) use self::mail::*;
-#[cfg(feature = "python")]
 mod python;
-#[cfg(feature = "python")]
 pub(crate) use self::python::*;
-#[cfg(feature = "slog")]
 mod slog;
-#[cfg(feature = "slog")]
 pub(crate) use self::slog::*;
-#[cfg(feature = "threading")]
 mod threading;
-#[cfg(feature = "threading")]
 pub(crate) use self::threading::*;
 mod web;
 pub(crate) use self::web::*;
-#[cfg(feature = "audio")]
 mod audio;
-#[cfg(feature = "audio")]
 pub(crate) use self::audio::*;
+mod vision;
+pub(crate) use self::vision::*;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Employee {

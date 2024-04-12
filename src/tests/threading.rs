@@ -1,4 +1,5 @@
 use anyhow::Result;
+use rustmix::threading::*;
 use std::{
     collections,
     sync::{
@@ -9,8 +10,6 @@ use std::{
     time::Instant,
 };
 use tokio::time::Duration;
-
-use rustmix::threading::*;
 
 const THREADS: usize = 4;
 const TEST_SIZE: usize = 10000;

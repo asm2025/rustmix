@@ -9,9 +9,9 @@ authors = ["Evan Almloff"]
 keywords = ["ai", "llm", "phi", "nlp", "candle"]
 
 [dependencies]
-candle-core.workspace = true
-candle-nn.workspace = true
-candle-transformers.workspace = true
+candle-core = { workspace = true }
+candle-nn = { workspace = true }
+candle-transformers = { workspace = true }
 tokenizers = { version = "0" }
 hf-hub = "0"
 
@@ -27,9 +27,9 @@ rand = "0"
 tokio = { version = "1", features = ["full"] }
 llm-samplers = { workspace = true }
 async-trait = "0"
-kalosm-sample.workspace = true
-kalosm-language-model.workspace = true
-kalosm-streams.workspace = true
+kalosm-sample = { workspace = true }
+kalosm-language-model = { workspace = true }
+kalosm-streams = { workspace = true }
 kalosm-common = { version = "0", workspace = true }
 
 [features]

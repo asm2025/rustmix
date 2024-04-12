@@ -10,9 +10,9 @@ keywords = ["ai", "segment-anything", "ocr"]
 
 [dependencies]
 image = "0"
-kalosm-ocr.workspace = true
-rwuerstchen.workspace = true
-segment-anything-rs.workspace = true
+kalosm-ocr = { workspace = true }
+rwuerstchen = { workspace = true }
+segment-anything-rs = { workspace = true }
 
 [features]
 metal = ["kalosm-ocr/metal", "rwuerstchen/metal", "segment-anything-rs/metal"]

@@ -1,14 +1,13 @@
 use anyhow::Result;
 use rand::{distributions::Alphanumeric, Rng};
-use std::{
-    io::{stdin, LineWriter, Write},
-    path::PathBuf,
-};
-
 use rustmix::io::{
     directory,
     file::{self, FileEx},
     path::{self, IntoPath, PathExt},
+};
+use std::{
+    io::{stdin, LineWriter, Write},
+    path::PathBuf,
 };
 
 use super::*;

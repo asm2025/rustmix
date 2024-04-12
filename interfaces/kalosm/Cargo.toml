@@ -13,8 +13,8 @@ kalosm-common = { version = "0", path = "../kalosm-common" }
 # kalosm-language = { default-features = false, workspace = true, optional = true }
 kalosm-sound = { workspace = true, optional = true }
 kalosm-vision = { workspace = true, optional = true }
-kalosm-streams.workspace = true
-llm-samplers.workspace = true
+kalosm-streams = { workspace = true }
+llm-samplers = { workspace = true }
 tokio = { version = "1", features = ["full", "macros", "rt-multi-thread"] }
 futures-util = "0"
 anyhow = "1"

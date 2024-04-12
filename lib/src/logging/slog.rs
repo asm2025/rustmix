@@ -45,11 +45,11 @@ impl<D: Decorator> Drain for CustomDecorator<D> {
     }
 }
 
-pub fn init(file_name: &str) -> Result<GlobalLoggerGuard> {
-    init_with(file_name, LogLevel::Info, None)
+pub fn configure(file_name: &str) -> Result<GlobalLoggerGuard> {
+    configure_with(file_name, LogLevel::Info, None)
 }
 
-pub fn init_with(
+pub fn configure_with(
     file_name: &str,
     level: LogLevel,
     limit: Option<usize>,

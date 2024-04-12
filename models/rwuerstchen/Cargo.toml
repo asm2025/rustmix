@@ -9,9 +9,9 @@ authors = ["Evan Almloff"]
 keywords = ["ai", "rwuerstchen", "image-generation"]
 
 [dependencies]
-candle-core.workspace = true
-candle-nn.workspace = true
-candle-transformers.workspace = true
+candle-core = { workspace = true }
+candle-nn = { workspace = true }
+candle-transformers = { workspace = true }
 tokenizers = { version = "0" }
 hf-hub = "0"
 
@@ -20,8 +20,8 @@ intel-mkl-src = { version = "0", features = ["mkl-static-lp64-iomp"], optional =
 cudarc = { version = "0", features = ["f16"], optional = true }
 half = { version = "2", features = ["num-traits", "use-intrinsics", "rand_distr"], optional = true }
 kalosm-common = { version = "0", workspace = true }
-kalosm-language-model.workspace = true
-kalosm-streams.workspace = true
+kalosm-language-model = { workspace = true }
+kalosm-streams = { workspace = true }
 
 anyhow = "1"
 async-trait = "0"

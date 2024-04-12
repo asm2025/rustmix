@@ -9,9 +9,9 @@ authors = ["Evan Almloff"]
 keywords = ["ai", "llm", "bert", "nlp", "transformers"]
 
 [dependencies]
-candle-core.workspace = true
-candle-nn.workspace = true
-candle-transformers.workspace = true
+candle-core = { workspace = true }
+candle-nn = { workspace = true }
+candle-transformers = { workspace = true }
 tokenizers = { version = "0" }
 hf-hub = "0"
 
@@ -27,7 +27,7 @@ async-trait = "0"
 tokio = { version = "1", features = ["full"] }
 
 kalosm-common = { version = "0", workspace = true }
-kalosm-language-model.workspace = true
+kalosm-language-model = { workspace = true }
 
 [features]
 accelerate = ["dep:accelerate-src", "candle-core/accelerate", "candle-nn/accelerate", "candle-transformers/accelerate"]

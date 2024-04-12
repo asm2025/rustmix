@@ -29,7 +29,8 @@ async fn main() -> Result<()> {
 
     //tests::test_python();
 
-    tests::test_whisper().await?;
+    //tests::test_sound().await?;
+    //tests::test_image().await?;
 
     /*
      Once logging is initialized, it cannot be reinitialized.

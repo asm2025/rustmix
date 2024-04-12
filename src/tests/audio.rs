@@ -1,26 +1,27 @@
 use anyhow::Result;
-use kalosm::audio::Segment;
+use rustmix::{
+    ai::{Segment, Sound},
+    io::path::AsPath,
+};
 use std::io::Write;
 
-use rustmix::{ai::Whisper, io::path::AsPath};
-
-pub async fn test_whisper() -> Result<()> {
-    let whisper = Whisper::new().await?;
+pub async fn test_sound() -> Result<()> {
+    let sound = Sound::new().await?;
     let file_name = ("test", "audio", "captcha", "fb1.mp3").as_path();
     println!("Transcribing file [text]: {}", file_name);
-    let result = whisper.transcribe_file(&file_name).await?;
-    println!("Whisper transcription: {}", result);
+    let result = sound.transcribe_file(&file_name).await?;
+    println!("Sound transcription: {}", result);
 
     let file_name = ("test", "audio", "captcha", "fb2.mp3").as_path();
     println!("Transcribing file [text]: {}", file_name);
-    let result = whisper.transcribe_file(&file_name).await?;
-    println!("Whisper transcription: {}", result);
+    let result = sound.transcribe_file(&file_name).await?;
+    println!("Sound transcription: {}", result);
 
     let file_name = ("test", "audio", "listen1.mp3").as_path();
     println!("Transcribing file [file_callback]: {}", file_name);
-    print!("Whisper transcription: ");
+    print!("Sound transcription: ");
     std::io::stdout().flush().unwrap();
-    whisper
+    sound
         .transcribe_file_callback(&file_name, |result| {
             print!("{}", result);
             std::io::stdout().flush().unwrap();
@@ -32,7 +33,7 @@ pub async fn test_whisper() -> Result<()> {
     println!("Transcribing file [stream]: {}", file_name);
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Segment>();
     tokio::spawn(async move {
-        print!("Whisper transcription: ");
+        print!("Sound transcription: ");
         std::io::stdout().flush().unwrap();
 
         while let Some(result) = rx.recv().await {
@@ -43,5 +44,5 @@ pub async fn test_whisper() -> Result<()> {
         println!()
     });
 
-    whisper.transcribe_stream(&file_name, tx).await
+    sound.transcribe_stream(&file_name, tx).await
 }

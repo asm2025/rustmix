@@ -2,7 +2,7 @@
 #![doc = include_str!("../README.md")]
 
 pub use futures_util::StreamExt as _;
-pub use kalosm_streams::timed_stream::*;
+pub use kalosm_streams::{text_stream::*, timed_stream::*};
 
 // #[cfg(feature = "language")]
 // pub mod language {

@@ -1,0 +1,66 @@
+[package]
+name = "rustmix"
+version = "0.1.0"
+edition = "2021"
+description = "rustmix is a Rust library that has some basic utility functions and components."
+authors = ["asm <asm2025@outlook.com>"]
+license = "MIT"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1"
+chrono = "0"
+crossbeam = { version = "0", optional = true }
+csv = "1"
+dotenv = "0"
+file-rotate = { version = "0", optional = true }
+futures = "0"
+html-entities = { version = "0", optional = true }
+lettre = { version = "0", optional = true }
+log = "0"
+log4rs = { version = "1", optional = true }
+once_cell = { version = "1", optional = true }
+pyo3 = { version = "0", features = ["auto-initialize", "abi3"], optional = true }
+rand = "0"
+rayon = { version = "1", optional = true }
+regex = { version = "1", optional = true }
+reqwest = { version = "0", features = ["blocking", "cookies", "json", "gzip", "deflate", "multipart", "socks", "stream"] }
+kalosm = { version = "0", workspace = true, default-features = false, optional = true }
+rodio = { version = "0", optional = true }
+image = { version = "0", optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+slog = { version = "2", optional = true }
+slog-async = { version = "2", optional = true }
+slog-scope = { version = "4", optional = true }
+slog-stdlog = { version = "4", optional = true }
+slog-term = { version = "2", optional = true }
+slog-json = { version = "2", optional = true }
+tokio = { version = "1", features = ["full"] }
+ua_generator = "0"
+url = { version = "2", features = ["serde"] }
+urlencoding = "2"
+
+[features]
+default = ["mail", "threading", "log-log4rs"]
+full = ["mail", "threading", "log-log4rs", "log-slog", "python", "audio", "vision"]
+llamacpp = ["kalosm/llamacpp"]
+metal = ["kalosm/metal"]
+cublas = ["kalosm/cublas"]
+mkl = ["kalosm/mkl"]
+# language = ["kalosm/language"]
+audio = ["kalosm/sound", "rodio"]
+vision = ["kalosm/vision", "image"]
+log-log4rs = ["log4rs"]
+log-slog = ["slog", "slog-async", "slog-scope", "slog-stdlog", "slog-term", "slog-json", "file-rotate"]
+mail = ["html-entities", "lettre", "once_cell", "regex"]
+python = ["pyo3"]
+threading = ["crossbeam", "rayon"]
+
+[package.metadata.scripts]
+run = "cargo run"
+check = "cargo check"
+build = "cargo build"
+release = "cargo build --release"
+features = "cargo tree --features" 

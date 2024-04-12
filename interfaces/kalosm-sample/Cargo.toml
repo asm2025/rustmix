@@ -14,7 +14,7 @@ rand = "0"
 anyhow = "1"
 tracing = "0"
 # llm = { git = "https://github.com/rustformers/llm", optional = true }
-candle-core.workspace = true
+candle-core = { workspace = true }
 tokenizers = { version = "0" }
 rustc-hash = "1"
 regex-automata = "0"

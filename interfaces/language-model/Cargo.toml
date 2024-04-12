@@ -26,15 +26,15 @@ async-openai = "0"
 async-trait = "0"
 serde_json = "1"
 tempfile = "3"
-candle-core.workspace = true
+candle-core = { workspace = true }
 tokio-util = { version = "0", features = ["rt"] }
 pin-project = "1"
 itertools = "0"
 tokenizers = { version = "0" }
 rustc-hash = "1"
 kalosm-sample = { workspace = true }
-kalosm-common.workspace = true
-kalosm-streams.workspace = true
+kalosm-common = { workspace = true }
+kalosm-streams = { workspace = true }
 # Required for LLM
 llm = { git = "https://github.com/rustformers/llm", optional = true }
 spinoff = "0"

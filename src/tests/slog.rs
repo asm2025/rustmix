@@ -1,6 +1,5 @@
 use anyhow::Result;
 use log::{debug, error, info, trace, warn};
-
 use rustmix::{io::path::AsPath, logging::slog};
 
 pub fn test_slog() -> Result<()> {
@@ -8,7 +7,7 @@ pub fn test_slog() -> Result<()> {
 
     println!("Building loggers from code...");
     let path = ("_logs", "test.log").as_path();
-    let _gaurd = slog::init(&path)?;
+    let _gaurd = slog::configure(&path)?;
     println!("Logger was built");
     println!("Logging messages...");
     error!("Messages configured logger programmatically:");

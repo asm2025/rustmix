@@ -9,9 +9,9 @@ authors = ["Evan Almloff"]
 keywords = ["ai", "ocr", "transformers"]
 
 [dependencies]
-candle-core.workspace = true
-candle-nn.workspace = true
-candle-transformers.workspace = true
+candle-core = { workspace = true }
+candle-nn = { workspace = true }
+candle-transformers = { workspace = true }
 tokenizers = { version = "0" }
 hf-hub = "0"
 

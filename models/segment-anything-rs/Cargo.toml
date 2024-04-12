@@ -9,9 +9,9 @@ authors = ["Evan Almloff"]
 keywords = ["ai", "segment-anything", "segmentation", "computer-vision"]
 
 [dependencies]
-candle-core.workspace = true
-candle-nn.workspace = true
-candle-transformers.workspace = true
+candle-core = { workspace = true }
+candle-nn = { workspace = true }
+candle-transformers = { workspace = true }
 tokenizers = { version = "0" }
 hf-hub = "0"
 

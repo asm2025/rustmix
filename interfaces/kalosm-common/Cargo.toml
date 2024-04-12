@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1"
-candle-core.workspace = true
+candle-core = { workspace = true }
 hf-hub = { version = "0" }
 reqwest = "0"
 tokio = { version = "1", features = ["full"] }
