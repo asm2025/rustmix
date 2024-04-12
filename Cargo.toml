@@ -106,7 +106,7 @@ codegen-units = 1
 opt-level = 3
 
 [features]
-default = ["mail", "threading", "log-log4rs"]#, "full"]
+default = ["mail", "threading", "log-log4rs", "full"]
 full = ["mail", "threading", "log-log4rs", "log-slog", "python", "audio", "vision"]
 llamacpp = ["kalosm?/llamacpp"]
 metal = ["kalosm?/metal"]

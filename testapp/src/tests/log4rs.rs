@@ -1,14 +1,27 @@
 use anyhow::Result;
 use log::{debug, error, info, trace, warn};
 
-use rustmix::{io::path::AsPath, logging::log4rs};
+use rustmix::{
+    io::{
+        directory,
+        path::{AsPath, PathExt},
+    },
+    logging::log4rs,
+};
 
 pub fn test_log4rs(from_config_file: bool) -> Result<()> {
     println!("\nTesting log4rs functions...");
 
     if from_config_file {
         println!("Building loggers from file...");
-        let path = ("test", "log", "log4rs.yaml").as_path();
+        let path = (
+            directory::current().as_str(),
+            "..",
+            "files",
+            "log",
+            "log4rs.yaml",
+        )
+            .as_full_path();
         log4rs::configure_from_file(&path)?;
         println!("Logger was built");
         log_a_few_messages("Messages configured logger from a yaml file:");

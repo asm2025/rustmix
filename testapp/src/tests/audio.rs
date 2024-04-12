@@ -1,23 +1,27 @@
 use anyhow::Result;
 use rustmix::{
     ai::sound::{Audio, Segment},
-    io::path::AsPath,
+    io::{
+        directory,
+        path::{AsPath, PathExt},
+    },
 };
 use std::io::Write;
 
 pub async fn test_sound() -> Result<()> {
     let sound = Audio::new().await?;
-    let file_name = ("test", "audio", "captcha", "fb1.mp3").as_path();
+    let curdir = (directory::current().as_str(), "..", "files", "audio").as_full_path();
+    let file_name = (curdir.as_str(), "captcha", "fb1.mp3").as_path();
     println!("Transcribing file [text]: {}", file_name);
     let result = sound.transcribe_file(&file_name).await?;
     println!("Sound transcription: {}", result);
 
-    let file_name = ("test", "audio", "captcha", "fb2.mp3").as_path();
+    let file_name = (curdir.as_str(), "captcha", "fb2.mp3").as_path();
     println!("Transcribing file [text]: {}", file_name);
     let result = sound.transcribe_file(&file_name).await?;
     println!("Sound transcription: {}", result);
 
-    let file_name = ("test", "audio", "listen1.mp3").as_path();
+    let file_name = (curdir.as_str(), "listen1.mp3").as_path();
     println!("Transcribing file [file_callback]: {}", file_name);
     print!("Sound transcription: ");
     std::io::stdout().flush().unwrap();
@@ -29,7 +33,7 @@ pub async fn test_sound() -> Result<()> {
         .await?;
     println!();
 
-    let file_name = ("test", "audio", "listen2.mp3").as_path();
+    let file_name = (curdir.as_str(), "listen2.mp3").as_path();
     println!("Transcribing file [stream]: {}", file_name);
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Segment>();
     tokio::spawn(async move {

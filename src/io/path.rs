@@ -8,14 +8,6 @@ pub trait PathExt {
     fn remove(&self, n: usize) -> PathBuf;
 }
 
-pub trait IntoPath<T> {
-    fn into_path(&self) -> PathBuf;
-}
-
-pub trait AsPath<T> {
-    fn as_path(&self) -> String;
-}
-
 impl<T: AsRef<Path>> PathExt for T {
     fn as_str(&self) -> &str {
         self.as_ref().to_str().unwrap_or_default()
@@ -51,10 +43,8 @@ impl<T: AsRef<Path>> PathExt for T {
     }
 }
 
-fn append_if_not_empty(path: &mut PathBuf, component: &str) {
-    if !component.is_empty() {
-        path.push(component);
-    }
+pub trait IntoPath<T> {
+    fn into_path(&self) -> PathBuf;
 }
 
 impl<T: AsRef<str>> IntoPath<T> for T {
@@ -137,10 +127,20 @@ impl<T: AsRef<str>> IntoPath<T> for Vec<T> {
     }
 }
 
+pub trait AsPath<T> {
+    fn as_path(&self) -> String;
+    fn as_full_path(&self) -> String;
+}
+
 impl<T: AsRef<str>> AsPath<T> for (T, T) {
     fn as_path(&self) -> String {
         let path = self.into_path();
         path.as_str().to_string()
+    }
+
+    fn as_full_path(&self) -> String {
+        let path = self.into_path();
+        path.canonicalize().unwrap().as_str().to_string()
     }
 }
 
@@ -149,12 +149,22 @@ impl<T: AsRef<str>> AsPath<T> for (T, T, T) {
         let path = self.into_path();
         path.as_str().to_string()
     }
+
+    fn as_full_path(&self) -> String {
+        let path = self.into_path();
+        path.canonicalize().unwrap().as_str().to_string()
+    }
 }
 
 impl<T: AsRef<str>> AsPath<T> for (T, T, T, T) {
     fn as_path(&self) -> String {
         let path = self.into_path();
         path.as_str().to_string()
+    }
+
+    fn as_full_path(&self) -> String {
+        let path = self.into_path();
+        path.canonicalize().unwrap().as_str().to_string()
     }
 }
 
@@ -163,6 +173,11 @@ impl<T: AsRef<str>> AsPath<T> for (T, T, T, T, T) {
         let path = self.into_path();
         path.as_str().to_string()
     }
+
+    fn as_full_path(&self) -> String {
+        let path = self.into_path();
+        path.canonicalize().unwrap().as_str().to_string()
+    }
 }
 
 impl<T: AsRef<str>, const N: usize> AsPath<T> for [T; N] {
@@ -170,12 +185,28 @@ impl<T: AsRef<str>, const N: usize> AsPath<T> for [T; N] {
         let path = self.into_path();
         path.as_str().to_string()
     }
+
+    fn as_full_path(&self) -> String {
+        let path = self.into_path();
+        path.canonicalize().unwrap().as_str().to_string()
+    }
 }
 
 impl<T: AsRef<str>> AsPath<T> for Vec<T> {
     fn as_path(&self) -> String {
         let path = self.into_path();
         path.as_str().to_string()
+    }
+
+    fn as_full_path(&self) -> String {
+        let path = self.into_path();
+        path.canonicalize().unwrap().as_str().to_string()
+    }
+}
+
+fn append_if_not_empty(path: &mut PathBuf, component: &str) {
+    if !component.is_empty() {
+        path.push(component);
     }
 }
 
