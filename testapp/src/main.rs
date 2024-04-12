@@ -34,7 +34,7 @@ async fn main() -> Result<()> {
 
     //tests::test_python()?;
 
-    tests::test_sound().await?;
+    //tests::test_sound().await?;
     //tests::test_image().await?;
 
     //tests::test_slog()?;
