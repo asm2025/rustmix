@@ -7,16 +7,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'rustmixapp'",
+            "name": "Debug executable 'testapp'",
             "cargo": {
-                "args": ["build", "--bin=rustmixapp"],
+                "args": ["build", "--bin=testapp"],
                 "filter": {
-                    "name": "rustmixapp",
+                    "name": "testapp",
                     "kind": "bin"
                 }
             },
             "args": [],
-            "cwd": "${workspaceFolder}"
+            "cwd": "${workspaceFolder}/testapp"
         },
         {
             "type": "lldb",
@@ -30,7 +30,7 @@
                 }
             },
             "args": [],
-            "cwd": "${workspaceFolder}/lib"
+            "cwd": "${workspaceFolder}"
         }
     ]
 }
