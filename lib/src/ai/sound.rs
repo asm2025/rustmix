@@ -6,17 +6,17 @@ use rodio::Decoder;
 use std::{fs::File, io::BufReader};
 use tokio::sync::mpsc::UnboundedSender;
 
-pub struct Sound {
+pub struct Audio {
     model: Whisper,
 }
 
-impl Sound {
+impl Audio {
     pub async fn new() -> Result<Self> {
         let model = WhisperBuilder::default()
             .with_language(Some(WhisperLanguage::English))
             .build()
             .await?;
-        Ok(Sound { model })
+        Ok(Audio { model })
     }
 
     pub async fn with(source: WhisperSource, language: WhisperLanguage) -> Result<Self> {
@@ -25,7 +25,7 @@ impl Sound {
             .with_language(Some(language))
             .build()
             .await?;
-        Ok(Sound { model })
+        Ok(Audio { model })
     }
 
     pub async fn transcribe_file(&self, file_name: &str) -> Result<String> {

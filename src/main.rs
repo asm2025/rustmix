@@ -5,7 +5,12 @@ mod tests;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // **** Make sure the feature is enabled in Cargo.toml before tsting ****
+    /*
+     **** Make sure the feature is enabled in Cargo.toml before tsting ****
+     Once logging is initialized, it cannot be reinitialized.
+     Therefore, to test configuring log from a configuration file and code at the same time is not possible.
+     It has to be done seperately.
+    */
     dotenv::dotenv().ok();
 
     //tests::test_path()?;
@@ -27,16 +32,11 @@ async fn main() -> Result<()> {
     //tests::test_parallel(Duration::ZERO).await?;
     //tests::test_parallel(Duration::from_millis(150)).await?;
 
-    //tests::test_python();
+    //tests::test_python()?;
 
     //tests::test_sound().await?;
     //tests::test_image().await?;
 
-    /*
-     Once logging is initialized, it cannot be reinitialized.
-     Therefore, to test configuring log from a configuration file and code at the same time is not possible.
-     It has to be done seperately.
-    */
     //tests::test_slog()?;
     //tests::test_log4rs(true)?;
     //tests::test_log4rs(false)?;

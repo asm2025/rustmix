@@ -1,12 +1,12 @@
 use anyhow::Result;
 use rustmix::{
-    ai::{Segment, Sound},
+    ai::sound::{Audio, Segment},
     io::path::AsPath,
 };
 use std::io::Write;
 
 pub async fn test_sound() -> Result<()> {
-    let sound = Sound::new().await?;
+    let sound = Audio::new().await?;
     let file_name = ("test", "audio", "captcha", "fb1.mp3").as_path();
     println!("Transcribing file [text]: {}", file_name);
     let result = sound.transcribe_file(&file_name).await?;
