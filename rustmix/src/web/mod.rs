@@ -1,14 +1,11 @@
 use reqwest::header;
-use ua_generator::ua;
+
+use crate::random::internet;
 
 mod http;
 pub use self::http::*;
 mod url;
 pub use self::url::*;
-
-pub fn get_user_agent() -> String {
-    ua::spoof_ua().to_owned()
-}
 
 pub fn build_client() -> reqwest::ClientBuilder {
     reqwest::Client::builder()
