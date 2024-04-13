@@ -73,5 +73,42 @@ pub fn test_random() {
     println!("time: {:?}", random::datetime::time());
     println!("duration: {:?}", random::datetime::duration());
 
+    println!("dir_path: {}", random::filesystem::dir_path());
+    println!("file_path: {}", random::filesystem::file_path());
+    println!("file_name: {}", random::filesystem::file_name());
+    println!("file_extension: {}", random::filesystem::file_extension());
+
+    println!("status_code: {}", random::internet::status_code());
+    println!(
+        "valid_status_code: {}",
+        random::internet::valid_status_code()
+    );
+    println!("mime_type: {}", random::internet::mime_type());
+    println!("free_email: {}", random::internet::free_email());
+    println!("safe_email: {}", random::internet::safe_email());
+    println!(
+        "free_email_provider: {}",
+        random::internet::free_email_provider()
+    );
+    println!("domain_suffix: {}", random::internet::domain_suffix());
+    println!("username: {}", random::internet::username());
+    println!("password: {}", random::internet::password(8..64));
+    println!("ipv4: {}", random::internet::ipv4());
+    println!("ipv6: {}", random::internet::ipv6());
+    println!("ip: {}", random::internet::ip());
+    println!("mac_address: {}", random::internet::mac_address());
+    println!("user_agent: {}", random::internet::user_agent());
+    println!(
+        "chrome_user_agent: {}",
+        random::internet::chrome_user_agent()
+    );
+    println!("edge_user_agent: {}", random::internet::edge_user_agent());
+    println!("opera_user_agent: {}", random::internet::opera_user_agent());
+    println!(
+        "safari_user_agent: {}",
+        random::internet::safari_user_agent()
+    );
+    println!("ie_user_agent: {}", random::internet::ie_user_agent());
+
     println!("word: {}", random::lorem::word());
 }
