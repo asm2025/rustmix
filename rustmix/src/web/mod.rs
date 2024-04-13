@@ -1,6 +1,6 @@
 use reqwest::header;
 
-use crate::random::internet;
+use crate::random::internet::user_agent;
 
 mod http;
 pub use self::http::*;
@@ -22,7 +22,7 @@ pub fn build_client() -> reqwest::ClientBuilder {
             );
             headers
         })
-        .user_agent(get_user_agent())
+        .user_agent(user_agent())
         .cookie_store(true)
         .pool_max_idle_per_host(0)
         .timeout(std::time::Duration::from_secs(30))
@@ -43,7 +43,7 @@ pub fn build_blocking_client() -> reqwest::blocking::ClientBuilder {
             );
             headers
         })
-        .user_agent(get_user_agent())
+        .user_agent(user_agent())
         .cookie_store(true)
         .pool_max_idle_per_host(0)
         .timeout(std::time::Duration::from_secs(30))

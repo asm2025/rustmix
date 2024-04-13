@@ -2422,6 +2422,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fake_user_agent"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb698e419e0a497f072b9e58745448030989cba891478f9b523a39088b216ea8"
+dependencies = [
+ "fastrand 2.0.2",
+]
+
+[[package]]
 name = "fancy-regex"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7143,13 +7152,13 @@ name = "rustmix"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bitflags 2.5.0",
  "chrono",
  "crossbeam",
  "csv",
  "dotenv",
  "fake",
  "fake-useragent",
+ "fake_user_agent",
  "file-rotate",
  "futures 0.3.30",
  "html-entities",
@@ -7173,6 +7182,7 @@ dependencies = [
  "slog-scope",
  "slog-stdlog",
  "slog-term",
+ "time 0.3.36",
  "tokio 1.37.0",
  "url 2.5.0",
  "urlencoding",
@@ -8528,6 +8538,7 @@ name = "testapp"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "dotenv",
  "image",
  "log",

@@ -1,5 +1,3 @@
-pub const SPECIAL_CHARS: [char; 10] = ['!', '@', '#', '$', '%', '^', '&', '*', '(', ')'];
-
 pub trait StringEx {
     fn trim(&self, ch: &char) -> &str;
     fn trim_start(&self, ch: &char) -> &str;

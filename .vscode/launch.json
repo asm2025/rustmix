@@ -16,7 +16,7 @@
                 }
             },
             "args": [],
-            "cwd": "${workspaceFolder}/testapp"
+            "cwd": "${workspaceFolder}"
         },
         {
             "type": "lldb",
@@ -30,7 +30,7 @@
                 }
             },
             "args": [],
-            "cwd": "${workspaceFolder}"
+            "cwd": "${workspaceFolder}/rustmix"
         }
     ]
 }
