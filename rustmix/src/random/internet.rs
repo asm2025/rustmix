@@ -5,6 +5,7 @@ use fake::{
 use fake_user_agent;
 use fake_useragent::UserAgentsBuilder;
 pub use fake_useragent::{Browsers, UserAgents};
+use num_cpus;
 use std::ops::Range;
 
 pub fn status_code() -> String {
@@ -87,10 +88,11 @@ pub fn ie_user_agent() -> String {
     fake_user_agent::get_ie_rua().to_owned()
 }
 
-pub fn build_user_agents(browsers: Option<Browsers>) -> UserAgents {
+pub fn build_user_agents(browsers: Option<Browsers>, threads: Option<u32>) -> UserAgents {
+    let threads = threads.unwrap_or(num_cpus::get() as u32);
     UserAgentsBuilder::new()
         .cache(true)
-        .thread(2)
+        .thread(threads)
         .set_browsers(browsers.unwrap_or(Browsers::new()))
         .build()
 }

@@ -110,5 +110,26 @@ pub fn test_random() {
     );
     println!("ie_user_agent: {}", random::internet::ie_user_agent());
 
+    let browsers = random::internet::Browsers::new()
+        .set_opera()
+        .set_safari()
+        .set_internet_explorer();
+    let user_agents = random::internet::build_user_agents(Some(browsers), None);
+    println!("user_agent: {}", user_agents.random());
+
     println!("word: {}", random::lorem::word());
+    println!("words: {}", random::lorem::words(1..10).join(", "));
+    println!("sentence: {}", random::lorem::sentence(1..10));
+    println!("sentences: {}", random::lorem::sentences(1..10).join("\n"));
+    println!("paragraph: {}", random::lorem::paragraph(1..10));
+    println!(
+        "paragraphs: {}",
+        random::lorem::paragraphs(1..10).join("\n")
+    );
+
+    println!("name: {}", random::person::name());
+    println!("first_name: {}", random::person::first_name());
+    println!("last_name: {}", random::person::last_name());
+    println!("suffix: {}", random::person::suffix());
+    println!("title: {}", random::person::title());
 }

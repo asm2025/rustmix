@@ -7167,6 +7167,7 @@ dependencies = [
  "lettre",
  "log",
  "log4rs",
+ "num_cpus",
  "once_cell",
  "pyo3",
  "rand 0.8.5",
