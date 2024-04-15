@@ -4,7 +4,7 @@ use log::{debug, error, info, trace, warn};
 use rustmix::{
     io::{
         directory,
-        path::{AsPath, PathExt},
+        path::{AsPath, PathEx},
     },
     logging::log4rs,
 };

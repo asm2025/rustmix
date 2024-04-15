@@ -3,7 +3,7 @@ use rustmix::{
     ai::sound::{Audio, Segment},
     io::{
         directory,
-        path::{AsPath, PathExt},
+        path::{AsPath, PathEx},
     },
 };
 use std::io::Write;

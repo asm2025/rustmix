@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-pub trait PathExt {
+pub trait PathEx {
     fn as_str(&self) -> &str;
     fn exists(&self) -> bool;
     fn is_empty(&self) -> bool;
@@ -8,7 +8,7 @@ pub trait PathExt {
     fn remove(&self, n: usize) -> PathBuf;
 }
 
-impl<T: AsRef<Path>> PathExt for T {
+impl<T: AsRef<Path>> PathEx for T {
     fn as_str(&self) -> &str {
         self.as_ref().to_str().unwrap_or_default()
     }

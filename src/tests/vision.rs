@@ -4,7 +4,7 @@ use rustmix::{
     ai::vision::Image,
     io::{
         directory,
-        path::{AsPath, PathExt},
+        path::{AsPath, PathEx},
     },
     string::StringEx,
 };

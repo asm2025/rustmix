@@ -3,7 +3,7 @@ use rand::{distributions::Alphanumeric, Rng};
 use rustmix::io::{
     directory,
     file::{self, FileEx},
-    path::{self, IntoPath, PathExt},
+    path::{self, IntoPath, PathEx},
 };
 use std::{
     io::{stdin, LineWriter, Write},
