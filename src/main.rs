@@ -13,6 +13,8 @@ async fn main() -> Result<()> {
     */
     dotenv::dotenv().ok();
 
+    //tests::test_app_info();
+
     //tests::test_random();
 
     //tests::test_path()?;
@@ -44,8 +46,6 @@ async fn main() -> Result<()> {
     //tests::test_slog()?;
     //tests::test_log4rs(true)?;
     //tests::test_log4rs(false)?;
-
-    //tests::test_app_info();
 
     Ok(())
 }
