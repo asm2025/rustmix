@@ -1,6 +1,6 @@
-extern crate reqwest as xreqwest;
+extern crate reqwest as _reqwest;
 
-pub use xreqwest::*;
+pub use _reqwest::*;
 
 use crate::random::internet::user_agent;
 
@@ -31,8 +31,8 @@ fn build_default_api_headers() -> header::HeaderMap {
     headers
 }
 
-pub fn build_client() -> xreqwest::ClientBuilder {
-    xreqwest::Client::builder()
+pub fn build_client() -> _reqwest::ClientBuilder {
+    _reqwest::Client::builder()
         .default_headers(build_default_headers())
         .user_agent(user_agent())
         .cookie_store(true)
@@ -40,8 +40,8 @@ pub fn build_client() -> xreqwest::ClientBuilder {
         .timeout(std::time::Duration::from_secs(30))
 }
 
-pub fn build_blocking_client() -> xreqwest::blocking::ClientBuilder {
-    xreqwest::blocking::Client::builder()
+pub fn build_blocking_client() -> _reqwest::blocking::ClientBuilder {
+    _reqwest::blocking::Client::builder()
         .default_headers(build_default_headers())
         .user_agent(user_agent())
         .cookie_store(true)
@@ -49,24 +49,24 @@ pub fn build_blocking_client() -> xreqwest::blocking::ClientBuilder {
         .timeout(std::time::Duration::from_secs(30))
 }
 
-pub fn build_client_with_headers(headers: header::HeaderMap) -> xreqwest::ClientBuilder {
+pub fn build_client_with_headers(headers: header::HeaderMap) -> _reqwest::ClientBuilder {
     let builder = build_client();
     builder.default_headers(headers)
 }
 
 pub fn build_blocking_client_with_headers(
     headers: header::HeaderMap,
-) -> xreqwest::blocking::ClientBuilder {
+) -> _reqwest::blocking::ClientBuilder {
     let builder = build_blocking_client();
     builder.default_headers(headers)
 }
 
-pub fn build_client_for_api() -> xreqwest::ClientBuilder {
+pub fn build_client_for_api() -> _reqwest::ClientBuilder {
     let builder = build_client();
     builder.default_headers(build_default_api_headers())
 }
 
-pub fn build_blocking_client_for_api() -> xreqwest::blocking::ClientBuilder {
+pub fn build_blocking_client_for_api() -> _reqwest::blocking::ClientBuilder {
     let builder = build_blocking_client();
     builder.default_headers(build_default_api_headers())
 }

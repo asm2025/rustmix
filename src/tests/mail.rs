@@ -1,7 +1,7 @@
 use anyhow::Result;
 use rustmix::{
     date::{parse_date_any, DATE_FORMAT, DATE_TIME_FORMAT},
-    mail::{TempMail, TempMailProvider},
+    web::mail::{TempMail, TempMailProvider},
 };
 
 use super::*;

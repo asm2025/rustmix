@@ -11,8 +11,6 @@ pub use self::app::*;
 pub mod date;
 pub mod error;
 pub mod io;
-#[cfg(feature = "mail")]
-pub mod mail;
 #[cfg(feature = "python")]
 pub mod python;
 pub mod random;

@@ -1,5 +1,7 @@
 #[cfg(feature = "hyper")]
 pub mod hyper;
+#[cfg(feature = "mail")]
+pub mod mail;
 pub mod reqwest;
 
 use anyhow::Result;
