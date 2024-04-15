@@ -7129,6 +7129,7 @@ dependencies = [
  "file-rotate",
  "futures 0.3.30",
  "html-entities",
+ "hyper 1.2.0",
  "image",
  "kalosm",
  "lettre",

@@ -1,5 +1,6 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use rustmix::web::*;
+use serde_json::Value;
 use std::collections::HashMap;
 
 use super::{get_employees, Employee};
@@ -25,39 +26,27 @@ pub async fn test_reqwest() -> Result<()> {
     println!("\nTesting reqwest functions...");
     println!("baseUrl: {BASE_URL}");
 
-    let client = build_client().build()?;
+    let client = reqwest::build_client().build()?;
 
     let url = (BASE_URL, "get?p1=foo&p2=baz").as_url()?;
     println!("Get: '{url}'");
     let response = client.get(url).send().await?;
     println!("response: {response:#?}");
-    println!("json: {:#?}", response.json::<Response>().await?);
+    println!("json: {:#?}", response.json::<Value>().await?);
 
     let url = (BASE_URL, "post").as_url()?;
     let body = get_employees(3);
     println!("Post: '{url}'");
-    let response = client
-        .post(url)
-        .json(&body)
-        .send()
-        .await?
-        .json::<Response>()
-        .await?;
-    println!("response: {response:#?}");
-
-    if let Some(data) = response.data {
-        let employees: Vec<Employee> = serde_json::from_str(&data)?;
-        println!("employees: {:#?}", employees);
-    }
+    let response: Value = client.post(url).json(&body).send().await?.json().await?;
+    let data = response["data"]
+        .as_str()
+        .ok_or(anyhow!("data field is not a string"))?;
+    let employees: Vec<Employee> = serde_json::from_str(data)?;
+    println!("employees: {:#?}", employees);
 
     let url = (BASE_URL, "ip").as_url()?;
     println!("IP: '{url}'");
-    let response = client
-        .get(url)
-        .send()
-        .await?
-        .json::<HashMap<String, String>>()
-        .await?;
+    let response: HashMap<String, String> = client.get(url).send().await?.json().await?;
     println!("response: {response:#?}");
 
     let url = (BASE_URL, "cookies/set?freeform=test&ff=12345").as_url()?;
@@ -66,7 +55,7 @@ pub async fn test_reqwest() -> Result<()> {
         .get(url)
         .send()
         .await?
-        .json::<Response>()
+        .json::<Value>()
         //.text()
         .await?;
     println!("response: {response:#?}");
@@ -80,24 +69,23 @@ pub fn test_blocking_reqwest() -> Result<()> {
     println!("\nTesting blocking reqwest functions...");
     println!("baseUrl: {BASE_URL}");
 
-    let client = build_blocking_client().build()?;
+    let client = reqwest::build_blocking_client().build()?;
 
     let url = (BASE_URL, "get?p1=foo&p2=baz").as_url()?;
     println!("Get: '{url}'");
     let response = client.get(url).send()?;
     println!("response: {response:#?}");
-    println!("json: {:#?}", response.json::<Response>()?);
+    println!("json: {:#?}", response.json::<Value>()?);
 
     let url = (BASE_URL, "post").as_url()?;
     let body = get_employees(3);
     println!("Post: '{url}'");
-    let response = client.post(url).json(&body).send()?.json::<Response>()?;
-    println!("response: {response:#?}");
-
-    if let Some(data) = response.data {
-        let employees: Vec<Employee> = serde_json::from_str(&data)?;
-        println!("employees: {:#?}", employees);
-    }
+    let response: Value = client.post(url).json(&body).send()?.json()?;
+    let data = response["data"]
+        .as_str()
+        .ok_or(anyhow!("data field is not a string"))?;
+    let employees: Vec<Employee> = serde_json::from_str(data)?;
+    println!("employees: {:#?}", employees);
 
     let url = (BASE_URL, "ip").as_url()?;
     println!("IP: '{url}'");
@@ -106,7 +94,7 @@ pub fn test_blocking_reqwest() -> Result<()> {
 
     let url = (BASE_URL, "cookies/set?freeform=test&ff=12345").as_url()?;
     println!("Cookies: '{url}'");
-    let response = client.get(url).send()?.json::<Response>()?;
+    let response = client.get(url).send()?.json::<Value>()?;
     println!("response: {response:#?}");
 
     Ok(())

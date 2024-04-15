@@ -1,14 +1,3 @@
-use anyhow::{anyhow, Result};
-use futures::Future;
-use std::{fmt, sync::Arc, time::Instant};
-use tokio::{
-    select,
-    sync::Notify,
-    time::{sleep, Duration},
-};
-
-use super::error;
-
 mod cond;
 pub use self::cond::*;
 mod consumer;
@@ -19,6 +8,17 @@ mod parallel_consumer;
 pub use self::parallel_consumer::*;
 mod producer_consumer;
 pub use self::producer_consumer::*;
+
+use anyhow::{anyhow, Result};
+use futures::Future;
+use std::{fmt, sync::Arc, time::Instant};
+use tokio::{
+    select,
+    sync::Notify,
+    time::{sleep, Duration},
+};
+
+use super::error;
 
 const CAPACITY_DEF: usize = 0;
 const THREADS_DEF: usize = 1;

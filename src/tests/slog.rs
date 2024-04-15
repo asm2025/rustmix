@@ -1,6 +1,6 @@
 use anyhow::Result;
 use log::{debug, error, info, trace, warn};
-use rustmix::{io::path::AsPath, logging::slog};
+use rustmix::{io::path::AsPath, slog};
 
 pub fn test_slog() -> Result<()> {
     println!("\nTesting slog functions...");

@@ -1,6 +1,3 @@
-use fake::{faker::boolean::raw as f_boolean, locales, uuid, Fake};
-use rand::{thread_rng, Rng};
-
 pub mod address;
 pub mod automotive;
 pub mod barcode;
@@ -11,6 +8,9 @@ pub mod filesystem;
 pub mod internet;
 pub mod lorem;
 pub mod person;
+
+use fake::{faker::boolean::raw as f_boolean, locales, uuid, Fake};
+use rand::{thread_rng, Rng};
 
 pub enum UuidVersion {
     V1,

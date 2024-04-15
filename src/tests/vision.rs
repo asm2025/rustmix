@@ -1,12 +1,12 @@
 use anyhow::Result;
 use image::ImageFormat;
 use rustmix::{
-    ai::vision::Image,
     io::{
         directory,
         path::{AsPath, PathEx},
     },
     string::StringEx,
+    vision::Image,
 };
 use std::path::MAIN_SEPARATOR;
 

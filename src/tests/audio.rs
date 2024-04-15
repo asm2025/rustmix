@@ -1,10 +1,10 @@
 use anyhow::Result;
 use rustmix::{
-    ai::sound::{Audio, Segment},
     io::{
         directory,
         path::{AsPath, PathEx},
     },
+    sound::{Audio, Segment},
 };
 use std::io::Write;
 

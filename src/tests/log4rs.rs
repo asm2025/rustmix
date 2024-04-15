@@ -6,7 +6,7 @@ use rustmix::{
         directory,
         path::{AsPath, PathEx},
     },
-    logging::log4rs,
+    log4rs,
 };
 
 pub fn test_log4rs(from_config_file: bool) -> Result<()> {

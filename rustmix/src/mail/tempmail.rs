@@ -10,7 +10,7 @@ use std::fmt::{Display, Result as DisplayResult};
 use crate::{
     date::{parse_date, parse_date_ftz, utc_today},
     random,
-    web::build_client_for_api,
+    web::reqwest::build_client_for_api,
 };
 
 const URL_TEMP_MAIL: &str = "https://api.internal.temp-mail.io/api/v3/";
