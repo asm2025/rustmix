@@ -1,11 +1,11 @@
 use anyhow::{anyhow, Result};
 use chrono::Local;
-use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit, FileRotate};
-use slog::{o, Drain, FnValue, Logger, OwnedKVList, Record};
-use slog_async::Async;
-use slog_json::Json;
-use slog_scope::GlobalLoggerGuard;
-use slog_term::{Decorator, PlainSyncDecorator};
+pub use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit, FileRotate};
+pub use slog::{o, Drain, FnValue, Logger, OwnedKVList, Record};
+pub use slog_async::Async;
+pub use slog_json::Json;
+pub use slog_scope::GlobalLoggerGuard;
+pub use slog_term::{Decorator, PlainSyncDecorator};
 use std::io;
 
 use super::{LogLevel, LOG_DATE_FORMAT, LOG_SIZE_MAX, LOG_SIZE_MIN};
@@ -24,7 +24,7 @@ impl From<LogLevel> for slog::Level {
     }
 }
 
-struct CustomDecorator<D: Decorator> {
+pub struct CustomDecorator<D: Decorator> {
     decorator: D,
 }
 

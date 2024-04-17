@@ -1,24 +1,15 @@
 use anyhow::{anyhow, Result};
-use log4rs::{
-    append::{
-        console::ConsoleAppender,
-        rolling_file::{
-            policy::compound::{
-                roll::fixed_window::FixedWindowRoller, trigger::size::SizeTrigger, CompoundPolicy,
-            },
-            RollingFileAppender,
-        },
-    },
-    config::{Appender, Config, Logger, Root},
-    encode::pattern::PatternEncoder,
-    Handle,
-};
+pub use log4rs::*;
 use std::path::{PathBuf, MAIN_SEPARATOR};
 
 use super::{LogLevel, LOG_DATE_FORMAT, LOG_SIZE_MAX, LOG_SIZE_MIN};
 use crate::string::StringEx;
 
-pub fn configure(file_name: &str, level: LogLevel, limit: Option<usize>) -> Result<Config> {
+pub fn configure(
+    file_name: &str,
+    level: LogLevel,
+    limit: Option<usize>,
+) -> Result<config::runtime::ConfigBuilder> {
     if file_name.is_empty() {
         return Err(anyhow!("File name is empty"));
     }
@@ -31,43 +22,43 @@ pub fn configure(file_name: &str, level: LogLevel, limit: Option<usize>) -> Resu
     let base_name = path.file_stem().unwrap().to_str().unwrap().to_string();
     let extension = path.extension().unwrap().to_str().unwrap().to_string();
     let roller_pattern = format!("{}{}.{{}}.old.{}", folder, base_name, extension);
-    let console = ConsoleAppender::builder()
-        .encoder(Box::new(PatternEncoder::new("{l:5.5}| {M} | {m}{n}")))
+    let console = append::console::ConsoleAppender::builder()
+        .encoder(Box::new(encode::pattern::PatternEncoder::new(
+            "{l:5.5}| {M} | {m}{n}",
+        )))
         .build();
-    let size_trigger = SizeTrigger::new(
+    let size_trigger = append::rolling_file::policy::compound::trigger::size::SizeTrigger::new(
         limit
             .unwrap_or(LOG_SIZE_MAX)
             .clamp(LOG_SIZE_MIN, LOG_SIZE_MAX) as u64,
     );
-    let fix_window_roller = FixedWindowRoller::builder().build(&roller_pattern, 6)?;
-    let policy = CompoundPolicy::new(Box::new(size_trigger), Box::new(fix_window_roller));
-    let file = RollingFileAppender::builder()
-        .encoder(Box::new(PatternEncoder::new(&format!(
+    let fix_window_roller =
+        append::rolling_file::policy::compound::roll::fixed_window::FixedWindowRoller::builder()
+            .build(&roller_pattern, 6)?;
+    let policy = append::rolling_file::policy::compound::CompoundPolicy::new(
+        Box::new(size_trigger),
+        Box::new(fix_window_roller),
+    );
+    let file = append::rolling_file::RollingFileAppender::builder()
+        .encoder(Box::new(encode::pattern::PatternEncoder::new(&format!(
             "{{d({})}} | {{l:5.5}} | {{M}} | {{m}}{{D( | {{f}}:{{L}})}}{{n}}",
             LOG_DATE_FORMAT
         ))))
         .append(true)
         .build(file_name, Box::new(policy))?;
     let config = Config::builder()
-        .appender(Appender::builder().build("console", Box::new(console)))
-        .appender(Appender::builder().build("file", Box::new(file)))
+        .appender(config::Appender::builder().build("console", Box::new(console)))
+        .appender(config::Appender::builder().build("file", Box::new(file)))
         .logger(
-            Logger::builder()
+            config::Logger::builder()
                 .appender("console")
                 .build("console", level.into()),
         )
         .logger(
-            Logger::builder()
+            config::Logger::builder()
                 .appender("file")
                 .build("file", level.into()),
-        )
-        .build(
-            Root::builder()
-                .appender("console")
-                .appender("file")
-                .build(level.into()),
-        )?;
-
+        );
     Ok(config)
 }
 
@@ -80,7 +71,12 @@ pub fn build(file_name: &str) -> Result<Handle> {
 }
 
 pub fn build_with(file_name: &str, level: LogLevel, limit: Option<usize>) -> Result<Handle> {
-    let config = configure(file_name, level, limit)?;
+    let config = configure(file_name, level, limit)?.build(
+        config::Root::builder()
+            .appender("console")
+            .appender("file")
+            .build(level.into()),
+    )?;
     log4rs::init_config(config).map_err(Into::into)
 }
 
