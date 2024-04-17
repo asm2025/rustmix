@@ -31,7 +31,7 @@ pyo3 = { version = "0", features = ["auto-initialize", "abi3"], optional = true 
 rand = "0"
 rayon = { version = "1", optional = true }
 regex = { version = "1", optional = true }
-reqwest = { version = "0", features = ["blocking", "cookies", "json", "gzip", "deflate", "multipart", "socks", "stream"] }
+reqwest = { version = "0", features = ["blocking", "cookies", "json", "gzip", "deflate", "multipart"] }
 rodio = { version = "0", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

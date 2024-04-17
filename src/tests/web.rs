@@ -60,6 +60,17 @@ pub async fn test_reqwest() -> Result<()> {
         .await?;
     println!("response: {response:#?}");
 
+    let url = "https://mbasic.facebook.com/reg/?cid=103&refsrc=deprecated&_rdr".as_url()?;
+    println!("Response: '{url}'");
+    let response = client
+        .post(url)
+        .header(reqwest::header::ACCEPT, "text/html; charset=utf-8")
+        .send()
+        .await?
+        .text()
+        .await?;
+    println!("response: {response:#?}");
+
     Ok(())
 }
 
@@ -95,6 +106,17 @@ pub fn test_blocking_reqwest() -> Result<()> {
     let url = (BASE_URL, "cookies/set?freeform=test&ff=12345").as_url()?;
     println!("Cookies: '{url}'");
     let response = client.get(url).send()?.json::<Value>()?;
+    println!("response: {response:#?}");
+
+    let url = "https://mbasic.facebook.com/reg/?cid=103&refsrc=deprecated&_rdr".as_url()?;
+    println!("Response: '{url}'");
+    let response = client
+        .post(url)
+        .header(reqwest::header::ACCEPT, "text/html; charset=utf-8")
+        .send()
+        .unwrap()
+        .text()
+        .unwrap();
     println!("response: {response:#?}");
 
     Ok(())
