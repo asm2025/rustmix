@@ -71,6 +71,10 @@ pub fn configure(file_name: &str, level: LogLevel, limit: Option<usize>) -> Resu
     Ok(config)
 }
 
+pub fn from_config(config: Config) -> Result<Handle> {
+    log4rs::init_config(config).map_err(Into::into)
+}
+
 pub fn build(file_name: &str) -> Result<Handle> {
     build_with(file_name, LogLevel::Info, None)
 }
@@ -80,7 +84,7 @@ pub fn build_with(file_name: &str, level: LogLevel, limit: Option<usize>) -> Res
     log4rs::init_config(config).map_err(Into::into)
 }
 
-pub fn build_from_file(yaml_file_name: &str) -> Result<()> {
+pub fn from_file(yaml_file_name: &str) -> Result<()> {
     if yaml_file_name.is_empty() {
         return Err(anyhow!("File name is empty"));
     }
