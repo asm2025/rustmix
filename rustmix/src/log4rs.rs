@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use log4rs::{
     append::{
         console::ConsoleAppender,
@@ -18,13 +18,9 @@ use std::path::{PathBuf, MAIN_SEPARATOR};
 use super::{LogLevel, LOG_DATE_FORMAT, LOG_SIZE_MAX, LOG_SIZE_MIN};
 use crate::string::StringEx;
 
-pub fn configure(file_name: &str) -> Result<Handle> {
-    configure_with(file_name, LogLevel::Info, None)
-}
-
-pub fn configure_with(file_name: &str, level: LogLevel, limit: Option<usize>) -> Result<Handle> {
+pub fn configure(file_name: &str, level: LogLevel, limit: Option<usize>) -> Result<Config> {
     if file_name.is_empty() {
-        panic!("File name is empty");
+        return Err(anyhow!("File name is empty"));
     }
 
     let path = PathBuf::from(file_name);
@@ -71,12 +67,22 @@ pub fn configure_with(file_name: &str, level: LogLevel, limit: Option<usize>) ->
                 .appender("file")
                 .build(level.into()),
         )?;
+
+    Ok(config)
+}
+
+pub fn build(file_name: &str) -> Result<Handle> {
+    build_with(file_name, LogLevel::Info, None)
+}
+
+pub fn build_with(file_name: &str, level: LogLevel, limit: Option<usize>) -> Result<Handle> {
+    let config = configure(file_name, level, limit)?;
     log4rs::init_config(config).map_err(Into::into)
 }
 
-pub fn configure_from_file(yaml_file_name: &str) -> Result<()> {
+pub fn build_from_file(yaml_file_name: &str) -> Result<()> {
     if yaml_file_name.is_empty() {
-        panic!("File name is empty");
+        return Err(anyhow!("File name is empty"));
     }
 
     log4rs::init_file(yaml_file_name, Default::default()).map_err(Into::into)

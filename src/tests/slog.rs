@@ -7,7 +7,7 @@ pub fn test_slog() -> Result<()> {
 
     println!("Building loggers from code...");
     let path = ("_logs", "test.log").as_path();
-    let _gaurd = slog::configure(&path)?;
+    let _gaurd = slog::build(&path)?;
     println!("Logger was built");
     println!("Logging messages...");
     error!("Messages configured logger programmatically:");

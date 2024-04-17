@@ -22,14 +22,14 @@ pub fn test_log4rs(from_config_file: bool) -> Result<()> {
             "log4rs.yaml",
         )
             .as_full_path();
-        log4rs::configure_from_file(&path)?;
+        log4rs::build_from_file(&path)?;
         println!("Logger was built");
         log_a_few_messages("Messages configured logger from a yaml file:");
         println!("Check the log file at: {}", &path);
     } else {
         println!("Building loggers from code...");
         let path = ("_logs", "test.log").as_path();
-        log4rs::configure(&path)?;
+        log4rs::build(&path)?;
         println!("Logger was built");
         log_a_few_messages("Messages configured logger programmatically:");
         println!("Check the log file at: {}", &path);

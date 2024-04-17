@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use chrono::Local;
 use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit, FileRotate};
 use slog::{o, Drain, FnValue, Logger, OwnedKVList, Record};
@@ -45,17 +45,17 @@ impl<D: Decorator> Drain for CustomDecorator<D> {
     }
 }
 
-pub fn configure(file_name: &str) -> Result<GlobalLoggerGuard> {
-    configure_with(file_name, LogLevel::Info, None)
+pub fn build(file_name: &str) -> Result<GlobalLoggerGuard> {
+    build_with(file_name, LogLevel::Info, None)
 }
 
-pub fn configure_with(
+pub fn build_with(
     file_name: &str,
     level: LogLevel,
     limit: Option<usize>,
 ) -> Result<GlobalLoggerGuard> {
     if file_name.is_empty() {
-        panic!("File name is empty");
+        return Err(anyhow!("File name is empty"));
     }
 
     let decorator = PlainSyncDecorator::new(io::stdout());
