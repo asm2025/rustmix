@@ -11,7 +11,7 @@ pub use self::producer_consumer::*;
 
 use anyhow::{anyhow, Result};
 use futures::Future;
-use std::{fmt, sync::Arc, time::Instant};
+use std::{fmt, pin::Pin, sync::Arc};
 use tokio::{
     select,
     sync::Notify,
@@ -33,7 +33,7 @@ const PEEK_TIMEOUT_MAX: Duration = Duration::from_secs(5);
 const PAUSE_TIMEOUT_DEF: Duration = Duration::from_millis(50);
 const PAUSE_TIMEOUT_MIN: Duration = Duration::from_millis(10);
 const PAUSE_TIMEOUT_MAX: Duration = Duration::from_secs(5);
-const SELECT_TIMEOUT: Duration = Duration::from_secs(60);
+const SELECT_TIMEOUT: Duration = Duration::from_millis(10);
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TaskResult {
@@ -97,41 +97,24 @@ pub trait AwaitableConsumer {
     fn is_finished(&self) -> bool;
 }
 
-fn wait(this: &impl AwaitableConsumer, finished: &Arc<Mutcond>) -> Result<()> {
-    if this.is_cancelled() {
-        return Err(anyhow!(error::CancelledError));
-    }
-
-    if this.is_finished() {
-        return Ok(());
-    }
-
+fn wait<T: AwaitableConsumer>(this: &T, finished: &Arc<Mutcond>) -> Result<()> {
     match finished.wait_while(|| !this.is_cancelled() && !this.is_finished()) {
-        Ok(_) => Ok(()),
+        Ok(_) => {
+            if this.is_cancelled() {
+                Err(anyhow!(error::CancelledError))
+            } else {
+                Ok(())
+            }
+        }
         Err(_) => Err(anyhow!(error::CancelledError)),
     }
 }
 
-async fn wait_async(this: &impl AwaitableConsumer, finished: &Arc<Notify>) -> Result<()> {
-    if this.is_cancelled() {
-        return Err(anyhow!(error::CancelledError));
-    }
-
-    if this.is_finished() {
-        return Ok(());
-    }
-
-    let start = Instant::now();
-
+async fn wait_async<T: AwaitableConsumer>(this: &T, finished: &Arc<Notify>) -> Result<()> {
     while !this.is_finished() && !this.is_cancelled() {
         select! {
             _ = finished.notified() => {},
-            _ = sleep(PAUSE_TIMEOUT_DEF) => {},
-            _ = sleep(SELECT_TIMEOUT) => {}
-        }
-
-        if start.elapsed() > SELECT_TIMEOUT {
-            return Err(anyhow!(error::TimedoutError));
+            else => {},
         }
     }
 
@@ -142,85 +125,140 @@ async fn wait_async(this: &impl AwaitableConsumer, finished: &Arc<Notify>) -> Re
     Ok(())
 }
 
-fn wait_for(
-    this: &impl AwaitableConsumer,
-    timeout: Duration,
+fn wait_until<T: AwaitableConsumer>(
+    this: &T,
     finished: &Arc<Mutcond>,
-) -> Result<bool> {
+    cond: impl Fn(&T) -> bool,
+) -> Result<()> {
+    match finished.wait_while(|| !this.is_cancelled() && !this.is_finished() && !cond(this)) {
+        Ok(_) => {
+            if this.is_cancelled() {
+                Err(anyhow!(error::CancelledError))
+            } else {
+                Ok(())
+            }
+        }
+        Err(_) => Err(anyhow!(error::CancelledError)),
+    }
+}
+
+async fn wait_until_async<
+    T: AwaitableConsumer,
+    F: Fn(&T) -> Pin<Box<dyn Future<Output = bool> + Send>>,
+>(
+    this: &T,
+    finished: &Arc<Notify>,
+    cond: F,
+) -> Result<()> {
+    while !this.is_cancelled() && !this.is_finished() {
+        select! {
+            _ = finished.notified() => {},
+            _ = cond(this) => {},
+            _ = sleep(SELECT_TIMEOUT) => {}
+        }
+    }
+
     if this.is_cancelled() {
         return Err(anyhow!(error::CancelledError));
     }
 
-    if this.is_finished() {
-        return Ok(true);
-    }
+    Ok(())
+}
 
+fn wait_for<T: AwaitableConsumer>(
+    this: &T,
+    timeout: Duration,
+    finished: &Arc<Mutcond>,
+) -> Result<()> {
     if timeout.is_zero() {
-        if this.is_finished() {
-            return Ok(true);
-        }
-
         return Err(anyhow!(error::TimedoutError));
     }
 
     match finished.wait_timeout_while(|| !this.is_cancelled() && !this.is_finished(), timeout) {
         Ok(_) => {
             if this.is_cancelled() {
-                return Err(anyhow!(error::CancelledError));
+                Err(anyhow!(error::CancelledError))
+            } else {
+                Ok(())
             }
-
-            if this.is_finished() {
-                return Ok(true);
-            }
-
-            Err(anyhow!(error::TimedoutError))
         }
         Err(_) => Err(anyhow!(error::TimedoutError)),
     }
 }
 
-async fn wait_for_async(
-    this: &impl AwaitableConsumer,
+async fn wait_for_async<T: AwaitableConsumer>(
+    this: &T,
     timeout: Duration,
     finished: &Arc<Notify>,
-) -> Result<bool> {
-    if this.is_cancelled() {
-        return Err(anyhow!(error::CancelledError));
-    }
-
-    if this.is_finished() {
-        return Ok(true);
-    }
-
+) -> Result<()> {
     if timeout.is_zero() {
-        if this.is_finished() {
-            return Ok(true);
-        }
-
         return Err(anyhow!(error::TimedoutError));
     }
 
-    let start = Instant::now();
+    select! {
+        _ = finished.notified() => {
+            if this.is_cancelled() {
+                Err(anyhow!(error::CancelledError))
+            } else {
+            Ok(())
+            }
+        },
+        _ = sleep(timeout) => Err(anyhow!(error::TimedoutError)),
+    }
+}
 
-    while !this.is_finished() && !this.is_cancelled() && start.elapsed() < timeout {
-        select! {
-            _ = finished.notified() => {},
-            _ = sleep(PAUSE_TIMEOUT_DEF) => {},
-            _ = sleep(timeout) => {}
+fn wait_for_until<T: AwaitableConsumer>(
+    this: &T,
+    timeout: Duration,
+    finished: &Arc<Mutcond>,
+    cond: impl Fn(&T) -> bool,
+) -> Result<()> {
+    if timeout.is_zero() {
+        return Err(anyhow!(error::TimedoutError));
+    }
+    match finished.wait_timeout_while(
+        || !this.is_cancelled() && !this.is_finished() && !cond(this),
+        timeout,
+    ) {
+        Ok(_) => {
+            if this.is_cancelled() {
+                Err(anyhow!(error::CancelledError))
+            } else {
+                Ok(())
+            }
         }
+        Err(_) => Err(anyhow!(error::TimedoutError)),
+    }
+}
 
-        if start.elapsed() > timeout {
-            return Err(anyhow!(error::TimedoutError));
-        }
+async fn wait_for_until_async<
+    T: AwaitableConsumer,
+    F: Fn(&T) -> Pin<Box<dyn Future<Output = bool> + Send>>,
+>(
+    this: &T,
+    timeout: Duration,
+    finished: &Arc<Notify>,
+    cond: F,
+) -> Result<()> {
+    if timeout.is_zero() {
+        return Err(anyhow!(error::TimedoutError));
     }
 
-    if this.is_cancelled() {
-        return Err(anyhow!(error::CancelledError));
-    }
-
-    if start.elapsed() <= timeout {
-        Ok(true)
-    } else {
-        Err(anyhow!(error::TimedoutError))
+    select! {
+        _ = finished.notified() => {
+            if this.is_cancelled() {
+                Err(anyhow!(error::CancelledError))
+            } else {
+                Ok(())
+            }
+        },
+        _ = cond(this) => {
+            if this.is_cancelled() {
+                Err(anyhow!(error::CancelledError))
+            } else {
+                Ok(())
+            }
+        },
+        _ = sleep(timeout) => Err(anyhow!(error::TimedoutError))
     }
 }

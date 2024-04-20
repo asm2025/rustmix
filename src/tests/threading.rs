@@ -218,27 +218,28 @@ pub async fn test_producer_consumer(cancel_after: Duration) -> Result<()> {
     let options = ProducerConsumerOptions::new().with_threads(THREADS);
     let prodcon = ProducerConsumer::<usize>::with_options(options);
     let unit = TEST_SIZE / THREADS;
+    let mut handles = vec![];
     prodcon.start(&handler.clone());
 
     for n in 0..THREADS {
         let pc = prodcon.clone();
         let p = prodcon.new_producer();
         let h = handler.clone();
-        thread::spawn(move || {
+        let handle = thread::spawn(move || {
             for i in 1..=unit {
+                if pc.is_cancelled() {
+                    break;
+                }
                 if let Err(e) = p.enqueue(i + unit * n) {
                     println!("Enqueue error: {:?}", e);
                     break;
-                }
-
-                if h.tasks() == TEST_SIZE {
-                    pc.complete();
                 }
             }
 
             drop(pc);
             drop(h);
         });
+        handles.push(handle);
     }
 
     if !cancel_after.is_zero() {
@@ -254,6 +255,14 @@ pub async fn test_producer_consumer(cancel_after: Duration) -> Result<()> {
         });
     }
 
+    for handle in handles {
+        if prodcon.is_cancelled() {
+            break;
+        }
+        handle.join().unwrap();
+    }
+
+    prodcon.complete();
     match prodcon.wait_async().await {
         Ok(_) => println!("Producer/Consumer finished"),
         Err(e) => println!("Producer/Consumer error: {:?}", e),

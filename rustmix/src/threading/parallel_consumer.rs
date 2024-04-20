@@ -325,12 +325,43 @@ impl<T: Send + Sync + Clone> Parallel<T> {
         wait_async(self, &self.finished_noti).await
     }
 
-    pub fn wait_for(&self, timeout: Duration) -> Result<bool> {
+    pub fn wait_until(&self, cond: impl Fn(&Parallel<T>) -> bool) -> Result<()> {
+        wait_until(self, &self.finished_cond, cond)
+    }
+
+    pub async fn wait_until_async<
+        F: Fn(&Parallel<T>) -> Pin<Box<dyn Future<Output = bool> + Send>>,
+    >(
+        &self,
+        cond: F,
+    ) -> Result<()> {
+        wait_until_async(self, &self.finished_noti, cond).await
+    }
+
+    pub fn wait_for(&self, timeout: Duration) -> Result<()> {
         wait_for(self, timeout, &self.finished_cond)
     }
 
-    pub async fn wait_for_async(&self, timeout: Duration) -> Result<bool> {
+    pub async fn wait_for_async(&self, timeout: Duration) -> Result<()> {
         wait_for_async(self, timeout, &self.finished_noti).await
+    }
+
+    pub fn wait_for_until(
+        &self,
+        timeout: Duration,
+        cond: impl Fn(&Parallel<T>) -> bool,
+    ) -> Result<()> {
+        wait_for_until(self, timeout, &self.finished_cond, cond)
+    }
+
+    pub async fn wait_for_until_async<
+        F: Fn(&Parallel<T>) -> Pin<Box<dyn Future<Output = bool> + Send>>,
+    >(
+        &self,
+        timeout: Duration,
+        cond: F,
+    ) -> Result<()> {
+        wait_for_until_async(self, timeout, &self.finished_noti, cond).await
     }
 }
 
