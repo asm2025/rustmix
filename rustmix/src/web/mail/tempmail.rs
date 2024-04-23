@@ -410,7 +410,7 @@ impl TempMail {
         }
 
         let body = match decode_html_entities(&body) {
-            Ok(text) => text,
+            Ok(it) => it,
             Err(_) => Err(anyhow!("Failed to decode html entities"))?,
         };
 

@@ -248,8 +248,8 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                             this.inc_running();
 
                             match delegate.process(&this, &item) {
-                                Ok(result) => {
-                                    if !delegate.on_completed(&this, &item, &result) {
+                                Ok(it) => {
+                                    if !delegate.on_completed(&this, &item, &it) {
                                         this.dec_running();
                                         break;
                                     }
@@ -293,10 +293,10 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                         this.inc_running();
 
                         match delegate.process(&this, &item) {
-                            Ok(result) => {
+                            Ok(it) => {
                                 let time = Instant::now();
 
-                                if !delegate.on_completed(&this, &item, &result) {
+                                if !delegate.on_completed(&this, &item, &it) {
                                     this.dec_running();
                                     break;
                                 }

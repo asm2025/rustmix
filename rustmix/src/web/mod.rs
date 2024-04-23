@@ -26,7 +26,7 @@ pub fn create<T: AsRef<str>>(value: T) -> Result<Url> {
     }
 
     match Url::parse(value) {
-        Ok(url) => Ok(url.into()),
+        Ok(it) => Ok(it.into()),
         Err(ParseError::RelativeUrlWithoutBase) => {
             Url::parse(LOCALHOST)?.join(value).map_err(Into::into)
         }
