@@ -6,6 +6,7 @@ use rodio::Decoder;
 use std::{fs::File, io::BufReader};
 use tokio::sync::mpsc::UnboundedSender;
 
+#[derive(Debug)]
 pub struct Audio {
     model: Whisper,
 }

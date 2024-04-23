@@ -3,6 +3,7 @@ pub use image::{ImageBuffer, Rgb};
 use kalosm::vision::Wuerstchen;
 pub use kalosm::{vision::WuerstchenInferenceSettings, *};
 
+#[derive(Debug)]
 pub struct Image {
     model: Wuerstchen,
 }

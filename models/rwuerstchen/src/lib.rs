@@ -401,6 +401,7 @@ impl ModelBuilder for WuerstchenBuilder {
 }
 
 /// A quantized wuerstchen image diffusion model
+#[derive(Debug)]
 pub struct Wuerstchen {
     thread: Option<std::thread::JoinHandle<()>>,
     sender: std::sync::mpsc::Sender<WuerstchenMessage>,

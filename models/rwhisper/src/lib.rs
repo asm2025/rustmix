@@ -694,6 +694,7 @@ impl Display for WhisperLanguage {
 }
 
 /// A quantized whisper audio transcription model.
+#[derive(Debug)]
 pub struct Whisper {
     thread: Option<std::thread::JoinHandle<()>>,
     sender: std::sync::mpsc::Sender<WhisperMessage>,

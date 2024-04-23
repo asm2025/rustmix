@@ -46,6 +46,7 @@ impl ModelLoadingProgress {
     }
 }
 
+#[derive(Debug)]
 pub struct Cache {
     location: PathBuf,
 }

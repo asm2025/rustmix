@@ -44,6 +44,7 @@ pub enum MessageType {
 }
 
 /// A single item in the chat history.
+#[derive(Debug)]
 pub struct ChatHistoryItem {
     ty: MessageType,
     contents: String,
@@ -301,6 +302,7 @@ impl<Model: SyncModel> ChatSession<Model> {
 }
 
 /// A builder for [`Chat`].
+#[derive(Debug)]
 pub struct ChatBuilder<M: Model> {
     model: M,
     chat_markers: ChatMarkers,
@@ -545,6 +547,7 @@ enum Response {
 }
 
 /// A chat session.
+#[derive(Debug)]
 pub struct Chat {
     sender: tokio::sync::mpsc::UnboundedSender<Message>,
     channel: tokio::sync::mpsc::UnboundedReceiver<Response>,
