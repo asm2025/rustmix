@@ -178,20 +178,22 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
     }
 
     fn check_finished(&self, td: &impl TaskDelegationBase<InjectorWorker<T>, T>) {
-        if self.workers() == 0 && (self.is_completed() || self.is_cancelled()) {
-            self.completed.store(true, Ordering::SeqCst);
-            self.finished.store(true, Ordering::SeqCst);
-
-            if self.is_cancelled() {
-                td.on_cancelled(self);
-            } else {
-                td.on_finished(self);
-            }
-
-            self.set_started(false);
-            self.finished_cond.notify_one();
-            self.finished_noti.notify_one();
+        if self.workers() > 0 || (!self.is_completed() && !self.is_cancelled()) {
+            return;
         }
+
+        self.completed.store(true, Ordering::SeqCst);
+        self.finished.store(true, Ordering::SeqCst);
+
+        if self.is_cancelled() {
+            td.on_cancelled(self);
+        } else {
+            td.on_finished(self);
+        }
+
+        self.set_started(false);
+        self.finished_cond.notify_one();
+        self.finished_noti.notify_one();
     }
 
     pub fn running(&self) -> usize {
@@ -251,7 +253,7 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
                             continue;
                         }
 
-                        if let Some(item) = this.find_task(&global, &local, &stealers) {
+                        if let Some(item) = this.dequeue_wait(&global, &local, &stealers) {
                             this.inc_running();
 
                             if let Ok(result) = delegate.process(&this, &item) {
@@ -284,7 +286,7 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
                         continue;
                     }
 
-                    if let Some(item) = this.find_task(&global, &local, &stealers) {
+                    if let Some(item) = this.dequeue_wait(&global, &local, &stealers) {
                         this.inc_running();
 
                         if let Ok(result) = delegate.process(&this, &item) {
@@ -364,7 +366,7 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
                             continue;
                         }
 
-                        if let Some(item) = this.find_task(&global, &local, &stealers) {
+                        if let Some(item) = this.dequeue_wait(&global, &local, &stealers) {
                             this.inc_running();
 
                             if let Ok(result) = delegate.process(&this, &item).await {
@@ -396,7 +398,7 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
                         continue;
                     }
 
-                    if let Some(item) = this.find_task(&global, &local, &stealers) {
+                    if let Some(item) = this.dequeue_wait(&global, &local, &stealers) {
                         this.inc_running();
 
                         if let Ok(result) = delegate.process(&this, &item).await {
@@ -428,8 +430,45 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
         }
     }
 
-    fn find_task(
+    pub fn enqueue(&self, item: T) -> Result<()> {
+        if self.is_cancelled() {
+            return Err(anyhow!(error::CancelledError));
+        }
+
+        if self.is_completed() {
+            return Err(anyhow!(error::QueueCompletedError));
+        }
+
+        self.injector.push(item);
+
+        if !self.options.sleep_after_send.is_zero() {
+            thread::sleep(self.options.sleep_after_send);
+        }
+
+        Ok(())
+    }
+
+    pub fn dequeue(
         &self,
+        global: &Arc<Injector<T>>,
+        local: &Arc<Mutex<Worker<T>>>,
+        stealers: &Arc<Mutex<Vec<Stealer<T>>>>,
+    ) -> Option<T> {
+        self.deq(false, global, local, stealers)
+    }
+
+    pub fn dequeue_wait(
+        &self,
+        global: &Arc<Injector<T>>,
+        local: &Arc<Mutex<Worker<T>>>,
+        stealers: &Arc<Mutex<Vec<Stealer<T>>>>,
+    ) -> Option<T> {
+        self.deq(true, global, local, stealers)
+    }
+
+    fn deq(
+        &self,
+        wait_for_item: bool,
         global: &Arc<Injector<T>>,
         local: &Arc<Mutex<Worker<T>>>,
         stealers: &Arc<Mutex<Vec<Stealer<T>>>>,
@@ -442,7 +481,7 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
                 return None;
             }
 
-            if self.is_paused() {
+            if wait_for_item && self.is_paused() {
                 thread::sleep(self.options.pause_timeout);
                 return None;
             }
@@ -470,24 +509,6 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
         } else {
             self.complete();
         }
-    }
-
-    pub fn enqueue(&self, item: T) -> Result<()> {
-        if self.is_cancelled() {
-            return Err(anyhow!(error::CancelledError));
-        }
-
-        if self.is_completed() {
-            return Err(anyhow!(error::QueueCompletedError));
-        }
-
-        self.injector.push(item);
-
-        if !self.options.sleep_after_send.is_zero() {
-            thread::sleep(self.options.sleep_after_send);
-        }
-
-        Ok(())
     }
 
     pub fn complete(&self) {

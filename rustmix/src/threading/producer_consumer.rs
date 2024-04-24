@@ -215,20 +215,22 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
     }
 
     fn check_finished(&self, td: &impl TaskDelegationBase<ProducerConsumer<T>, T>) {
-        if self.consumers() == 0 && (self.is_completed() || self.is_cancelled()) {
-            self.completed.store(true, Ordering::SeqCst);
-            self.finished.store(true, Ordering::SeqCst);
-
-            if self.is_cancelled() {
-                td.on_cancelled(self);
-            } else {
-                td.on_finished(self);
-            }
-
-            self.set_started(false);
-            self.finished_cond.notify_one();
-            self.finished_noti.notify_one();
+        if self.consumers() > 0 || (!self.is_completed() && !self.is_cancelled()) {
+            return;
         }
+
+        self.completed.store(true, Ordering::SeqCst);
+        self.finished.store(true, Ordering::SeqCst);
+
+        if self.is_cancelled() {
+            td.on_cancelled(self);
+        } else {
+            td.on_finished(self);
+        }
+
+        self.set_started(false);
+        self.finished_cond.notify_one();
+        self.finished_noti.notify_one();
     }
 
     pub fn running(&self) -> usize {

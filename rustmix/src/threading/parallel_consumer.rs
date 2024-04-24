@@ -195,19 +195,21 @@ impl<T: Send + Sync + Clone> Parallel<T> {
     }
 
     fn check_finished(&self, td: &impl TaskDelegationBase<Parallel<T>, T>) {
-        if self.running() == 0 {
-            self.finished.store(true, Ordering::SeqCst);
-
-            if self.is_cancelled() {
-                td.on_cancelled(self);
-            } else {
-                td.on_finished(self);
-            }
-
-            self.set_started(false);
-            self.finished_cond.notify_one();
-            self.finished_noti.notify_one();
+        if self.running() > 0 {
+            return;
         }
+
+        self.finished.store(true, Ordering::SeqCst);
+
+        if self.is_cancelled() {
+            td.on_cancelled(self);
+        } else {
+            td.on_finished(self);
+        }
+
+        self.set_started(false);
+        self.finished_cond.notify_one();
+        self.finished_noti.notify_one();
     }
 
     pub fn start<

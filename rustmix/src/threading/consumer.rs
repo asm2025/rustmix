@@ -179,20 +179,22 @@ impl<T: Send + Sync + Clone> Consumer<T> {
     }
 
     fn check_finished(&self, td: &impl TaskDelegationBase<Consumer<T>, T>) {
-        if self.consumers() == 0 && (self.is_completed() || self.is_cancelled()) {
-            self.completed.store(true, Ordering::SeqCst);
-            self.finished.store(true, Ordering::SeqCst);
-
-            if self.is_cancelled() {
-                td.on_cancelled(self);
-            } else {
-                td.on_finished(self);
-            }
-
-            self.set_started(false);
-            self.finished_cond.notify_one();
-            self.finished_noti.notify_one();
+        if self.consumers() > 0 || (!self.is_completed() && !self.is_cancelled()) {
+            return;
         }
+
+        self.completed.store(true, Ordering::SeqCst);
+        self.finished.store(true, Ordering::SeqCst);
+
+        if self.is_cancelled() {
+            td.on_cancelled(self);
+        } else {
+            td.on_finished(self);
+        }
+
+        self.set_started(false);
+        self.finished_cond.notify_one();
+        self.finished_noti.notify_one();
     }
 
     pub fn running(&self) -> usize {
@@ -242,8 +244,8 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                         }
 
                         if let Some(item) = match this.options.behavior {
-                            QueueBehavior::FIFO => this.dequeue(),
-                            QueueBehavior::LIFO => this.pop(),
+                            QueueBehavior::FIFO => this.dequeue_wait(),
+                            QueueBehavior::LIFO => this.pop_wait(),
                         } {
                             this.inc_running();
 
@@ -287,8 +289,8 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                     }
 
                     if let Some(item) = match this.options.behavior {
-                        QueueBehavior::FIFO => this.dequeue(),
-                        QueueBehavior::LIFO => this.pop(),
+                        QueueBehavior::FIFO => this.dequeue_wait(),
+                        QueueBehavior::LIFO => this.pop_wait(),
                     } {
                         this.inc_running();
 
@@ -368,8 +370,8 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                         }
 
                         if let Some(item) = match this.options.behavior {
-                            QueueBehavior::FIFO => this.dequeue(),
-                            QueueBehavior::LIFO => this.pop(),
+                            QueueBehavior::FIFO => this.dequeue_wait(),
+                            QueueBehavior::LIFO => this.pop_wait(),
                         } {
                             this.inc_running();
 
@@ -401,8 +403,8 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                     }
 
                     if let Some(item) = match this.options.behavior {
-                        QueueBehavior::FIFO => this.dequeue(),
-                        QueueBehavior::LIFO => this.pop(),
+                        QueueBehavior::FIFO => this.dequeue_wait(),
+                        QueueBehavior::LIFO => this.pop_wait(),
                     } {
                         this.inc_running();
 
@@ -461,23 +463,33 @@ impl<T: Send + Sync + Clone> Consumer<T> {
         Ok(())
     }
 
-    fn dequeue(&self) -> Option<T> {
+    pub fn dequeue(&self) -> Option<T> {
+        self.deq(false)
+    }
+
+    pub fn dequeue_wait(&self) -> Option<T> {
+        self.deq(true)
+    }
+
+    fn deq(&self, wait_for_item: bool) -> Option<T> {
         let mut items = self.items.lock().unwrap();
 
-        while items.is_empty() && !self.is_cancelled() && !self.is_completed() {
-            if !self
-                .items_cond
-                .wait_timeout(self.options.peek_timeout)
-                .unwrap()
-            {
-                continue;
-            }
+        if wait_for_item {
+            while items.is_empty() && !self.is_cancelled() && !self.is_completed() {
+                if !self
+                    .items_cond
+                    .wait_timeout(self.options.peek_timeout)
+                    .unwrap()
+                {
+                    continue;
+                }
 
-            if self.is_cancelled() || self.is_completed() {
-                return None;
-            }
+                if self.is_cancelled() || self.is_completed() {
+                    return None;
+                }
 
-            return items.pop_front();
+                return items.pop_front();
+            }
         }
 
         if items.is_empty() || self.is_cancelled() {
@@ -487,23 +499,35 @@ impl<T: Send + Sync + Clone> Consumer<T> {
         items.pop_front()
     }
 
-    fn pop(&self) -> Option<T> {
+    #[inline]
+    pub fn pop(&self) -> Option<T> {
+        self.po(false)
+    }
+
+    #[inline]
+    pub fn pop_wait(&self) -> Option<T> {
+        self.po(true)
+    }
+
+    fn po(&self, wait_for_item: bool) -> Option<T> {
         let mut items = self.items.lock().unwrap();
 
-        while items.is_empty() && !self.is_cancelled() && !self.is_completed() {
-            if !self
-                .items_cond
-                .wait_timeout(self.options.peek_timeout)
-                .unwrap()
-            {
-                continue;
-            }
+        if wait_for_item {
+            while items.is_empty() && !self.is_cancelled() && !self.is_completed() {
+                if !self
+                    .items_cond
+                    .wait_timeout(self.options.peek_timeout)
+                    .unwrap()
+                {
+                    continue;
+                }
 
-            if self.is_cancelled() || self.is_completed() {
-                return None;
-            }
+                if self.is_cancelled() || self.is_completed() {
+                    return None;
+                }
 
-            return items.pop_back();
+                return items.pop_back();
+            }
         }
 
         if items.is_empty() || self.is_cancelled() {
