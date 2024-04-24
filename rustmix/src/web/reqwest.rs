@@ -31,42 +31,46 @@ fn build_default_api_headers() -> header::HeaderMap {
     headers
 }
 
-pub fn build_client() -> _reqwest::ClientBuilder {
+pub fn build_client_with_ua(ua: String) -> _reqwest::ClientBuilder {
     _reqwest::Client::builder()
         .default_headers(build_default_headers())
-        .user_agent(user_agent())
+        .user_agent(ua)
         .cookie_store(true)
         .pool_max_idle_per_host(0)
         .timeout(std::time::Duration::from_secs(30))
+}
+
+pub fn build_blocking_client_with_ua(ua: String) -> _reqwest::blocking::ClientBuilder {
+    _reqwest::blocking::Client::builder()
+        .default_headers(build_default_headers())
+        .user_agent(ua)
+        .cookie_store(true)
+        .pool_max_idle_per_host(0)
+        .timeout(std::time::Duration::from_secs(30))
+}
+
+pub fn build_client() -> _reqwest::ClientBuilder {
+    build_client_with_ua(user_agent().to_string())
 }
 
 pub fn build_blocking_client() -> _reqwest::blocking::ClientBuilder {
-    _reqwest::blocking::Client::builder()
-        .default_headers(build_default_headers())
-        .user_agent(user_agent())
-        .cookie_store(true)
-        .pool_max_idle_per_host(0)
-        .timeout(std::time::Duration::from_secs(30))
+    build_blocking_client_with_ua(user_agent().to_string())
 }
 
 pub fn build_client_with_headers(headers: header::HeaderMap) -> _reqwest::ClientBuilder {
-    let builder = build_client();
-    builder.default_headers(headers)
+    build_client().default_headers(headers)
 }
 
 pub fn build_blocking_client_with_headers(
     headers: header::HeaderMap,
 ) -> _reqwest::blocking::ClientBuilder {
-    let builder = build_blocking_client();
-    builder.default_headers(headers)
+    build_blocking_client().default_headers(headers)
 }
 
 pub fn build_client_for_api() -> _reqwest::ClientBuilder {
-    let builder = build_client();
-    builder.default_headers(build_default_api_headers())
+    build_client().default_headers(build_default_api_headers())
 }
 
 pub fn build_blocking_client_for_api() -> _reqwest::blocking::ClientBuilder {
-    let builder = build_blocking_client();
-    builder.default_headers(build_default_api_headers())
+    build_blocking_client().default_headers(build_default_api_headers())
 }

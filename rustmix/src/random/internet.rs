@@ -2,10 +2,8 @@ use fake::{
     faker::{filesystem::raw as f_filesystem, http::raw as f_http, internet::raw as f_internet},
     locales, Fake,
 };
-use fake_user_agent;
-use fake_useragent::UserAgentsBuilder;
-pub use fake_useragent::{Browsers, UserAgents};
-use num_cpus;
+use randua;
+pub use randua::UserAgent;
 use std::ops::Range;
 
 pub fn status_code() -> String {
@@ -60,39 +58,6 @@ pub fn mac_address() -> String {
     f_internet::MACAddress(locales::EN).fake()
 }
 
-pub fn user_agent() -> String {
-    fake_user_agent::get_rua().to_owned()
-}
-
-pub fn chrome_user_agent() -> String {
-    fake_user_agent::get_chrome_rua().to_owned()
-}
-
-pub fn edge_user_agent() -> String {
-    fake_user_agent::get_edge_rua().to_owned()
-}
-
-pub fn firefox_user_agent() -> String {
-    fake_user_agent::get_firefox_rua().to_owned()
-}
-
-pub fn opera_user_agent() -> String {
-    fake_user_agent::get_opera_rua().to_owned()
-}
-
-pub fn safari_user_agent() -> String {
-    fake_user_agent::get_safari_rua().to_owned()
-}
-
-pub fn ie_user_agent() -> String {
-    fake_user_agent::get_ie_rua().to_owned()
-}
-
-pub fn build_user_agents(browsers: Option<Browsers>, threads: Option<u32>) -> UserAgents {
-    let threads = threads.unwrap_or(num_cpus::get() as u32);
-    UserAgentsBuilder::new()
-        .cache(true)
-        .thread(threads)
-        .set_browsers(browsers.unwrap_or(Browsers::new()))
-        .build()
+pub fn user_agent() -> UserAgent {
+    randua::new()
 }

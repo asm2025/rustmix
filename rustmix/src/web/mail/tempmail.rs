@@ -150,11 +150,11 @@ impl TempMail {
     }
 
     pub async fn random() -> Result<Self> {
-        let provider = match random::numeric(0, 100) {
+        let provider = match random::numeric(0..100) {
             0..=33 => TempMailProvider::Tempmail,
             34..=66 => TempMailProvider::EmailFake,
             _ => {
-                let domain = match random::numeric(0, 100) {
+                let domain = match random::numeric(0..100) {
                     0..=10 => SecMailDomain::SecMailCom,
                     11..=20 => SecMailDomain::SecMailOrg,
                     21..=30 => SecMailDomain::SecMailNet,
@@ -229,7 +229,7 @@ impl TempMail {
     }
 
     fn sec_mail_generate(domain: SecMailDomain) -> Self {
-        let len = random::numeric(4, 32);
+        let len = random::numeric(4..32);
         let username = random::string(len);
         TempMail {
             provider: TempMailProvider::SecMail(domain.clone()),

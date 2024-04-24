@@ -7,7 +7,7 @@ pub fn test_random() {
     println!("alphanum: {}", random::alphanum_str(10));
     println!("boolean: {}", random::boolean());
     println!("float: {}", random::float());
-    println!("numeric: {}", random::numeric(1, 10));
+    println!("numeric: {}", random::numeric(1..10));
     println!("uuid: {}", random::uuid());
     println!("uuid v3: {}", random::uuid_v(random::UuidVersion::V3));
     println!("uuid v5: {}", random::uuid_v(random::UuidVersion::V5));
@@ -100,22 +100,24 @@ pub fn test_random() {
     println!("user_agent: {}", random::internet::user_agent());
     println!(
         "chrome_user_agent: {}",
-        random::internet::chrome_user_agent()
+        random::internet::user_agent().chrome()
     );
-    println!("edge_user_agent: {}", random::internet::edge_user_agent());
-    println!("opera_user_agent: {}", random::internet::opera_user_agent());
+    println!(
+        "firefox_user_agent: {}",
+        random::internet::user_agent().firefox()
+    );
     println!(
         "safari_user_agent: {}",
-        random::internet::safari_user_agent()
+        random::internet::user_agent().safari()
     );
-    println!("ie_user_agent: {}", random::internet::ie_user_agent());
-
-    let browsers = random::internet::Browsers::new()
-        .set_opera()
-        .set_safari()
-        .set_internet_explorer();
-    let user_agents = random::internet::build_user_agents(Some(browsers), None);
-    println!("user_agent: {}", user_agents.random());
+    println!(
+        "desktop_user_agent: {}",
+        random::internet::user_agent().desktop()
+    );
+    println!(
+        "phone_user_agent: {}",
+        random::internet::user_agent().phone()
+    );
 
     println!("word: {}", random::lorem::word());
     println!("words: {}", random::lorem::words(1..10).join(", "));

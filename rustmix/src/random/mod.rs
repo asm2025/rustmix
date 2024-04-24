@@ -11,6 +11,7 @@ pub mod person;
 
 use fake::{faker::boolean::raw as f_boolean, locales, uuid, Fake};
 use rand::{thread_rng, Rng};
+use std::ops::Range;
 
 pub enum UuidVersion {
     V1,
@@ -83,12 +84,9 @@ pub fn float() -> f64 {
     rng.gen_range(0.0..1.0)
 }
 
-pub fn numeric<T>(min: T, max: T) -> T
-where
-    T: rand::distributions::uniform::SampleUniform + PartialOrd,
-{
+pub fn numeric<T: rand::distributions::uniform::SampleUniform + PartialOrd>(r: Range<T>) -> T {
     let mut rng = thread_rng();
-    rng.gen_range(min..max)
+    rng.gen_range(r)
 }
 
 pub fn uuid() -> String {

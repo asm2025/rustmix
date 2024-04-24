@@ -43,8 +43,7 @@ slog-stdlog = { version = "4", optional = true }
 slog-term = { version = "2", optional = true }
 tokio = { version = "1", features = ["full"] }
 time = "0"
-fake-useragent = "0"
-fake_user_agent = "0"
+randua = "0"
 url = { version = "2", features = ["serde"] }
 urlencoding = "2"
 
