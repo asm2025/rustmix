@@ -162,7 +162,7 @@ impl<T: Send + Sync + Clone> Consumer<T> {
     }
 
     pub fn count(&self) -> usize {
-        self.items.lock().unwrap().len() + self.running.load(Ordering::SeqCst)
+        self.items.lock().unwrap().clone().len() + self.running.load(Ordering::SeqCst)
     }
 
     pub fn consumers(&self) -> usize {
