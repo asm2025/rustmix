@@ -7,6 +7,7 @@ pub mod slog;
 pub mod sound;
 #[cfg(feature = "vision")]
 pub mod vision;
+
 pub use self::app::*;
 pub mod date;
 pub mod error;
@@ -18,11 +19,17 @@ pub mod string;
 pub mod threading;
 pub mod web;
 
+use lazy_static::lazy_static;
 use log::LevelFilter;
+use std::sync::Mutex;
 
 pub const LOG_DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S.%f";
 pub const LOG_SIZE_MIN: usize = 1024 * 1024 * 2;
 pub const LOG_SIZE_MAX: usize = 1024 * 1024 * 10;
+
+lazy_static! {
+    static ref DEBUG: Mutex<bool> = Mutex::new(false);
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum LogLevel {
@@ -47,5 +54,29 @@ impl From<LogLevel> for LevelFilter {
             LogLevel::Critical => LevelFilter::Error,
             _ => LevelFilter::Info,
         }
+    }
+}
+
+pub fn set_debug(value: bool) {
+    let mut debug = DEBUG.lock().unwrap();
+    *debug = value;
+}
+
+#[cfg(debug_assertions)]
+pub fn is_debug() -> bool {
+    let debug = DEBUG.lock().unwrap();
+    *debug
+}
+
+#[cfg(not(debug_assertions))]
+pub fn is_debug() -> bool {
+    false
+}
+
+pub fn num_cpus() -> usize {
+    if is_debug() {
+        1
+    } else {
+        num_cpus::get()
     }
 }

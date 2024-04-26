@@ -6404,6 +6404,7 @@ dependencies = [
  "hyper-util",
  "image",
  "kalosm",
+ "lazy_static 1.4.0",
  "lettre",
  "log",
  "log4rs",

@@ -13,7 +13,16 @@ chrono = "0"
 crossbeam = { version = "0", optional = true }
 csv = "1"
 dotenv = "0"
-fake = { version = "2", features = ["derive", "uuid", "always-true-rng", "random_color", "chrono", "time", "http", "geo"] }
+fake = { version = "2", features = [
+    "derive",
+    "uuid",
+    "always-true-rng",
+    "random_color",
+    "chrono",
+    "time",
+    "http",
+    "geo",
+] }
 file-rotate = { version = "0", optional = true }
 futures = "0"
 html-entities = { version = "0", optional = true }
@@ -22,16 +31,29 @@ http-body-util = "0"
 hyper-util = { version = "0", features = ["full"] }
 image = { version = "0", optional = true }
 kalosm = { version = "0", workspace = true, default-features = false, optional = true }
+lazy_static = "1"
 lettre = { version = "0", optional = true }
 log = "0"
 log4rs = { version = "1", optional = true }
 num_cpus = "1"
 once_cell = { version = "1", optional = true }
-pyo3 = { version = "0", features = ["auto-initialize", "abi3"], optional = true }
+pyo3 = { version = "0", features = [
+    "auto-initialize",
+    "abi3",
+], optional = true }
 rand = "0"
 rayon = { version = "1", optional = true }
 regex = { version = "1", optional = true }
-reqwest = { version = "0", features = ["blocking", "cookies", "json", "gzip", "deflate", "multipart", "socks", "stream"] }
+reqwest = { version = "0", features = [
+    "blocking",
+    "cookies",
+    "json",
+    "gzip",
+    "deflate",
+    "multipart",
+    "socks",
+    "stream",
+] }
 rodio = { version = "0", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -49,7 +71,16 @@ urlencoding = "2"
 
 [features]
 default = ["mail", "threading", "log4rs"]
-full = ["mail", "threading", "log4rs", "slog", "hyper", "python", "audio", "vision"]
+full = [
+    "mail",
+    "threading",
+    "log4rs",
+    "slog",
+    "hyper",
+    "python",
+    "audio",
+    "vision",
+]
 llamacpp = ["kalosm?/llamacpp"]
 metal = ["kalosm?/metal"]
 cublas = ["kalosm?/cublas"]
@@ -58,7 +89,15 @@ mkl = ["kalosm?/mkl"]
 mail = ["dep:html-entities", "dep:lettre", "dep:once_cell", "dep:regex"]
 threading = ["dep:crossbeam", "dep:rayon"]
 log4rs = ["dep:log4rs"]
-slog = ["dep:slog", "dep:slog-async", "dep:slog-scope", "dep:slog-stdlog", "dep:slog-term", "dep:slog-json", "dep:file-rotate"]
+slog = [
+    "dep:slog",
+    "dep:slog-async",
+    "dep:slog-scope",
+    "dep:slog-stdlog",
+    "dep:slog-term",
+    "dep:slog-json",
+    "dep:file-rotate",
+]
 hyper = ["dep:hyper"]
 python = ["dep:pyo3"]
 audio = ["kalosm/sound", "dep:rodio"]
@@ -69,4 +108,4 @@ run = "cargo run"
 check = "cargo check"
 build = "cargo build"
 release = "cargo build --release"
-features = "cargo tree --features" 
+features = "cargo tree --features"

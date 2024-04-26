@@ -1,5 +1,47 @@
 use std::{error::Error, fmt};
 
+use crate::is_debug;
+
+pub trait ExceptionStr {
+    fn get_string(&self) -> String;
+}
+
+impl<E: Error + ?Sized> ExceptionStr for E {
+    fn get_string(&self) -> String {
+        if is_debug() {
+            return format!("{:?}", self);
+        }
+
+        self.to_string()
+    }
+}
+
+pub trait ExceptionEx {
+    fn get_message(&self) -> String;
+}
+
+impl<E: Error + ExceptionStr> ExceptionEx for E {
+    fn get_message(&self) -> String {
+        if !is_debug() {
+            return self.get_string();
+        }
+
+        let mut msg = String::new();
+        let mut e: Option<&dyn Error> = Some(self);
+
+        while let Some(err) = e {
+            if msg.len() > 0 {
+                msg.push_str("\n");
+            }
+
+            msg.push_str(&err.get_string());
+            e = err.source();
+        }
+
+        msg
+    }
+}
+
 #[derive(Debug)]
 pub struct CancelledError;
 
