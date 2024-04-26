@@ -121,10 +121,6 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
         }
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.count() == 0
-    }
-
     pub fn is_started(&self) -> bool {
         *self.started.lock().unwrap()
     }
@@ -157,11 +153,15 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
     }
 
     pub fn is_busy(&self) -> bool {
-        self.count() > 0
+        self.len() + self.running.load(Ordering::SeqCst) > 0
     }
 
-    pub fn count(&self) -> usize {
-        self.injector.len() + self.running.load(Ordering::SeqCst)
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn len(&self) -> usize {
+        self.injector.len()
     }
 
     pub fn workers(&self) -> usize {

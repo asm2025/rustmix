@@ -1,8 +1,9 @@
 use anyhow::{anyhow, Result};
+use crossbeam::queue::SegQueue;
 use std::{
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc, Mutex
+        Arc, Mutex,
     },
     thread,
 };
@@ -10,7 +11,6 @@ use tokio::{
     sync::Notify,
     time::{Duration, Instant},
 };
-use crossbeam::queue::SegQueue;
 
 use super::{cond::Mutcond, *};
 
@@ -144,16 +144,16 @@ impl<T: Send + Sync + Clone> Consumer<T> {
         self.finished.load(Ordering::SeqCst)
     }
 
+    pub fn is_busy(&self) -> bool {
+        self.len() + self.running.load(Ordering::SeqCst) > 0
+    }
+
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
-    pub fn is_busy(&self) -> bool {
-        self.len() > 0
-    }
-
     pub fn len(&self) -> usize {
-        self.items.len() + self.running.load(Ordering::SeqCst)
+        self.items.len()
     }
 
     pub fn consumers(&self) -> usize {
