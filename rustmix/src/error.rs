@@ -42,6 +42,20 @@ impl<E: Error + ExceptionStr> ExceptionEx for E {
     }
 }
 
+pub trait AnyhowEx {
+    fn get_message(&self) -> String;
+}
+
+impl AnyhowEx for anyhow::Error {
+    fn get_message(&self) -> String {
+        if let Some(err) = self.source() {
+            return err.get_message();
+        }
+
+        return self.get_string();
+    }
+}
+
 #[derive(Debug)]
 pub struct CancelledError;
 
