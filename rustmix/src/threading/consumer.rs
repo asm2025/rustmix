@@ -1,9 +1,8 @@
 use anyhow::{anyhow, Result};
 use std::{
-    collections::LinkedList,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc, Mutex,
+        Arc, Mutex
     },
     thread,
 };
@@ -11,12 +10,12 @@ use tokio::{
     sync::Notify,
     time::{Duration, Instant},
 };
+use crossbeam::queue::SegQueue;
 
 use super::{cond::Mutcond, *};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConsumerOptions {
-    pub behavior: QueueBehavior,
     pub threads: usize,
     pub threshold: Duration,
     pub sleep_after_send: Duration,
@@ -27,7 +26,6 @@ pub struct ConsumerOptions {
 impl Default for ConsumerOptions {
     fn default() -> Self {
         ConsumerOptions {
-            behavior: QUEUE_BEHAVIOR_DEF,
             threads: THREADS_DEF.clamp(THREADS_MIN, THREADS_MAX),
             threshold: THRESHOLD_DEF,
             sleep_after_send: SLEEP_AFTER_SEND_DEF,
@@ -45,13 +43,6 @@ impl ConsumerOptions {
     pub fn with_threads(&self, threads: usize) -> Self {
         ConsumerOptions {
             threads: threads.clamp(THREADS_MIN, THREADS_MAX),
-            ..self.clone()
-        }
-    }
-
-    pub fn with_behavior(&self, behavior: QueueBehavior) -> Self {
-        ConsumerOptions {
-            behavior,
             ..self.clone()
         }
     }
@@ -74,7 +65,7 @@ impl ConsumerOptions {
 #[derive(Clone, Debug)]
 pub struct Consumer<T: Send + Sync + Clone + 'static> {
     options: ConsumerOptions,
-    items: Arc<Mutex<LinkedList<T>>>,
+    items: Arc<SegQueue<T>>,
     items_cond: Arc<Mutcond>,
     started: Arc<Mutex<bool>>,
     finished: Arc<AtomicBool>,
@@ -91,7 +82,7 @@ impl<T: Send + Sync + Clone> Consumer<T> {
     pub fn new() -> Self {
         Consumer {
             options: Default::default(),
-            items: Arc::new(Mutex::new(LinkedList::new())),
+            items: Arc::new(SegQueue::new()),
             items_cond: Arc::new(Mutcond::new()),
             started: Arc::new(Mutex::new(false)),
             finished: Arc::new(AtomicBool::new(false)),
@@ -108,7 +99,7 @@ impl<T: Send + Sync + Clone> Consumer<T> {
     pub fn with_options(options: ConsumerOptions) -> Self {
         Consumer {
             options,
-            items: Arc::new(Mutex::new(LinkedList::new())),
+            items: Arc::new(SegQueue::new()),
             items_cond: Arc::new(Mutcond::new()),
             started: Arc::new(Mutex::new(false)),
             finished: Arc::new(AtomicBool::new(false)),
@@ -120,10 +111,6 @@ impl<T: Send + Sync + Clone> Consumer<T> {
             consumers: Arc::new(AtomicUsize::new(0)),
             running: Arc::new(AtomicUsize::new(0)),
         }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.count() == 0
     }
 
     pub fn is_started(&self) -> bool {
@@ -157,13 +144,16 @@ impl<T: Send + Sync + Clone> Consumer<T> {
         self.finished.load(Ordering::SeqCst)
     }
 
-    pub fn is_busy(&self) -> bool {
-        self.count() > 0
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
-    pub fn count(&self) -> usize {
-        let items = self.items.try_lock().map_or(1, |items| items.len());
-        items + self.running.load(Ordering::SeqCst)
+    pub fn is_busy(&self) -> bool {
+        self.len() > 0
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len() + self.running.load(Ordering::SeqCst)
     }
 
     pub fn consumers(&self) -> usize {
@@ -244,10 +234,7 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                             continue;
                         }
 
-                        if let Some(item) = match this.options.behavior {
-                            QueueBehavior::FIFO => this.dequeue_wait(),
-                            QueueBehavior::LIFO => this.pop_wait(),
-                        } {
+                        if let Some(item) = this.dequeue_wait() {
                             this.inc_running();
 
                             match delegate.process(&this, &item) {
@@ -289,10 +276,7 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                         continue;
                     }
 
-                    if let Some(item) = match this.options.behavior {
-                        QueueBehavior::FIFO => this.dequeue_wait(),
-                        QueueBehavior::LIFO => this.pop_wait(),
-                    } {
+                    if let Some(item) = this.dequeue_wait() {
                         this.inc_running();
 
                         match delegate.process(&this, &item) {
@@ -370,10 +354,7 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                             continue;
                         }
 
-                        if let Some(item) = match this.options.behavior {
-                            QueueBehavior::FIFO => this.dequeue_wait(),
-                            QueueBehavior::LIFO => this.pop_wait(),
-                        } {
+                        if let Some(item) = this.dequeue_wait() {
                             this.inc_running();
 
                             if let Ok(result) = delegate.process(&this, &item).await {
@@ -403,10 +384,7 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                         continue;
                     }
 
-                    if let Some(item) = match this.options.behavior {
-                        QueueBehavior::FIFO => this.dequeue_wait(),
-                        QueueBehavior::LIFO => this.pop_wait(),
-                    } {
+                    if let Some(item) = this.dequeue_wait() {
                         this.inc_running();
 
                         if let Ok(result) = delegate.process(&this, &item).await {
@@ -453,8 +431,7 @@ impl<T: Send + Sync + Clone> Consumer<T> {
             return Err(anyhow!(error::QueueCompletedError));
         }
 
-        let mut items = self.items.lock().unwrap();
-        items.push_back(item);
+        self.items.push(item);
 
         if !self.options.sleep_after_send.is_zero() {
             thread::sleep(self.options.sleep_after_send);
@@ -473,10 +450,8 @@ impl<T: Send + Sync + Clone> Consumer<T> {
     }
 
     fn deq(&self, wait_for_item: bool) -> Option<T> {
-        let mut items = self.items.lock().unwrap();
-
         if wait_for_item {
-            while items.is_empty() && !self.is_cancelled() && !self.is_completed() {
+            while self.items.is_empty() && !self.is_cancelled() && !self.is_completed() {
                 if !self
                     .items_cond
                     .wait_timeout(self.options.peek_timeout)
@@ -489,75 +464,19 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                     return None;
                 }
 
-                return items.pop_front();
+                return self.items.pop();
             }
         }
 
-        if items.is_empty() || self.is_cancelled() {
+        if self.items.is_empty() || self.is_cancelled() {
             return None;
         }
 
-        items.pop_front()
-    }
-
-    #[inline]
-    pub fn pop(&self) -> Option<T> {
-        self.po(false)
-    }
-
-    #[inline]
-    pub fn pop_wait(&self) -> Option<T> {
-        self.po(true)
-    }
-
-    fn po(&self, wait_for_item: bool) -> Option<T> {
-        let mut items = self.items.lock().unwrap();
-
-        if wait_for_item {
-            while items.is_empty() && !self.is_cancelled() && !self.is_completed() {
-                if !self
-                    .items_cond
-                    .wait_timeout(self.options.peek_timeout)
-                    .unwrap()
-                {
-                    continue;
-                }
-
-                if self.is_cancelled() || self.is_completed() {
-                    return None;
-                }
-
-                return items.pop_back();
-            }
-        }
-
-        if items.is_empty() || self.is_cancelled() {
-            return None;
-        }
-
-        items.pop_back()
-    }
-
-    pub fn peek(&self) -> Option<T> {
-        let items = self.items.lock().unwrap();
-
-        if items.is_empty() {
-            return None;
-        }
-
-        if let Some(item) = match self.options.behavior {
-            QueueBehavior::FIFO => items.front(),
-            QueueBehavior::LIFO => items.back(),
-        } {
-            Some(item.clone())
-        } else {
-            None
-        }
+        self.items.pop()
     }
 
     pub fn clear(&self) {
-        let mut items = self.items.lock().unwrap();
-        items.clear();
+        while self.items.pop().is_some() {}
     }
 
     pub fn complete(&self) {

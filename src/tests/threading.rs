@@ -54,7 +54,11 @@ impl TaskDelegationBase<ProducerConsumer<usize>, usize> for TaskHandler {
     }
 
     fn on_cancelled(&self, _td: &ProducerConsumer<usize>) {
-        println!("Processing tasks was cancelled");
+        println!(
+            "Processing tasks was cancelled. Got: {} tasks and finished {} tasks.",
+            self.tasks(),
+            self.done()
+        );
     }
 
     fn on_finished(&self, _pc: &ProducerConsumer<usize>) {
@@ -96,7 +100,11 @@ impl TaskDelegationBase<Consumer<usize>, usize> for TaskHandler {
     }
 
     fn on_cancelled(&self, _td: &Consumer<usize>) {
-        println!("Processing tasks was cancelled");
+        println!(
+            "Processing tasks was cancelled. Got: {} tasks and finished {} tasks.",
+            self.tasks(),
+            self.done()
+        );
     }
 
     fn on_finished(&self, _pc: &Consumer<usize>) {
@@ -138,7 +146,11 @@ impl TaskDelegationBase<InjectorWorker<usize>, usize> for TaskHandler {
     }
 
     fn on_cancelled(&self, _td: &InjectorWorker<usize>) {
-        println!("Processing tasks was cancelled");
+        println!(
+            "Processing tasks was cancelled. Got: {} tasks and finished {} tasks.",
+            self.tasks(),
+            self.done()
+        );
     }
 
     fn on_finished(&self, _pc: &InjectorWorker<usize>) {
@@ -180,7 +192,11 @@ impl TaskDelegationBase<Parallel<usize>, usize> for TaskHandler {
     }
 
     fn on_cancelled(&self, _td: &Parallel<usize>) {
-        println!("Processing tasks was cancelled");
+        println!(
+            "Processing tasks was cancelled. Got: {} tasks and finished {} tasks.",
+            self.tasks(),
+            self.done()
+        );
     }
 
     fn on_finished(&self, _pc: &Parallel<usize>) {
