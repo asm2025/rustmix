@@ -26,9 +26,7 @@ fake = { version = "2", features = [
 file-rotate = { version = "0", optional = true }
 futures = "0"
 html-entities = { version = "0", optional = true }
-hyper = { version = "1", features = ["full"], optional = true }
 http-body-util = "0"
-hyper-util = { version = "0", features = ["full"] }
 image = { version = "0", optional = true }
 kalosm = { version = "0", workspace = true, default-features = false, optional = true }
 lazy_static = "1"
@@ -71,16 +69,7 @@ urlencoding = "2"
 
 [features]
 default = ["mail", "threading", "log4rs"]
-full = [
-    "mail",
-    "threading",
-    "log4rs",
-    "slog",
-    "hyper",
-    "python",
-    "audio",
-    "vision",
-]
+full = ["mail", "threading", "log4rs", "slog", "python", "audio", "vision"]
 llamacpp = ["kalosm?/llamacpp"]
 metal = ["kalosm?/metal"]
 cublas = ["kalosm?/cublas"]
@@ -98,7 +87,6 @@ slog = [
     "dep:slog-json",
     "dep:file-rotate",
 ]
-hyper = ["dep:hyper"]
 python = ["dep:pyo3"]
 audio = ["kalosm/sound", "dep:rodio"]
 vision = ["kalosm/vision", "dep:image"]

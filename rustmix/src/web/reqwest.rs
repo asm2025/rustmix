@@ -2,8 +2,6 @@ extern crate reqwest as _reqwest;
 
 pub use _reqwest::*;
 
-use crate::random::internet::user_agent;
-
 fn build_default_headers() -> header::HeaderMap {
     let mut headers = header::HeaderMap::new();
     headers.insert(
@@ -31,30 +29,28 @@ fn build_default_api_headers() -> header::HeaderMap {
     headers
 }
 
-pub fn build_client_with_ua(ua: String) -> _reqwest::ClientBuilder {
+pub fn build_client() -> _reqwest::ClientBuilder {
     _reqwest::Client::builder()
         .default_headers(build_default_headers())
-        .user_agent(ua)
         .cookie_store(true)
         .pool_max_idle_per_host(0)
         .timeout(std::time::Duration::from_secs(30))
-}
-
-pub fn build_blocking_client_with_ua(ua: String) -> _reqwest::blocking::ClientBuilder {
-    _reqwest::blocking::Client::builder()
-        .default_headers(build_default_headers())
-        .user_agent(ua)
-        .cookie_store(true)
-        .pool_max_idle_per_host(0)
-        .timeout(std::time::Duration::from_secs(30))
-}
-
-pub fn build_client() -> _reqwest::ClientBuilder {
-    build_client_with_ua(user_agent().to_string())
 }
 
 pub fn build_blocking_client() -> _reqwest::blocking::ClientBuilder {
-    build_blocking_client_with_ua(user_agent().to_string())
+    _reqwest::blocking::Client::builder()
+        .default_headers(build_default_headers())
+        .cookie_store(true)
+        .pool_max_idle_per_host(0)
+        .timeout(std::time::Duration::from_secs(30))
+}
+
+pub fn build_client_with_user_agent(agent: String) -> _reqwest::ClientBuilder {
+    build_client().user_agent(agent)
+}
+
+pub fn build_blocking_client_with_user_agent(agent: String) -> _reqwest::blocking::ClientBuilder {
+    build_blocking_client().user_agent(agent)
 }
 
 pub fn build_client_with_headers(headers: header::HeaderMap) -> _reqwest::ClientBuilder {
