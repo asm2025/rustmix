@@ -1,14 +1,14 @@
-use anyhow::{Ok, Result};
-use futures::stream::StreamExt;
+use anyhow::Result;
+use futures::{executor::block_on, stream::StreamExt};
 use kalosm::audio::*;
 pub use kalosm::audio::{Segment, WhisperLanguage, WhisperSource};
 use rodio::Decoder;
-use std::{fs::File, io::BufReader};
+use std::{fs::File, io::BufReader, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Audio {
-    model: Whisper,
+    model: Arc<Whisper>,
 }
 
 impl Audio {
@@ -20,7 +20,9 @@ impl Audio {
             .with_language(Some(WhisperLanguage::English))
             .build()
             .await?;
-        Ok(Audio { model })
+        Ok(Audio {
+            model: Arc::new(model),
+        })
     }
 
     pub async fn new() -> Result<Self> {
@@ -28,7 +30,9 @@ impl Audio {
             .with_language(Some(WhisperLanguage::English))
             .build()
             .await?;
-        Ok(Audio { model })
+        Ok(Audio {
+            model: Arc::new(model),
+        })
     }
 
     pub async fn with(source: WhisperSource, language: WhisperLanguage) -> Result<Self> {
@@ -37,10 +41,27 @@ impl Audio {
             .with_language(Some(language))
             .build()
             .await?;
-        Ok(Audio { model })
+        Ok(Audio {
+            model: Arc::new(model),
+        })
     }
 
-    pub async fn transcribe_file(&self, file_name: &str) -> Result<String> {
+    pub fn transcribe_file(&self, file_name: &str) -> Result<String> {
+        let file = File::open(file_name)?;
+        let source = Decoder::new(BufReader::new(file))?;
+        let mut stream = self.model.transcribe(source)?;
+        block_on(async move {
+            let mut text = String::new();
+
+            while let Some(result) = stream.next().await {
+                text.push_str(result.text());
+            }
+
+            Ok(text)
+        })
+    }
+
+    pub async fn transcribe_file_async(&self, file_name: &str) -> Result<String> {
         let file = File::open(file_name)?;
         let source = Decoder::new(BufReader::new(file))?;
         let mut stream = self.model.transcribe(source)?;
@@ -53,7 +74,23 @@ impl Audio {
         Ok(text)
     }
 
-    pub async fn transcribe_file_callback(
+    pub fn transcribe_file_callback(
+        &self,
+        file_name: &str,
+        callback: impl Fn(&str) -> (),
+    ) -> Result<()> {
+        let file = File::open(file_name)?;
+        let source = Decoder::new(BufReader::new(file))?;
+        let mut stream = self.model.transcribe(source)?;
+        block_on(async move {
+            while let Some(result) = stream.next().await {
+                callback(result.text());
+            }
+        });
+        Ok(())
+    }
+
+    pub async fn transcribe_file_callback_async(
         &self,
         file_name: &str,
         callback: impl Fn(&str) -> (),
@@ -69,7 +106,7 @@ impl Audio {
         Ok(())
     }
 
-    pub async fn transcribe_stream(
+    pub fn transcribe_stream(
         &self,
         file_name: &str,
         sender: UnboundedSender<Segment>,

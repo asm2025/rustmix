@@ -28,7 +28,7 @@ pub async fn test_image() -> Result<()> {
         println!("Generating images...");
         directory::ensure(&curdir)?;
 
-        if let Ok(images) = image.generate(&prompt).await {
+        if let Ok(images) = image.generate(&prompt) {
             for (i, img) in images.iter().enumerate() {
                 let filename = format!("{}IMG{:02}.png", curdir, i + 1);
                 img.save_with_format(&filename, ImageFormat::Png)?;

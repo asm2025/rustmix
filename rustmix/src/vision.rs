@@ -1,17 +1,21 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
+use futures::executor::block_on;
 pub use image::{ImageBuffer, Rgb};
 use kalosm::vision::Wuerstchen;
 pub use kalosm::{vision::WuerstchenInferenceSettings, *};
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct Image {
-    model: Wuerstchen,
+    model: Arc<Wuerstchen>,
 }
 
 impl Image {
     pub async fn new() -> Result<Self> {
         let model = Wuerstchen::builder().build().await?;
-        Ok(Image { model })
+        Ok(Image {
+            model: Arc::new(model),
+        })
     }
 
     pub async fn with(
@@ -35,13 +39,15 @@ impl Image {
             .with_prior_tokenizer(prior_tokenizer)
             .build()
             .await?;
-        Ok(Image { model })
+        Ok(Image {
+            model: Arc::new(model),
+        })
     }
 
-    pub async fn generate(&self, prompt: &str) -> Result<Vec<ImageBuffer<Rgb<u8>, Vec<u8>>>> {
+    pub fn generate(&self, prompt: &str) -> Result<Vec<ImageBuffer<Rgb<u8>, Vec<u8>>>> {
         let settings = WuerstchenInferenceSettings::new(prompt);
-
-        if let Ok(mut stream) = self.model.run(settings) {
+        let mut stream = self.model.run(settings)?;
+        block_on(async move {
             let mut images = Vec::new();
 
             while let Some(image) = stream.next().await {
@@ -51,8 +57,20 @@ impl Image {
             }
 
             Ok(images)
-        } else {
-            Err(anyhow!("Failed to generate images"))
+        })
+    }
+
+    pub async fn generate_async(&self, prompt: &str) -> Result<Vec<ImageBuffer<Rgb<u8>, Vec<u8>>>> {
+        let settings = WuerstchenInferenceSettings::new(prompt);
+        let mut stream = self.model.run(settings)?;
+        let mut images = Vec::new();
+
+        while let Some(image) = stream.next().await {
+            if let Some(buffer) = image.generated_image() {
+                images.push(buffer);
+            }
         }
+
+        Ok(images)
     }
 }
