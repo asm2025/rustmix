@@ -1,5 +1,5 @@
 use anyhow::Result;
-use pyo3::types::PyBytes;
+use pyo3::types::{PyAnyMethods, PyBytes};
 use rustmix::python;
 
 pub fn test_python() -> Result<()> {
@@ -20,8 +20,8 @@ ret = base64.b64encode(s.encode('utf-8'))
         str
     );
     python::exec(&code, |l| {
-        let ret = l.get_item("ret").unwrap().unwrap();
-        let b64: &PyBytes = ret.downcast().unwrap();
+        let ret = l.get_item("ret").unwrap();
+        let b64: &PyBytes = ret.downcast().unwrap().extract().unwrap();
         let b64 = b64.to_string();
         println!("String: '{}', Base64: '{}'", &str, &b64);
     })?;
@@ -41,7 +41,7 @@ if __name__ == "__main__":
         |g| g.set_item("myVar", "Original Value").unwrap(),
         |l| l.set_item("__name__", "__main__").unwrap(),
         |g, _l| {
-            let my_var: String = g.get_item("myVar").unwrap().unwrap().extract().unwrap();
+            let my_var: String = g.get_item("myVar").unwrap().extract().unwrap();
             println!("back to rust -> myVar: {}", my_var);
         },
     )?;

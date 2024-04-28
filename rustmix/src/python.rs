@@ -26,9 +26,9 @@ pub fn version() -> PyResult<VersionInfo> {
 
 pub fn user() -> PyResult<String> {
     Python::with_gil(|py| {
-        let locals = [("os", py.import("os")?)].into_py_dict(py);
+        let locals = [("os", py.import_bound("os")?)].into_py_dict_bound(py);
         let code = "os.getenv('USER') or os.getenv('USERNAME') or 'Unknown'";
-        let user: String = py.eval(code, None, Some(&locals))?.extract()?;
+        let user: String = py.eval_bound(code, None, Some(&locals))?.extract()?;
         Ok(user)
     })
 }
@@ -36,33 +36,37 @@ pub fn user() -> PyResult<String> {
 pub fn run(file_name: &str) -> PyResult<()> {
     Python::with_gil(|py| {
         let code = fs::read_to_string(file_name)?;
-        let locals = [("__name__", "__main__")].into_py_dict(py);
-        py.run(&code, None, Some(locals))?;
+        let locals = [("__name__", "__main__")].into_py_dict_bound(py);
+        py.run_bound(&code, None, Some(&locals))?;
         Ok(())
     })
 }
 
-pub fn exec<C: FnOnce(&PyDict)>(code: &str, callback: C) -> PyResult<()> {
+pub fn exec<C: FnOnce(&Bound<'_, PyDict>)>(code: &str, callback: C) -> PyResult<()> {
     Python::with_gil(|py| {
-        let locals = PyDict::new(py);
-        py.run(&code, None, Some(&locals))?;
+        let locals = PyDict::new_bound(py);
+        py.run_bound(&code, None, Some(&locals))?;
         callback(&locals);
         Ok(())
     })
 }
 
-pub fn exec_with<G: FnOnce(&PyDict), L: FnOnce(&PyDict), C: FnOnce(&PyDict, &PyDict)>(
+pub fn exec_with<
+    G: FnOnce(&Bound<'_, PyDict>),
+    L: FnOnce(&Bound<'_, PyDict>),
+    C: FnOnce(&Bound<'_, PyDict>, &Bound<'_, PyDict>),
+>(
     code: &str,
     set_globals: G,
     set_locals: L,
     callback: C,
 ) -> PyResult<()> {
     Python::with_gil(|py| {
-        let global = PyDict::new(py);
-        let locals = PyDict::new(py);
+        let global = PyDict::new_bound(py);
+        let locals = PyDict::new_bound(py);
         set_globals(&global);
         set_locals(&locals);
-        py.run(&code, Some(global), Some(locals))?;
+        py.run_bound(&code, Some(&global), Some(&locals))?;
         callback(&global, &locals);
         Ok(())
     })

@@ -27,6 +27,10 @@ async fn main() -> Result<()> {
     //tests::test_reqwest().await?;
     //task::spawn_blocking(move || tests::test_blocking_reqwest().unwrap()).await?;
 
+    //tests::test_slog()?;
+    //tests::test_log4rs(true)?;
+    //tests::test_log4rs(false)?;
+
     //tests::test_tempmail().await?;
 
     //tests::test_producer_consumer(Duration::ZERO).await?;
@@ -40,12 +44,8 @@ async fn main() -> Result<()> {
 
     //tests::test_python()?;
 
-    //tests::test_sound().await?;
+    tests::test_sound().await?;
     //tests::test_image().await?;
-
-    //tests::test_slog()?;
-    //tests::test_log4rs(true)?;
-    //tests::test_log4rs(false)?;
 
     Ok(())
 }
