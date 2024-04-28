@@ -11,6 +11,6 @@ authors = ["Evan Almloff"]
 futures-util = "0"
 anyhow = "1"
 tracing = "0"
-pin-project = "1"
+pin-project-lite = "0"
 tokio = { version = "1", features = ["full"] }
 image = "0"

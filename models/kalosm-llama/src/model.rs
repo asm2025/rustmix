@@ -3,7 +3,6 @@ use crate::{raw::Model, session::LlamaSession};
 use anyhow::{Error as E, Result};
 use kalosm_common::*;
 use kalosm_language_model::SyncModelExt;
-use llm_samplers::prelude::Logits;
 use std::sync::Arc;
 
 use candle_core::{
@@ -14,7 +13,6 @@ use kalosm_language_model::SyncModel;
 use tokenizers::Tokenizer;
 
 use crate::InferenceSettings;
-use kalosm_common::accelerated_device_if_available;
 
 /// The inner, synchronous Llama model.
 pub struct LlamaModel {
@@ -32,34 +30,19 @@ impl SyncModel for LlamaModel {
         Ok(Self::Session { cache })
     }
 
-    fn feed_text(
-        &self,
-        session: &mut Self::Session,
-        prompt: &str,
-        top_k: Option<usize>,
-    ) -> anyhow::Result<Logits> {
+    fn feed_text(&self, session: &mut Self::Session, prompt: &str) -> anyhow::Result<Vec<f32>> {
         let encoded = self.tokenizer.encode(prompt, true).map_err(E::msg)?;
         let tokens = encoded.get_ids();
-        self.feed_tokens(session, tokens, top_k)
+        self.feed_tokens(session, tokens)
     }
 
-    fn feed_tokens(
-        &self,
-        session: &mut Self::Session,
-        tokens: &[u32],
-        top_k: Option<usize>,
-    ) -> anyhow::Result<Logits> {
-        Self::forward(
-            &self.model,
-            &self.device,
-            tokens,
-            Some(&mut session.cache),
-            top_k,
-        )
+    fn feed_tokens(&self, session: &mut Self::Session, tokens: &[u32]) -> anyhow::Result<Vec<f32>> {
+        Self::forward(&self.model, &self.device, tokens, Some(&mut session.cache))
     }
 
     fn stop_token(&self) -> anyhow::Result<u32> {
-        let eos_token = match self.tokenizer.get_vocab(true).get("</s>") {
+        let vocab = self.tokenizer.get_vocab(true);
+        let eos_token = match vocab.get("</s>").or(vocab.get("<|end_of_text|>")) {
             Some(token) => *token,
             None => anyhow::bail!("cannot find the </s> token"),
         };
@@ -77,24 +60,16 @@ impl LlamaModel {
         device: &Device,
         tokens: &[u32],
         cache: Option<&mut LlamaCache>,
-        top_k: Option<usize>,
-    ) -> anyhow::Result<Logits> {
+    ) -> anyhow::Result<Vec<f32>> {
         if tokens.is_empty() {
             return Err(anyhow::anyhow!("Cannot run model on empty input"));
         }
 
         let logits = model.forward(tokens, device, cache)?;
 
-        if top_k == Some(0) {
-            return Ok(Logits::default());
-        }
-
         let logits = logits.squeeze(0)?.to_dtype(DType::F32)?;
         let logits: Vec<f32> = logits.to_vec1()?;
-        match top_k {
-            Some(top_k) => Ok(Logits::try_from_iter_top_k(logits, top_k)?),
-            None => Ok(Logits::try_from_iter(logits)?),
-        }
+        Ok(logits)
     }
 
     /// Create a new sync Llama model from a builder.
@@ -102,25 +77,19 @@ impl LlamaModel {
         builder: crate::LlamaBuilder,
         mut handler: impl FnMut(ModelLoadingProgress) + Send + Sync + 'static,
     ) -> anyhow::Result<Self> {
+        let tokenizer_source = format!("Tokenizer ({})", builder.source.tokenizer);
+        let mut create_progress = ModelLoadingProgress::downloading_progress(tokenizer_source);
         let tokenizer = builder
             .source
-            .tokenizer(|progress| {
-                handler(ModelLoadingProgress::Downloading {
-                    source: format!("Tokenizer ({})", builder.source.tokenizer),
-                    progress,
-                })
-            })
+            .tokenizer(|progress| handler(create_progress(progress)))
             .await?;
 
         let device = accelerated_device_if_available()?;
+        let source = format!("Model ({})", builder.source.model);
+        let mut create_progress = ModelLoadingProgress::downloading_progress(source);
         let filename = builder
             .source
-            .model(|progress| {
-                handler(ModelLoadingProgress::Downloading {
-                    source: format!("Model ({})", builder.source.tokenizer),
-                    progress,
-                })
-            })
+            .model(|progress| handler(create_progress(progress)))
             .await?;
         let mut file = std::fs::File::open(&filename)?;
         let model = match filename.extension().and_then(|v| v.to_str()) {

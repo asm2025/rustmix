@@ -20,10 +20,11 @@ use tokenizers::PreTokenizer;
 use tokenizers::PreTokenizerWrapper;
 use tokenizers::TokenizerImpl;
 
+#[doc(hidden)]
+pub use anyhow;
+
 mod structured_parser;
 pub use structured_parser::*;
-#[cfg(feature = "llamacpp")]
-mod llm;
 
 /// A type erased wrapper for a tokenizer.
 pub struct DynTokenizer {

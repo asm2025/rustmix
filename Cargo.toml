@@ -18,15 +18,10 @@ image = "0"
 dotenv = "0"
 rustmix = { workspace = true, version = "0", features = ["full"] }
 
-[patch.crates-io]
-dioxus-core = { git = "https://github.com/ealmloff/dioxus", branch = "improved-signals" }
-dioxus-rsx = { git = "https://github.com/ealmloff/dioxus", branch = "improved-signals" }
-dioxus = { git = "https://github.com/ealmloff/dioxus", branch = "improved-signals" }
-
 [workspace]
 members = [
-	"rustmix",
-	"models/rbert",
+    "rustmix",
+    "models/rbert",
     "models/kalosm-llama",
     "models/rphi",
     "models/rwhisper",
@@ -35,16 +30,15 @@ members = [
     "models/kalosm-ocr",
     "interfaces/kalosm",
     "interfaces/kalosm-common",
-    # "interfaces/kalosm-language",
+    "interfaces/kalosm-language",
     "interfaces/language-model",
     "interfaces/kalosm-sample",
     "interfaces/kalosm-vision",
     "interfaces/kalosm-sound",
     "interfaces/kalosm-streams",
     "interfaces/kalosm-learning",
-    "interfaces/kalosm-learning-macro"
+    "interfaces/kalosm-learning-macro",
 ]
-resolver = "2"
 
 [workspace.dependencies]
 candle-core = { git = "https://github.com/huggingface/candle", rev = "cdc8b57b5cf28ad92642b076d67e610bdb958b2d" }
@@ -56,7 +50,7 @@ kalosm-sample = { path = "./interfaces/kalosm-sample", version = "0" }
 kalosm-common = { path = "./interfaces/kalosm-common", version = "0" }
 kalosm-language-model = { path = "./interfaces/language-model", version = "0" }
 kalosm-streams = { path = "./interfaces/kalosm-streams", version = "0" }
-# kalosm-language = { path = "./interfaces/kalosm-language", version = "0" }
+kalosm-language = { path = "./interfaces/kalosm-language", version = "0" }
 kalosm-sound = { path = "./interfaces/kalosm-sound", version = "0" }
 kalosm-vision = { path = "./interfaces/kalosm-vision", version = "0" }
 kalosm-learning = { path = "./interfaces/kalosm-learning", version = "0" }
@@ -70,6 +64,14 @@ segment-anything-rs = { path = "./models/segment-anything-rs", version = "0" }
 kalosm-ocr = { path = "./models/kalosm-ocr", version = "0" }
 rustmix = { path = "./rustmix", version = "0" }
 llm-samplers = "=0.0.7"
+
+[patch.crates-io]
+dioxus = { git = "https://github.com/dioxuslabs/dioxus" }
+dioxus-core = { git = "https://github.com/dioxuslabs/dioxus" }
+dioxus-rsx = { git = "https://github.com/dioxuslabs/dioxus" }
+dioxus-html = { git = "https://github.com/dioxuslabs/dioxus" }
+dioxus-hooks = { git = "https://github.com/dioxuslabs/dioxus" }
+dioxus-desktop = { git = "https://github.com/dioxuslabs/dioxus" }
 
 [profile.dist]
 inherits = "release"
@@ -89,4 +91,4 @@ run = "cargo run"
 check = "cargo check"
 build = "cargo build"
 release = "cargo build --release"
-features = "cargo tree --features" 
+features = "cargo tree --features"

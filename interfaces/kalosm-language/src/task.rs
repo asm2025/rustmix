@@ -82,7 +82,7 @@ impl<S: Session> TaskSessionEntry<S> {
 
     fn create_new_session(&mut self, model: &mut impl SyncModel<Session = S>) -> Result<S> {
         let mut session = model.new_session()?;
-        model.feed_text(&mut session, &self.cached_prompt, Some(0))?;
+        model.feed_text(&mut session, &self.cached_prompt)?;
 
         self.session = session.try_clone().ok();
 
@@ -104,19 +104,8 @@ impl<S: Session> TaskSessionEntry<S> {
         }
     }
 
-    fn start_session(
-        &mut self,
-        message: &str,
-        model: &mut impl SyncModel<Session = S>,
-    ) -> Result<S> {
-        let mut session = self.create_session(model)?;
-
-        let prompt = message.to_string() + &self.after_input;
-
-        // Feed the message to the model.
-        model.feed_text(&mut session, &prompt, Some(0))?;
-
-        Ok(session)
+    fn task_prompt(&self, message: &str) -> String {
+        message.to_string() + &self.after_input
     }
 }
 
@@ -291,7 +280,7 @@ impl TaskRunner for UnstructuredRunner {
                         .downcast_mut()
                         .unwrap()
                 };
-                let mut session = match session_entry.start_session(&input, model) {
+                let mut session = match session_entry.create_session(model) {
                     Ok(session) => session,
                     Err(err) => {
                         tracing::error!("Failed to start session: {}", err);
@@ -302,9 +291,10 @@ impl TaskRunner for UnstructuredRunner {
                     tx.send(tok)?;
                     Ok(kalosm_language_model::ModelFeedback::Continue)
                 };
+                let prompt = session_entry.task_prompt(&input);
                 if let Err(err) = model.stream_text_with_sampler(
                     &mut session,
-                    &input,
+                    &prompt,
                     None,
                     Some(&stop_on),
                     sampler,
@@ -402,7 +392,7 @@ where
                 let span = tracing::span!(tracing::Level::TRACE, "Task session");
                 let _span = span.enter();
 
-                let mut session = match session_entry.start_session(&input, model) {
+                let mut session = match session_entry.create_session( model) {
                     Ok(session) => session,
                     Err(err) => {
                         tracing::error!("Failed to start session: {}", err);
@@ -416,13 +406,15 @@ where
                     tx.send(tok)?;
                     Ok(())
                 };
+                let prompt = session_entry.task_prompt(&input);
                 let result = model.generate_structured(
                     &mut session,
-                    &input,
+                    &prompt,
                     arc_parser,
                     state,
                     sampler,
                     on_token,
+                    Some(32),
                 );
                 if parsed_tx.send(result).is_err() {
                     tracing::error!("Failed to send parsed result");

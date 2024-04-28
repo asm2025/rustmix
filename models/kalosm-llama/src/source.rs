@@ -10,6 +10,14 @@ fn llama_tokenizer() -> FileSource {
     )
 }
 
+fn llama_v3_tokenizer() -> FileSource {
+    FileSource::huggingface(
+        "NousResearch/Meta-Llama-3-8B-Instruct".to_string(),
+        "main".to_string(),
+        "tokenizer.json".to_string(),
+    )
+}
+
 fn mistral_tokenizer() -> FileSource {
     FileSource::huggingface(
         "mistralai/Mistral-7B-v0.1".to_string(),
@@ -60,17 +68,14 @@ impl LlamaSource {
         self
     }
 
-    pub(crate) async fn tokenizer(
-        &self,
-        progress: impl FnMut(f32) + Send + Sync,
-    ) -> anyhow::Result<Tokenizer> {
+    pub(crate) async fn tokenizer(&self, progress: impl FnMut(f32)) -> anyhow::Result<Tokenizer> {
         let tokenizer_path = self.tokenizer.download(progress).await?;
         Tokenizer::from_file(tokenizer_path).map_err(anyhow::Error::msg)
     }
 
     pub(crate) async fn model(
         &self,
-        progress: impl FnMut(f32) + Send + Sync,
+        progress: impl FnMut(f32),
     ) -> anyhow::Result<std::path::PathBuf> {
         self.model.download(progress).await
     }
@@ -294,6 +299,27 @@ impl LlamaSource {
         }
     }
 
+    /// A preset for WizardLM 2 7B
+    pub fn wizard_lm_7b_v2() -> Self {
+        Self {
+            model: FileSource::huggingface(
+                "bartowski/WizardLM-2-7B-GGUF".to_string(),
+                "main".to_string(),
+                "WizardLM-2-7B-Q4_K_M.gguf".to_string(),
+            ),
+            tokenizer: mistral_tokenizer(),
+            group_query_attention: 8,
+            markers: Some(ChatMarkers {
+                system_prompt_marker: "",
+                end_system_prompt_marker: "",
+                user_marker: "USER: ",
+                end_user_marker: "</s>",
+                assistant_marker: "ASSISTANT: ",
+                end_assistant_marker: "</s>",
+            }),
+        }
+    }
+
     /// A preset for tiny llama 1.1b 1.0 Chat
     pub fn tiny_llama_1_1b_chat() -> Self {
         Self {
@@ -337,7 +363,32 @@ impl LlamaSource {
         }
     }
 
-    /// A preset for Llama7b
+    /// A preset for Phi-3-mini-4k-instruct
+    pub fn phi_3_mini_4k_instruct() -> Self {
+        Self {
+            model: FileSource::huggingface(
+                "microsoft/Phi-3-mini-4k-instruct-gguf".to_string(),
+                "main".to_string(),
+                "Phi-3-mini-4k-instruct-q4.gguf".to_string(),
+            ),
+            tokenizer: FileSource::huggingface(
+                "microsoft/Phi-3-mini-4k-instruct".to_string(),
+                "main".to_string(),
+                "tokenizer.json".to_string(),
+            ),
+            group_query_attention: 1,
+            markers: Some(ChatMarkers {
+                system_prompt_marker: "<|system|>\n",
+                end_system_prompt_marker: "<|end|>",
+                user_marker: "<|user|>\n",
+                end_user_marker: "<|end|>",
+                assistant_marker: "<|assistant|>\n",
+                end_assistant_marker: "<|end|>",
+            }),
+        }
+    }
+
+    /// A preset for Llama7b v2
     pub fn llama_7b() -> Self {
         Self {
             model: FileSource::huggingface(
@@ -348,6 +399,41 @@ impl LlamaSource {
             tokenizer: llama_tokenizer(),
             group_query_attention: 1,
             ..Default::default()
+        }
+    }
+
+    /// A preset for Llama8b v3
+    pub fn llama_8b() -> Self {
+        Self {
+            model: FileSource::huggingface(
+                "NousResearch/Meta-Llama-3-8B-GGUF".to_string(),
+                "main".to_string(),
+                "Meta-Llama-3-8B-Q4_K_M.gguf".to_string(),
+            ),
+            tokenizer: llama_v3_tokenizer(),
+            group_query_attention: 1,
+            ..Default::default()
+        }
+    }
+
+    /// A preset for Llama8b v3
+    pub fn llama_8b_chat() -> Self {
+        Self {
+            model: FileSource::huggingface(
+                "bartowski/Meta-Llama-3-8B-Instruct-GGUF".to_string(),
+                "main".to_string(),
+                "Meta-Llama-3-8B-Instruct-Q4_K_M.gguf".to_string(),
+            ),
+            tokenizer: llama_v3_tokenizer(),
+            group_query_attention: 1,
+            markers: Some(ChatMarkers {
+                system_prompt_marker: "<|begin_of_text|><|start_header_id|>system<|end_header_id|>",
+                end_system_prompt_marker: "<|eot_id|>",
+                user_marker: "<|start_header_id|>user<|end_header_id|>",
+                end_user_marker: "<|eot_id|>",
+                assistant_marker: "<|start_header_id|>assistant<|end_header_id|>",
+                end_assistant_marker: "<|eot_id|>",
+            }),
         }
     }
 

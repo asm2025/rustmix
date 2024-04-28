@@ -1,7 +1,7 @@
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [package]
 name = "rustmix"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "rustmix is a Rust library that has some basic utility functions and components."
 authors = ["asm <asm2025@outlook.com>"]
@@ -70,11 +70,10 @@ urlencoding = "2"
 [features]
 default = ["mail", "threading", "log4rs"]
 full = ["mail", "threading", "log4rs", "slog", "python", "audio", "vision"]
-llamacpp = ["kalosm?/llamacpp"]
 metal = ["kalosm?/metal"]
 cublas = ["kalosm?/cublas"]
 mkl = ["kalosm?/mkl"]
-# language = ["kalosm/language"]
+language = ["kalosm/language"]
 mail = ["dep:html-entities", "dep:lettre", "dep:once_cell", "dep:regex"]
 threading = ["dep:crossbeam", "dep:rayon"]
 log4rs = ["dep:log4rs"]

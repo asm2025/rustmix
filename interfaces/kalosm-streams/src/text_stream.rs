@@ -1,4 +1,6 @@
-use pin_project::pin_project;
+//! Streams for text data.
+
+use pin_project_lite::pin_project;
 use std::{
     collections::VecDeque,
     pin::Pin,
@@ -9,7 +11,7 @@ pub use crate::sender::*;
 use futures_util::{Stream, StreamExt};
 
 /// A stream of text. This is automatically implemented for all streams of something that acts like a string (String, &str).
-pub trait TextStream<I: AsRef<str>>: Stream<Item = I> {
+pub trait TextStream<I: AsRef<str> = String>: Stream<Item = I> {
     /// Split the stream into words.
     fn words(self) -> WordStream<Self, I>
     where
@@ -82,14 +84,15 @@ pub trait Pattern {
     fn matches(&self, char: char) -> bool;
 }
 
-/// A stream that output segments of text at a time.
-#[pin_project]
-pub struct SegmentedStream<S: Stream<Item = I>, I: AsRef<str>, P: Pattern> {
-    #[pin]
-    backing: S,
-    queue: VecDeque<String>,
-    incomplete: String,
-    pattern: P,
+pin_project! {
+    /// A stream that output segments of text at a time.
+    pub struct SegmentedStream<S: Stream<Item = I>, I: AsRef<str>, P: Pattern> {
+        #[pin]
+        backing: S,
+        queue: VecDeque<String>,
+        incomplete: String,
+        pattern: P,
+    }
 }
 
 impl<S: Stream<Item = I>, I: AsRef<str>, P: Pattern> SegmentedStream<S, I, P> {
@@ -161,11 +164,12 @@ impl Pattern for SentencePattern {
     }
 }
 
-/// A stream that output sentences of text at a time.
-#[pin_project]
-pub struct SentenceStream<S: Stream<Item = I>, I: AsRef<str>> {
-    #[pin]
-    segmented: SegmentedStream<S, I, SentencePattern>,
+pin_project! {
+    /// A stream that output sentences of text at a time.
+    pub struct SentenceStream<S: Stream<Item = I>, I: AsRef<str>> {
+        #[pin]
+        segmented: SegmentedStream<S, I, SentencePattern>,
+    }
 }
 
 impl<S: Stream<Item = I>, I: AsRef<str>> SentenceStream<S, I> {
@@ -185,11 +189,12 @@ impl<S: Stream<Item = I>, I: AsRef<str>> Stream for SentenceStream<S, I> {
     }
 }
 
-/// A stream that output words of text at a time.
-#[pin_project]
-pub struct WordStream<S: Stream<Item = I>, I: AsRef<str>> {
-    #[pin]
-    segmented: SegmentedStream<S, I, WordPattern>,
+pin_project! {
+    /// A stream that output words of text at a time.
+    pub struct WordStream<S: Stream<Item = I>, I: AsRef<str>> {
+        #[pin]
+        segmented: SegmentedStream<S, I, WordPattern>,
+    }
 }
 
 impl<S: Stream<Item = I>, I: AsRef<str>> WordStream<S, I> {
@@ -217,11 +222,12 @@ impl Pattern for WordPattern {
     }
 }
 
-/// A stream that output paragraphs of text at a time.
-#[pin_project]
-pub struct ParagraphStream<S: Stream<Item = I>, I: AsRef<str>> {
-    #[pin]
-    segmented: SegmentedStream<S, I, ParagraphPattern>,
+pin_project! {
+    /// A stream that output paragraphs of text at a time.
+    pub struct ParagraphStream<S: Stream<Item = I>, I: AsRef<str>> {
+        #[pin]
+        segmented: SegmentedStream<S, I, ParagraphPattern>,
+    }
 }
 
 impl<S: Stream<Item = I>, I: AsRef<str>> ParagraphStream<S, I> {

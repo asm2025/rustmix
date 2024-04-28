@@ -150,11 +150,12 @@ impl IntoDocuments for DocumentFolder {
 }
 
 impl DocumentFolder {
-    #[async_recursion::async_recursion]
-    async fn start_into_documents(
-        &self,
-        set: &mut JoinSet<anyhow::Result<Document>>,
-    ) -> anyhow::Result<()> {
+    fn start_into_documents<'a>(
+        &'a self,
+        set: &'a mut JoinSet<anyhow::Result<Document>>,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>> + Send + Sync + 'a>>
+    {
+        Box::pin(async move {
         let mut read_dir = tokio::fs::read_dir(&self.path).await?;
         while let Some(entry) = read_dir.next_entry().await? {
             let path = entry.path();
@@ -167,5 +168,6 @@ impl DocumentFolder {
             }
         }
         Ok(())
+        })
     }
 }
