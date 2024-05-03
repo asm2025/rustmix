@@ -68,7 +68,7 @@ default-features = false
 axum = "0"
 ego-tree = "0"
 scraper = "0"
-tokenizers = "0"
+tokenizers = "0.15.2"
 tracing-subscriber = "0"
 
 [dev-dependencies.candle-core]

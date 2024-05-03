@@ -20,7 +20,7 @@ candle-nn = { workspace = true }
 candle-transformers = { workspace = true }
 byteorder = "1"
 hf-hub = "0"
-tokenizers = "0"
+tokenizers = "0.15.2"
 serde_json = "1"
 hound = "3"
 rodio = "0"
@@ -31,9 +31,15 @@ async-trait = "0"
 kalosm-streams = { workspace = true }
 
 accelerate-src = { version = "0", optional = true }
-intel-mkl-src = { version = "0", features = ["mkl-static-lp64-iomp"], optional = true }
+intel-mkl-src = { version = "0", features = [
+    "mkl-static-lp64-iomp",
+], optional = true }
 cudarc = { version = "0", features = ["f16"], optional = true }
-half = { version = "2", features = ["num-traits", "use-intrinsics", "rand_distr"], optional = true }
+half = { version = "2", features = [
+    "num-traits",
+    "use-intrinsics",
+    "rand_distr",
+], optional = true }
 kalosm-common = { version = "0", workspace = true }
 kalosm-language-model = { workspace = true }
 
@@ -41,9 +47,19 @@ kalosm-language-model = { workspace = true }
 kalosm-sound = { workspace = true }
 
 [features]
-accelerate = ["dep:accelerate-src", "candle-core/accelerate", "candle-nn/accelerate", "candle-transformers/accelerate"]
+accelerate = [
+    "dep:accelerate-src",
+    "candle-core/accelerate",
+    "candle-nn/accelerate",
+    "candle-transformers/accelerate",
+]
 cuda = ["candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
 cudnn = ["candle-core/cudnn"]
-mkl = ["dep:intel-mkl-src", "candle-core/mkl", "candle-nn/mkl", "candle-transformers/mkl"]
+mkl = [
+    "dep:intel-mkl-src",
+    "candle-core/mkl",
+    "candle-nn/mkl",
+    "candle-transformers/mkl",
+]
 nccl = ["cuda", "cudarc/nccl", "dep:half"]
 metal = ["candle-core/metal", "candle-nn/metal", "candle-transformers/metal"]
