@@ -51,7 +51,7 @@ pdf_text = { git = "https://github.com/pdf-rs/pdf_text" }
 convert_case = "0"
 itertools = "0"
 async-recursion = "1"
-tokenizers = { version = "0" }
+tokenizers = { version = "0.15.2" }
 rustc-hash = "1"
 kalosm-sample = { workspace = true }
 ego-tree = "0"
@@ -63,6 +63,13 @@ half = "2"
 
 [features]
 metal = ["rphi/metal", "rbert/metal", "kalosm-llama/metal"]
-cublas = ["rbert/cuda", "rbert/cudnn", "rphi/cuda", "rphi/cudnn", "kalosm-llama/cuda", "kalosm-llama/cudnn"]
+cublas = [
+    "rbert/cuda",
+    "rbert/cudnn",
+    "rphi/cuda",
+    "rphi/cudnn",
+    "kalosm-llama/cuda",
+    "kalosm-llama/cudnn",
+]
 mkl = ["rphi/mkl", "rbert/mkl", "kalosm-llama/mkl"]
 remote = ["kalosm-language-model/remote"]

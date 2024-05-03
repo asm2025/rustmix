@@ -14,7 +14,7 @@ rand = "0"
 anyhow = "1"
 tracing = "0"
 candle-core = { workspace = true }
-tokenizers = { version = "0" }
+tokenizers = { version = "0.15.2" }
 rustc-hash = "1"
 regex-automata = "0"
 thiserror = "1"
