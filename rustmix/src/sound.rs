@@ -35,6 +35,16 @@ impl Audio {
         })
     }
 
+    pub async fn with_source(source: WhisperSource) -> Result<Self> {
+        let model = WhisperBuilder::default()
+            .with_source(source)
+            .build()
+            .await?;
+        Ok(Audio {
+            model: Arc::new(model),
+        })
+    }
+
     pub async fn with(source: WhisperSource, language: WhisperLanguage) -> Result<Self> {
         let model = WhisperBuilder::default()
             .with_source(source)
