@@ -44,7 +44,7 @@ use model::WhisperInner;
 use rodio::{source::UniformSourceIterator, Source};
 use std::{fmt::Display, str::FromStr, time::Duration};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 
 use candle_transformers::models::whisper::{self as m};
 
@@ -319,13 +319,22 @@ impl WhisperBuilder {
             .await?;
 
         let (rx, tx) = std::sync::mpsc::channel();
+        let (erx, etx) = std::sync::mpsc::channel();
         let thread = std::thread::spawn(move || {
             tokio::runtime::Builder::new_current_thread()
                 .build()
                 .unwrap()
                 .block_on(async move {
-                    let mut model =
-                        WhisperInner::new(self, filename, tokenizer_filename, config).unwrap();
+                    let model = WhisperInner::new(self, filename, tokenizer_filename, config);
+
+                    if model.is_err() {
+                        let err = model.err().unwrap();
+                        erx.send(err).unwrap();
+                        return;
+                    }
+
+                    let mut model = model.unwrap();
+
                     while let Ok(message) = tx.recv() {
                         match message {
                             WhisperMessage::Kill => return,
@@ -337,10 +346,14 @@ impl WhisperBuilder {
                 });
         });
 
-        Ok(Whisper {
-            thread: Some(thread),
-            sender: rx,
-        })
+        match etx.try_recv() {
+            Ok(err) => Err(err.into()),
+            Err(std::sync::mpsc::TryRecvError::Empty) => Ok(Whisper {
+                thread: Some(thread),
+                sender: rx,
+            }),
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => Err(anyhow!("thread panicked")),
+        }
     }
 
     /// Set the model to be used.
