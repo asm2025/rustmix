@@ -1,5 +1,4 @@
-use anyhow::Result;
-use rustmix::threading::*;
+use rustmix::{threading::*, Result};
 use std::{
     collections,
     sync::{

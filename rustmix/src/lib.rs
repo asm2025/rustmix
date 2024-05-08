@@ -11,6 +11,7 @@ pub mod vision;
 pub use self::app::*;
 pub mod date;
 pub mod error;
+pub mod input;
 pub mod io;
 #[cfg(feature = "python")]
 pub mod python;
@@ -30,6 +31,8 @@ pub const LOG_SIZE_MAX: usize = 1024 * 1024 * 10;
 lazy_static! {
     static ref DEBUG: Mutex<bool> = Mutex::new(false);
 }
+
+pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[derive(Debug, Clone, Copy)]
 pub enum LogLevel {

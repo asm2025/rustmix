@@ -1,10 +1,11 @@
-use anyhow::Result;
 use futures::{executor::block_on, stream::StreamExt};
 use kalosm::audio::*;
 pub use kalosm::audio::{Segment, WhisperLanguage, WhisperSource};
 use rodio::Decoder;
 use std::{fs::File, io::BufReader, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
+
+use crate::Result;
 
 #[derive(Debug, Clone)]
 pub struct Audio {
@@ -123,6 +124,8 @@ impl Audio {
     ) -> Result<()> {
         let file = File::open(file_name)?;
         let source = Decoder::new(BufReader::new(file))?;
-        self.model.transcribe_into(source, sender)
+        self.model
+            .transcribe_into(source, sender)
+            .map_err(|e| e.into())
     }
 }

@@ -1,5 +1,4 @@
-use anyhow::{anyhow, Result};
-use rustmix::web::*;
+use rustmix::{error::InvalidResponseError, web::*, Result};
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -38,9 +37,7 @@ pub async fn test_reqwest() -> Result<()> {
     let body = get_employees(3);
     println!("Post: '{url}'");
     let response: Value = client.post(url).json(&body).send().await?.json().await?;
-    let data = response["data"]
-        .as_str()
-        .ok_or(anyhow!("data field is not a string"))?;
+    let data = response["data"].as_str().ok_or(InvalidResponseError)?;
     let employees: Vec<Employee> = serde_json::from_str(data)?;
     println!("employees: {:#?}", employees);
 
@@ -92,9 +89,7 @@ pub fn test_blocking_reqwest() -> Result<()> {
     let body = get_employees(3);
     println!("Post: '{url}'");
     let response: Value = client.post(url).json(&body).send()?.json()?;
-    let data = response["data"]
-        .as_str()
-        .ok_or(anyhow!("data field is not a string"))?;
+    let data = response["data"].as_str().ok_or(InvalidResponseError)?;
     let employees: Vec<Employee> = serde_json::from_str(data)?;
     println!("employees: {:#?}", employees);
 

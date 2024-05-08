@@ -1,4 +1,3 @@
-use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use html_entities::decode_html_entities;
 use once_cell::sync::Lazy;
@@ -9,8 +8,10 @@ use std::fmt::{Display, Result as DisplayResult};
 
 use crate::{
     date::{parse_date, parse_date_ftz, utc_today},
+    error::{ElementNotFoundError, NoContentError},
     random,
     web::reqwest::build_client_for_api,
+    Result,
 };
 
 const URL_TEMP_MAIL: &str = "https://api.internal.temp-mail.io/api/v3/";
@@ -202,22 +203,22 @@ impl TempMail {
         let body = Self::email_fake_get_content(URL_EMAIL_FAKE).await?;
 
         if body.is_empty() {
-            return Err(anyhow!("Failed to get email-fake.com"));
+            return Err(NoContentError.into());
         }
 
         let start = match body.find("fem coserch") {
             Some(index) => index,
-            None => return Err(anyhow!("Failed to find coserch")),
+            None => return Err(ElementNotFoundError("coserch".to_string()).into()),
         };
         let body = &body[start..];
         let end = match body.find("fem dropselect") {
             Some(index) => index,
-            None => return Err(anyhow!("Failed to find dropselect")),
+            None => return Err(ElementNotFoundError("dropselect".to_string()).into()),
         };
         let body = &body[..end];
         let captures = match RGX_EMAIL_FAKE_GENERATE.captures(&body) {
             Some(captures) => captures,
-            None => return Err(anyhow!("Failed to find username and domain")),
+            None => return Err(ElementNotFoundError("username and domain".to_string()).into()),
         };
         let username = captures.get(1).unwrap().as_str();
         let domain = captures.get(2).unwrap().as_str();
@@ -409,10 +410,7 @@ impl TempMail {
             }
         }
 
-        let body = match decode_html_entities(&body) {
-            Ok(it) => it,
-            Err(_) => Err(anyhow!("Failed to decode html entities"))?,
-        };
+        let body = decode_html_entities(&body).unwrap();
 
         if let Some(matches) = RGX_EMAIL_FAKE_MESSAGE.captures(&body) {
             let f = matches.get(2).unwrap().as_str().to_lowercase();
@@ -435,14 +433,7 @@ impl TempMail {
 
     async fn email_fake_get_content(url: &str) -> Result<String> {
         let response = __HTTP.get(url).send().await?;
-
-        if response.status() != 200 {
-            return Err(anyhow!(format!(
-                "Failed to get email-fake.com. {}",
-                response.status()
-            )));
-        }
-
+        response.error_for_status_ref()?;
         Ok(response.text().await?)
     }
 

@@ -1,9 +1,10 @@
-use anyhow::Result;
 use futures::executor::block_on;
 pub use image::{ImageBuffer, Rgb};
 use kalosm::vision::Wuerstchen;
 pub use kalosm::{vision::WuerstchenInferenceSettings, *};
 use std::sync::Arc;
+
+use crate::Result;
 
 #[derive(Debug)]
 pub struct Image {

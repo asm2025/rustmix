@@ -1,4 +1,3 @@
-use anyhow::{anyhow, Result};
 use crossbeam::channel;
 use std::{
     sync::{
@@ -13,6 +12,10 @@ use tokio::{
 };
 
 use super::{cond::Mutcond, *};
+use crate::{
+    error::{CancelledError, QueueCompletedError},
+    Result,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProducerConsumerOptions {
@@ -87,11 +90,11 @@ impl<T: Send + Sync + Clone> Producer<T> {
 
     pub fn enqueue(&self, item: T) -> Result<()> {
         if self.pc.is_cancelled() {
-            return Err(anyhow!(error::CancelledError));
+            return Err(CancelledError.into());
         }
 
         if self.pc.is_completed() {
-            return Err(anyhow!(error::QueueCompletedError));
+            return Err(QueueCompletedError.into());
         }
 
         self.sender.send(item).unwrap();
@@ -341,18 +344,18 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
 
                     match delegate.process(&this, &item) {
                         Ok(it) => {
-                            let time = Instant::now();
-
                             if !delegate.on_completed(&this, &item, &it) {
                                 this.dec_running();
                                 break;
                             }
 
-                            if !this.options.threshold.is_zero()
-                                && time.elapsed() < this.options.threshold
-                            {
-                                let remaining = this.options.threshold - time.elapsed();
-                                thread::sleep(remaining);
+                            if !this.options.threshold.is_zero() {
+                                let time = Instant::now();
+
+                                if time.elapsed() < this.options.threshold {
+                                    let remaining = this.options.threshold - time.elapsed();
+                                    thread::sleep(remaining);
+                                }
                             }
                         }
                         Err(e) => {
@@ -463,18 +466,18 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
 
                     match delegate.process(&this, &item).await {
                         Ok(it) => {
-                            let time = Instant::now();
-
                             if !delegate.on_completed(&this, &item, &it) {
                                 this.dec_running();
                                 break;
                             }
 
-                            if !this.options.threshold.is_zero()
-                                && time.elapsed() < this.options.threshold
-                            {
-                                let remaining = this.options.threshold - time.elapsed();
-                                thread::sleep(remaining);
+                            if !this.options.threshold.is_zero() {
+                                let time = Instant::now();
+
+                                if time.elapsed() < this.options.threshold {
+                                    let remaining = this.options.threshold - time.elapsed();
+                                    thread::sleep(remaining);
+                                }
                             }
                         }
                         Err(e) => {

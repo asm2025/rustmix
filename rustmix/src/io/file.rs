@@ -1,4 +1,3 @@
-use anyhow::Result;
 use csv::{ReaderBuilder, WriterBuilder};
 use serde::{de, Serialize};
 use serde_json;
@@ -9,6 +8,7 @@ use std::{
 };
 
 use super::directory;
+use crate::Result;
 
 const LINES_BUFFER_DEFAULT: usize = 1000;
 

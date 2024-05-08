@@ -1,4 +1,3 @@
-use anyhow::Result;
 use image::ImageFormat;
 use rustmix::{
     io::{
@@ -7,6 +6,7 @@ use rustmix::{
     },
     string::StringEx,
     vision::Image,
+    Result,
 };
 use std::path::MAIN_SEPARATOR;
 

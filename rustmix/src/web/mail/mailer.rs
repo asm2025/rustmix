@@ -1,8 +1,9 @@
-use anyhow::Result;
 use lettre::{
     transport::smtp::{authentication::Credentials, response::Response},
     Message, SmtpTransport, Transport,
 };
+
+use crate::Result;
 
 #[derive(Debug, Clone)]
 pub struct Mailer {

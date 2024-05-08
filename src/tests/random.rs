@@ -1,7 +1,7 @@
 use chrono::{Duration, Utc};
-use rustmix::random;
+use rustmix::{random, Result};
 
-pub fn test_random() {
+pub fn test_random() -> Result<()> {
     println!("Testing random...");
     println!("string: {}", random::string(10));
     println!("alphanum: {}", random::alphanum_str(10));
@@ -134,4 +134,6 @@ pub fn test_random() {
     println!("last_name: {}", random::person::last_name());
     println!("suffix: {}", random::person::suffix());
     println!("title: {}", random::person::title());
+
+    Ok(())
 }

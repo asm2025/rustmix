@@ -1,6 +1,7 @@
-use anyhow::Result;
 use std::fs;
 pub use std::path::{Path, PathBuf};
+
+use crate::Result;
 
 pub fn current() -> PathBuf {
     std::env::current_dir().unwrap()

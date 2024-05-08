@@ -1,15 +1,15 @@
-use anyhow::Result;
 use rustmix::{
     io::{
         directory,
         path::{AsPath, PathEx},
     },
     sound::*,
+    Result,
 };
 use std::io::Write;
 
 pub async fn test_sound() -> Result<()> {
-    let sound = Audio::with(WhisperSource::BaseEn, WhisperLanguage::English).await?;
+    let sound = Audio::with_source(WhisperSource::BaseEn).await?;
     let curdir = (directory::current().as_str(), "files", "audio").as_path();
     let file_name = (curdir.as_str(), "captcha", "fb1.mp3").as_path();
     println!("Transcribing file [text]: {}", file_name);

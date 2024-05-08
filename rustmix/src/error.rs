@@ -1,12 +1,13 @@
-use std::{error::Error, fmt};
+use std::error::Error as StdError;
+use thiserror::Error;
 
 use crate::is_debug;
 
-pub trait ExceptionStr {
+pub trait ErrorStr {
     fn get_string(&self) -> String;
 }
 
-impl<E: Error + ?Sized> ExceptionStr for E {
+impl<E: StdError + ?Sized> ErrorStr for E {
     fn get_string(&self) -> String {
         if is_debug() {
             return format!("{:?}", self);
@@ -16,18 +17,18 @@ impl<E: Error + ?Sized> ExceptionStr for E {
     }
 }
 
-pub trait ExceptionEx {
+pub trait ErrorEx {
     fn get_message(&self) -> String;
 }
 
-impl<E: Error + ExceptionStr> ExceptionEx for E {
+impl<E: StdError + ?Sized> ErrorEx for E {
     fn get_message(&self) -> String {
         if !is_debug() {
             return self.get_string();
         }
 
         let mut msg = String::new();
-        let mut e: Option<&dyn Error> = Some(self);
+        let mut e: Option<&dyn StdError> = Some(&self);
 
         while let Some(err) = e {
             if msg.len() > 0 {
@@ -42,51 +43,50 @@ impl<E: Error + ExceptionStr> ExceptionEx for E {
     }
 }
 
-pub trait AnyhowEx {
-    fn get_message(&self) -> String;
-}
-
-impl AnyhowEx for anyhow::Error {
-    fn get_message(&self) -> String {
-        if let Some(err) = self.source() {
-            return err.get_message();
-        }
-
-        return self.get_string();
-    }
-}
-
-#[derive(Debug)]
+#[derive(Error, Debug)]
+#[error("Operation is cancelled")]
 pub struct CancelledError;
 
-impl fmt::Display for CancelledError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Operation is cancelled")
-    }
-}
+#[derive(Error, Debug)]
+#[error("Operation is not supported")]
+pub struct NotSupportedError;
 
-impl Error for CancelledError {}
+#[derive(Error, Debug)]
+#[error("Invalid operation")]
+pub struct InvalidOperationError;
 
-#[derive(Debug)]
-pub struct QueueCompletedError;
-
-impl fmt::Display for QueueCompletedError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Queue is already completed")
-    }
-}
-
-impl Error for QueueCompletedError {}
-
-#[derive(Debug)]
+#[derive(Error, Debug)]
+#[error("Operation timed out")]
 pub struct TimedoutError;
 
-impl fmt::Display for TimedoutError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Operation timed out")
-    }
-}
+#[derive(Error, Debug)]
+#[error("Queue has been already completed")]
+pub struct QueueCompletedError;
 
-impl Error for TimedoutError {}
+#[derive(Error, Debug)]
+#[error("No input provided")]
+pub struct NoInputError;
 
-pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
+#[derive(Error, Debug)]
+#[error("Invalid input")]
+pub struct InvalidInputError;
+
+#[derive(Error, Debug)]
+#[error("Not confirmed")]
+pub struct NotConfirmError;
+
+#[derive(Error, Debug)]
+#[error("Argument is null or empty: {0}")]
+pub struct ArgumentIsNullOrEmptyError(pub String);
+
+#[derive(Error, Debug)]
+#[error("No content")]
+pub struct NoContentError;
+
+#[derive(Error, Debug)]
+#[error("HtmlElement not found: {0}")]
+pub struct ElementNotFoundError(pub String);
+
+#[derive(Error, Debug)]
+#[error("Invalid HTTP response")]
+pub struct InvalidResponseError;

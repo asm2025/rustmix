@@ -1,4 +1,3 @@
-use anyhow::{anyhow, Result};
 use chrono::Local;
 pub use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit, FileRotate};
 pub use slog::{self as lib};
@@ -9,6 +8,7 @@ pub use slog_term::{Decorator, PlainSyncDecorator};
 use std::io;
 
 use super::{LogLevel, LOG_DATE_FORMAT, LOG_SIZE_MAX, LOG_SIZE_MIN};
+use crate::{error::ArgumentIsNullOrEmptyError, Result};
 
 impl From<LogLevel> for slog::Level {
     fn from(level: LogLevel) -> slog::Level {
@@ -55,7 +55,7 @@ pub fn build_with(
     limit: Option<usize>,
 ) -> Result<GlobalLoggerGuard> {
     if file_name.is_empty() {
-        return Err(anyhow!("File name is empty"));
+        return Err(ArgumentIsNullOrEmptyError("file_name".to_string()).into());
     }
 
     let decorator = PlainSyncDecorator::new(io::stdout());

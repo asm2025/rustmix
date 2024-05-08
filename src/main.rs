@@ -1,4 +1,4 @@
-use anyhow::Result;
+use rustmix::Result;
 use tokio::{task, time::Duration};
 
 mod tests;
@@ -44,7 +44,7 @@ async fn main() -> Result<()> {
 
     //tests::test_python()?;
 
-    //tests::test_sound().await?;
+    tests::test_sound().await?;
     //tests::test_image().await?;
 
     Ok(())
