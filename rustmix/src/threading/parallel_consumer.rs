@@ -14,10 +14,7 @@ use tokio::{
 };
 
 use super::{cond::Mutcond, *};
-use crate::{
-    error::{CancelledError, ErrorEx, QueueCompletedError},
-    Result,
-};
+use crate::{error::ErrorEx, Result};
 
 pub trait Len {
     fn len(&self) -> usize;

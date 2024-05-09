@@ -52,8 +52,8 @@ pub struct CancelledError;
 pub struct NotSupportedError;
 
 #[derive(Error, Debug)]
-#[error("Invalid operation")]
-pub struct InvalidOperationError;
+#[error("Invalid operation. {0}")]
+pub struct InvalidOperationError(pub String);
 
 #[derive(Error, Debug)]
 #[error("Operation timed out")]

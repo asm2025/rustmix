@@ -7347,6 +7347,7 @@ dependencies = [
  "html-entities",
  "http-body-util",
  "image 0.25.1",
+ "indicatif",
  "kalosm",
  "lazy_static 1.4.0",
  "lettre",

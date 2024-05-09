@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::io::Write;
 
 mod app;
 pub(crate) use self::app::*;
@@ -67,13 +66,4 @@ pub fn print_batch<T: std::fmt::Display>(batch: u32, items: Vec<T>) -> bool {
     }
 
     true
-}
-
-pub fn stdin_input(prompt: &str) -> String {
-    print!("{}", prompt);
-    std::io::stdout().flush().unwrap();
-
-    let mut input = String::new();
-    std::io::stdin().read_line(&mut input).unwrap();
-    input.trim().to_string()
 }

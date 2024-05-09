@@ -27,7 +27,8 @@ futures = "0"
 html-entities = { version = "0", optional = true }
 http-body-util = "0"
 image = { version = "0", optional = true }
-kalosm = { version = "0", workspace = true, optional = true }
+indicatif = "0"
+kalosm = { workspace = true, optional = true }
 lazy_static = "1"
 lettre = { version = "0", optional = true }
 log = "0"
