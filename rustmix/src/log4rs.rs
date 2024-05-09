@@ -20,7 +20,7 @@ use crate::{error::ArgumentIsNullOrEmptyError, string::StringEx, Result};
 
 pub fn configure(file_name: &str, level: LogLevel, limit: Option<usize>) -> Result<ConfigBuilder> {
     if file_name.is_empty() {
-        return Err(ArgumentIsNullOrEmptyError("file_name".to_string()).into());
+        return Err(ArgumentIsNullOrEmptyError("file_name").into());
     }
 
     let path = PathBuf::from(file_name);
@@ -84,7 +84,7 @@ pub fn build_with(file_name: &str, level: LogLevel, limit: Option<usize>) -> Res
 
 pub fn from_file(yaml_file_name: &str) -> Result<()> {
     if yaml_file_name.is_empty() {
-        return Err(ArgumentIsNullOrEmptyError("yaml_file_name".to_string()).into());
+        return Err(ArgumentIsNullOrEmptyError("yaml_file_name").into());
     }
 
     log4rs::init_file(yaml_file_name, Default::default()).map_err(Into::into)

@@ -53,7 +53,7 @@ pub struct NotSupportedError;
 
 #[derive(Error, Debug)]
 #[error("Invalid operation. {0}")]
-pub struct InvalidOperationError(pub String);
+pub struct InvalidOperationError(pub &'static str);
 
 #[derive(Error, Debug)]
 #[error("Operation timed out")]
@@ -77,7 +77,7 @@ pub struct NotConfirmError;
 
 #[derive(Error, Debug)]
 #[error("Argument is null or empty: {0}")]
-pub struct ArgumentIsNullOrEmptyError(pub String);
+pub struct ArgumentIsNullOrEmptyError(pub &'static str);
 
 #[derive(Error, Debug)]
 #[error("No content")]
@@ -85,7 +85,7 @@ pub struct NoContentError;
 
 #[derive(Error, Debug)]
 #[error("HtmlElement not found: {0}")]
-pub struct ElementNotFoundError(pub String);
+pub struct ElementNotFoundError(pub &'static str);
 
 #[derive(Error, Debug)]
 #[error("Invalid HTTP response")]

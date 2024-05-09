@@ -55,7 +55,7 @@ pub fn build_with(
     limit: Option<usize>,
 ) -> Result<GlobalLoggerGuard> {
     if file_name.is_empty() {
-        return Err(ArgumentIsNullOrEmptyError("file_name".to_string()).into());
+        return Err(ArgumentIsNullOrEmptyError("file_name").into());
     }
 
     let decorator = PlainSyncDecorator::new(io::stdout());

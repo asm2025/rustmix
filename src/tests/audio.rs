@@ -7,7 +7,7 @@ use rustmix::{
     threading::Spinner,
     Result,
 };
-use std::{cell::RefCell, io::Write};
+use std::io::Write;
 use tokio::sync::mpsc::unbounded_channel;
 
 pub async fn test_sound() -> Result<()> {
@@ -18,53 +18,59 @@ pub async fn test_sound() -> Result<()> {
     println!("So have patience and wait for the model initialized message");
 
     let spinner = Spinner::new();
-    spinner.set_message("Initializing audio model...".to_string());
+    spinner.set_message("Initializing audio model...");
     let sound = Audio::with_source(WhisperSource::BaseEn).await?;
-    spinner.finish_with_message("Audio model initialized".to_string())?;
+    spinner.finish_with_message("Audio model initialized")?;
 
     let curdir = (directory::current().as_str(), "files", "audio").as_path();
+
     let file_name = (curdir.as_str(), "captcha", "fb1.mp3").as_path();
     spinner.reset()?;
     spinner.set_message(format!("Transcribing file [text]: {}", &file_name));
     let snd = sound.clone();
     let result = spinner.run(move || snd.transcribe_file(&file_name).unwrap())?;
-    spinner.finish_with_message(format!("Sound transcription: {}", result))?;
+    spinner.finish_and_clear()?;
+    println!("Sound transcription: {}", result);
 
     let file_name = (curdir.as_str(), "captcha", "fb2.mp3").as_path();
     spinner.reset()?;
     spinner.set_message(format!("Transcribing file [text]: {}", &file_name));
     let snd = sound.clone();
     let result = spinner.run(move || snd.transcribe_file(&file_name).unwrap())?;
-    spinner.finish_with_message(format!("Sound transcription: {}", result))?;
+    spinner.finish_and_clear()?;
+    println!("Sound transcription: {}", result);
 
     let file_name = (curdir.as_str(), "listen1.mp3").as_path();
     spinner.reset()?;
-    spinner.set_message(format!("Transcribing file [file_callback]: {}", &file_name));
+    spinner.set_message(format!("Transcribing file [callback]: {}", &file_name));
     let snd = sound.clone();
-    let result = spinner.run(move || {
-        let r = RefCell::new(String::new());
-        snd.transcribe_file_callback(&file_name, |text| {
-            r.borrow_mut().push_str(&text);
+    spinner.run(move || {
+        print!("Sound transcription: ");
+        std::io::stdout().flush().unwrap();
+        snd.transcribe_file_callback(&file_name, move |e| {
+            print!("{}", e);
         })
         .unwrap();
-        r.into_inner()
+        println!();
     })?;
-    spinner.finish_with_message(format!("Sound transcription: {}", result))?;
+    spinner.finish_and_clear()?;
 
     let file_name = (curdir.as_str(), "listen2.mp3").as_path();
-    println!("Transcribing file [stream]: {}", &file_name);
+    spinner.reset()?;
+    spinner.set_message(format!("Transcribing file [stream]: {}", &file_name));
     let (tx, mut rx) = unbounded_channel::<Segment>();
-    tokio::spawn(async move {
+    let handle = tokio::spawn(async move {
         print!("Sound transcription: ");
         std::io::stdout().flush().unwrap();
 
         while let Some(result) = rx.recv().await {
             print!("{}", result.text());
-            std::io::stdout().flush().unwrap();
         }
 
-        println!()
+        println!();
     });
-
-    sound.transcribe_stream(&file_name, tx)
+    sound.transcribe_stream(&file_name, tx)?;
+    handle.await?;
+    spinner.finish_and_clear()?;
+    Ok(())
 }

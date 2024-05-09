@@ -23,9 +23,9 @@ pub async fn test_image() -> Result<()> {
     println!("So have patience and wait for the model initialized message");
 
     let spinner = Spinner::new();
-    spinner.set_message("Initializing image model...".to_string());
+    spinner.set_message("Initializing image model...");
     let image = Image::new().await?;
-    spinner.finish_with_message("Image model initialized".to_string())?;
+    spinner.finish_with_message("Image model initialized")?;
 
     loop {
         let prompt = input::get("Enter a prompt to generate images: ")?;
@@ -48,10 +48,10 @@ pub async fn test_image() -> Result<()> {
 
         spinner.reset()?;
         spinner.set_steady_tick(INTERVAL);
-        spinner.set_message("Generating images...".to_string());
+        spinner.set_message("Generating images...");
 
         if let Ok(images) = image.generate(&prompt) {
-            spinner.finish_with_message("Images generated".to_string())?;
+            spinner.finish_with_message("Images generated")?;
 
             for (i, img) in images.iter().enumerate() {
                 let filename = format!("{}IMG{:02}.png", curdir, i + 1);
@@ -60,7 +60,7 @@ pub async fn test_image() -> Result<()> {
 
             println!("Images saved");
         } else {
-            spinner.finish_with_message("Failed to generate images".to_string())?;
+            spinner.finish_with_message("Failed to generate images")?;
         }
     }
 
