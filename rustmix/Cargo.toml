@@ -63,7 +63,7 @@ slog-json = { version = "2", optional = true }
 slog-scope = { version = "4", optional = true }
 slog-stdlog = { version = "4", optional = true }
 slog-term = { version = "2", optional = true }
-termion = "3"
+termion = "4"
 thiserror = "1"
 time = "0"
 tokio = { version = "1", features = ["full"] }
