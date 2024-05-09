@@ -1,6 +1,5 @@
-use anyhow::Result;
 use pyo3::types::{PyAnyMethods, PyBytes};
-use rustmix::python;
+use rustmix::{python, Result};
 
 pub fn test_python() -> Result<()> {
     let version = python::version()?;

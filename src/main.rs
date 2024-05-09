@@ -1,4 +1,4 @@
-use anyhow::Result;
+use rustmix::Result;
 use tokio::{task, time::Duration};
 
 mod tests;

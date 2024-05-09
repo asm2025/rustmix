@@ -1,9 +1,11 @@
-use anyhow::Result;
 use rand::{distributions::Alphanumeric, Rng};
-use rustmix::io::{
-    directory,
-    file::{self, FileEx},
-    path::{self, IntoPath, PathEx},
+use rustmix::{
+    io::{
+        directory,
+        file::{self, FileEx},
+        path::{self, IntoPath, PathEx},
+    },
+    Result,
 };
 use std::{
     io::{stdin, LineWriter, Write},

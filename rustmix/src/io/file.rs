@@ -1,4 +1,3 @@
-use anyhow::Result;
 use csv::{ReaderBuilder, WriterBuilder};
 use serde::{de, Serialize};
 use serde_json;
@@ -9,6 +8,7 @@ use std::{
 };
 
 use super::directory;
+use crate::Result;
 
 const LINES_BUFFER_DEFAULT: usize = 1000;
 
@@ -103,10 +103,7 @@ pub trait FileEx {
 impl FileEx for std::fs::File {
     fn read(&self) -> Result<impl Iterator<Item = String>> {
         let reader = BufReader::new(self);
-        Ok(reader
-            .lines()
-            .filter_map(|line| line.ok())
-            .filter(|line| !line.is_empty()))
+        Ok(reader.lines().filter_map(|line| line.ok()))
     }
 
     fn read_filtered<F: Fn(&str) -> bool + 'static>(
@@ -114,10 +111,17 @@ impl FileEx for std::fs::File {
         filter: F,
     ) -> Result<impl Iterator<Item = String>> {
         let reader = BufReader::new(self);
-        Ok(reader
-            .lines()
-            .filter_map(|line| line.ok())
-            .filter(move |line| !line.is_empty() && filter(line)))
+        Ok(reader.lines().filter_map(move |e| {
+            if let Ok(line) = e {
+                if line.is_empty() || !filter(&line) {
+                    return None;
+                }
+
+                Some(line)
+            } else {
+                None
+            }
+        }))
     }
 
     fn read_batch<R: Fn(u32, Vec<String>) -> bool + 'static>(
@@ -133,7 +137,7 @@ impl FileEx for std::fs::File {
         let mut reader = BufReader::new(self);
         let mut batch_number = 0u32;
         let mut line: String = String::new();
-        let mut lines = Vec::with_capacity(batch);
+        let mut lines: Vec<String> = Vec::with_capacity(batch);
 
         while let Ok(n) = reader.read_line(&mut line) {
             if n == 0 {
@@ -153,10 +157,10 @@ impl FileEx for std::fs::File {
             }
 
             batch_number += 1;
-            let result = lines.clone();
+            let contin = callback(batch_number, lines.clone());
             lines.clear();
 
-            if !callback(batch_number, result) {
+            if !contin {
                 break;
             }
         }
@@ -166,7 +170,7 @@ impl FileEx for std::fs::File {
         }
 
         batch_number += 1;
-        callback(batch_number, lines);
+        callback(batch_number, lines.clone());
         Ok(batch_number)
     }
 
@@ -207,10 +211,10 @@ impl FileEx for std::fs::File {
             }
 
             batch_number += 1;
-            let result = lines.clone();
+            let contin = callback(batch_number, lines.clone());
             lines.clear();
 
-            if !callback(batch_number, result) {
+            if !contin {
                 break;
             }
         }
@@ -220,7 +224,7 @@ impl FileEx for std::fs::File {
         }
 
         batch_number += 1;
-        callback(batch_number, lines);
+        callback(batch_number, lines.clone());
         Ok(batch_number)
     }
 

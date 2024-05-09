@@ -8,7 +8,6 @@ authors = ["asm <asm2025@outlook.com>"]
 license = "MIT"
 
 [dependencies]
-anyhow = "1"
 chrono = "0"
 crossbeam = { version = "0", optional = true }
 csv = "1"
@@ -28,7 +27,8 @@ futures = "0"
 html-entities = { version = "0", optional = true }
 http-body-util = "0"
 image = { version = "0", optional = true }
-kalosm = { version = "0", workspace = true, default-features = false, optional = true }
+indicatif = "0"
+kalosm = { workspace = true, optional = true }
 lazy_static = "1"
 lettre = { version = "0", optional = true }
 log = "0"
@@ -40,6 +40,7 @@ pyo3 = { version = "0", features = [
     "abi3",
 ], optional = true }
 rand = "0"
+randua = "0"
 rayon = { version = "1", optional = true }
 regex = { version = "1", optional = true }
 reqwest = { version = "0", features = [
@@ -53,6 +54,7 @@ reqwest = { version = "0", features = [
     "stream",
 ] }
 rodio = { version = "0", optional = true }
+rpassword = "7"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 slog = { version = "2", optional = true }
@@ -61,9 +63,10 @@ slog-json = { version = "2", optional = true }
 slog-scope = { version = "4", optional = true }
 slog-stdlog = { version = "4", optional = true }
 slog-term = { version = "2", optional = true }
-tokio = { version = "1", features = ["full"] }
+termion = "4"
+thiserror = "1"
 time = "0"
-randua = "0"
+tokio = { version = "1", features = ["full"] }
 url = { version = "2", features = ["serde"] }
 urlencoding = "2"
 

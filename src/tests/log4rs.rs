@@ -1,4 +1,3 @@
-use anyhow::Result;
 use log::{debug, error, info, trace, warn};
 
 use rustmix::{
@@ -6,7 +5,7 @@ use rustmix::{
         directory,
         path::{AsPath, PathEx},
     },
-    log4rs,
+    log4rs, Result,
 };
 
 pub fn test_log4rs(from_config_file: bool) -> Result<()> {

@@ -2,9 +2,10 @@
 pub mod mail;
 pub mod reqwest;
 
-use anyhow::Result;
 use url::{ParseError, Url};
 use urlencoding::{decode, encode};
+
+use crate::Result;
 
 pub fn url_encode<T: AsRef<str>>(value: T) -> String {
     encode(value.as_ref()).to_string()

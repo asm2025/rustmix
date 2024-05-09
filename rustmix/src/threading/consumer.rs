@@ -1,4 +1,3 @@
-use anyhow::{anyhow, Result};
 use crossbeam::queue::SegQueue;
 use std::{
     sync::{
@@ -13,6 +12,10 @@ use tokio::{
 };
 
 use super::{cond::Mutcond, *};
+use crate::{
+    error::{CancelledError, ErrorEx, QueueCompletedError},
+    Result,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConsumerOptions {
@@ -248,7 +251,7 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                                     if !delegate.on_completed(
                                         &this,
                                         &item,
-                                        &TaskResult::Error(e.to_string()),
+                                        &TaskResult::Error(e.get_message()),
                                     ) {
                                         this.dec_running();
                                         break;
@@ -281,25 +284,25 @@ impl<T: Send + Sync + Clone> Consumer<T> {
 
                         match delegate.process(&this, &item) {
                             Ok(it) => {
-                                let time = Instant::now();
-
                                 if !delegate.on_completed(&this, &item, &it) {
                                     this.dec_running();
                                     break;
                                 }
 
-                                if !this.options.threshold.is_zero()
-                                    && time.elapsed() < this.options.threshold
-                                {
-                                    let remaining = this.options.threshold - time.elapsed();
-                                    thread::sleep(remaining);
+                                if !this.options.threshold.is_zero() {
+                                    let time = Instant::now();
+
+                                    if time.elapsed() < this.options.threshold {
+                                        let remaining = this.options.threshold - time.elapsed();
+                                        thread::sleep(remaining);
+                                    }
                                 }
                             }
                             Err(e) => {
                                 if !delegate.on_completed(
                                     &this,
                                     &item,
-                                    &TaskResult::Error(e.to_string()),
+                                    &TaskResult::Error(e.get_message()),
                                 ) {
                                     this.dec_running();
                                     break;
@@ -357,10 +360,22 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                         if let Some(item) = this.dequeue_wait() {
                             this.inc_running();
 
-                            if let Ok(result) = delegate.process(&this, &item).await {
-                                if !delegate.on_completed(&this, &item, &result) {
-                                    this.dec_running();
-                                    break;
+                            match delegate.process(&this, &item).await {
+                                Ok(it) => {
+                                    if !delegate.on_completed(&this, &item, &it) {
+                                        this.dec_running();
+                                        break;
+                                    }
+                                }
+                                Err(e) => {
+                                    if !delegate.on_completed(
+                                        &this,
+                                        &item,
+                                        &TaskResult::Error(e.get_message()),
+                                    ) {
+                                        this.dec_running();
+                                        break;
+                                    }
                                 }
                             }
 
@@ -387,19 +402,31 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                     if let Some(item) = this.dequeue_wait() {
                         this.inc_running();
 
-                        if let Ok(result) = delegate.process(&this, &item).await {
-                            let time = Instant::now();
+                        match delegate.process(&this, &item).await {
+                            Ok(it) => {
+                                if !delegate.on_completed(&this, &item, &it) {
+                                    this.dec_running();
+                                    break;
+                                }
 
-                            if !delegate.on_completed(&this, &item, &result) {
-                                this.dec_running();
-                                break;
+                                if !this.options.threshold.is_zero() {
+                                    let time = Instant::now();
+
+                                    if time.elapsed() < this.options.threshold {
+                                        let remaining = this.options.threshold - time.elapsed();
+                                        thread::sleep(remaining);
+                                    }
+                                }
                             }
-
-                            if !this.options.threshold.is_zero()
-                                && time.elapsed() < this.options.threshold
-                            {
-                                let remaining = this.options.threshold - time.elapsed();
-                                thread::sleep(remaining);
+                            Err(e) => {
+                                if !delegate.on_completed(
+                                    &this,
+                                    &item,
+                                    &TaskResult::Error(e.get_message()),
+                                ) {
+                                    this.dec_running();
+                                    break;
+                                }
                             }
                         }
 
@@ -424,11 +451,11 @@ impl<T: Send + Sync + Clone> Consumer<T> {
 
     pub fn enqueue(&self, item: T) -> Result<()> {
         if self.is_cancelled() {
-            return Err(anyhow!(error::CancelledError));
+            return Err(CancelledError.into());
         }
 
         if self.is_completed() {
-            return Err(anyhow!(error::QueueCompletedError));
+            return Err(QueueCompletedError.into());
         }
 
         self.items.push(item);

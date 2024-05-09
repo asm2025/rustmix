@@ -1,4 +1,3 @@
-use anyhow::Result;
 use rayon::{prelude::*, ThreadPoolBuilder};
 use std::{
     collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, LinkedList, VecDeque},
@@ -15,6 +14,7 @@ use tokio::{
 };
 
 use super::{cond::Mutcond, *};
+use crate::{error::ErrorEx, Result};
 
 pub trait Len {
     fn len(&self) -> usize;
@@ -250,10 +250,22 @@ impl<T: Send + Sync + Clone> Parallel<T> {
                             return;
                         }
 
-                        if let Ok(result) = delegate.process(&this, &item) {
-                            if !delegate.on_completed(&this, &item, &result) {
-                                this.cancel();
-                                return;
+                        match delegate.process(&this, &item) {
+                            Ok(result) => {
+                                if !delegate.on_completed(&this, &item, &result) {
+                                    this.cancel();
+                                    return;
+                                }
+                            }
+                            Err(e) => {
+                                if !delegate.on_completed(
+                                    &this,
+                                    &item,
+                                    &TaskResult::Error(e.get_message()),
+                                ) {
+                                    this.cancel();
+                                    return;
+                                }
                             }
                         }
 
@@ -278,19 +290,31 @@ impl<T: Send + Sync + Clone> Parallel<T> {
                         return;
                     }
 
-                    if let Ok(result) = delegate.process(&this, &item) {
-                        let time = Instant::now();
+                    match delegate.process(&this, &item) {
+                        Ok(result) => {
+                            if !delegate.on_completed(&this, &item, &result) {
+                                this.cancel();
+                                return;
+                            }
 
-                        if !delegate.on_completed(&this, &item, &result) {
-                            this.cancel();
-                            return;
+                            if !this.options.threshold.is_zero() {
+                                let time = Instant::now();
+
+                                if time.elapsed() < this.options.threshold {
+                                    let remaining = this.options.threshold - time.elapsed();
+                                    thread::sleep(remaining);
+                                }
+                            }
                         }
-
-                        if !this.options.threshold.is_zero()
-                            && time.elapsed() < this.options.threshold
-                        {
-                            let remaining = this.options.threshold - time.elapsed();
-                            thread::sleep(remaining);
+                        Err(e) => {
+                            if !delegate.on_completed(
+                                &this,
+                                &item,
+                                &TaskResult::Error(e.get_message()),
+                            ) {
+                                this.cancel();
+                                return;
+                            }
                         }
                     }
 
