@@ -2,7 +2,7 @@ use futures::{executor::block_on, stream::StreamExt};
 use kalosm::audio::*;
 pub use kalosm::audio::{Segment, WhisperLanguage, WhisperSource};
 use rodio::Decoder;
-use std::{fs::File, io::BufReader, sync::Arc};
+use std::{fs::File, io::BufReader, path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::Result;
@@ -57,7 +57,7 @@ impl Audio {
         })
     }
 
-    pub fn transcribe_file(&self, file_name: &str) -> Result<String> {
+    pub fn transcribe_file<T: AsRef<Path>>(&self, file_name: T) -> Result<String> {
         let file = File::open(file_name)?;
         let source = Decoder::new(BufReader::new(file))?;
         let mut stream = self.model.transcribe(source)?;
@@ -72,7 +72,7 @@ impl Audio {
         })
     }
 
-    pub async fn transcribe_file_async(&self, file_name: &str) -> Result<String> {
+    pub async fn transcribe_file_async<T: AsRef<Path>>(&self, file_name: T) -> Result<String> {
         let file = File::open(file_name)?;
         let source = Decoder::new(BufReader::new(file))?;
         let mut stream = self.model.transcribe(source)?;
@@ -85,9 +85,9 @@ impl Audio {
         Ok(text)
     }
 
-    pub fn transcribe_file_callback(
+    pub fn transcribe_file_callback<T: AsRef<Path>>(
         &self,
-        file_name: &str,
+        file_name: T,
         callback: impl Fn(&str) -> (),
     ) -> Result<()> {
         let file = File::open(file_name)?;
@@ -101,9 +101,9 @@ impl Audio {
         Ok(())
     }
 
-    pub async fn transcribe_file_callback_async(
+    pub async fn transcribe_file_callback_async<T: AsRef<Path>>(
         &self,
-        file_name: &str,
+        file_name: T,
         callback: impl Fn(&str) -> (),
     ) -> Result<()> {
         let file = File::open(file_name)?;
@@ -117,9 +117,9 @@ impl Audio {
         Ok(())
     }
 
-    pub fn transcribe_stream(
+    pub fn transcribe_stream<T: AsRef<Path>>(
         &self,
-        file_name: &str,
+        file_name: T,
         sender: UnboundedSender<Segment>,
     ) -> Result<()> {
         let file = File::open(file_name)?;
