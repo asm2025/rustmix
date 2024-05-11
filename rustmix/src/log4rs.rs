@@ -1,4 +1,7 @@
-use lib::{
+pub use log4rs::*;
+use std::path::Path;
+
+use self::{
     append::{
         console::ConsoleAppender,
         rolling_file::{
@@ -8,29 +11,28 @@ use lib::{
             RollingFileAppender,
         },
     },
-    config::{runtime::ConfigBuilder, Appender, Config, Logger, Root},
+    config::{runtime::ConfigBuilder, Appender, Root},
     encode::pattern::PatternEncoder,
-    Handle,
 };
-pub use log4rs::{self as lib};
-use std::path::{PathBuf, MAIN_SEPARATOR};
-
 use super::{LogLevel, LOG_DATE_FORMAT, LOG_SIZE_MAX, LOG_SIZE_MIN};
-use crate::{error::ArgumentIsNullOrEmptyError, string::StringEx, Result};
+use crate::Result;
 
-pub fn configure(file_name: &str, level: LogLevel, limit: Option<usize>) -> Result<ConfigBuilder> {
-    if file_name.is_empty() {
-        return Err(ArgumentIsNullOrEmptyError("file_name").into());
-    }
-
-    let path = PathBuf::from(file_name);
-    let folder = match path.parent() {
-        Some(folder) => folder.to_str().unwrap().suffix(MAIN_SEPARATOR),
-        None => "".to_string(),
+pub fn configure<T: AsRef<Path>>(
+    file_name: T,
+    level: LogLevel,
+    limit: Option<usize>,
+) -> Result<ConfigBuilder> {
+    let file_name = file_name.as_ref();
+    let folder = match file_name.parent() {
+        Some(folder) => folder,
+        None => Path::new(""),
     };
-    let base_name = path.file_stem().unwrap().to_str().unwrap().to_string();
-    let extension = path.extension().unwrap().to_str().unwrap().to_string();
-    let roller_pattern = format!("{}{}.{{}}.old.{}", folder, base_name, extension);
+    let base_name = file_name.file_stem().unwrap().to_str().unwrap().to_string();
+    let extension = file_name.extension().unwrap().to_str().unwrap().to_string();
+    let roller_pattern = folder
+        .join(format!("{}.{{}}.old.{}", base_name, extension))
+        .to_string_lossy()
+        .into_owned();
     let console = ConsoleAppender::builder()
         .encoder(Box::new(PatternEncoder::new("{l:5.5}| {M} | {m}{n}")))
         .build();
@@ -52,12 +54,12 @@ pub fn configure(file_name: &str, level: LogLevel, limit: Option<usize>) -> Resu
         .appender(Appender::builder().build("console", Box::new(console)))
         .appender(Appender::builder().build("file", Box::new(file)))
         .logger(
-            Logger::builder()
+            config::Logger::builder()
                 .appender("console")
                 .build("console", level.into()),
         )
         .logger(
-            Logger::builder()
+            config::Logger::builder()
                 .appender("file")
                 .build("file", level.into()),
         );
@@ -68,11 +70,15 @@ pub fn from_config(config: Config) -> Result<Handle> {
     log4rs::init_config(config).map_err(Into::into)
 }
 
-pub fn build(file_name: &str) -> Result<Handle> {
+pub fn build<T: AsRef<Path>>(file_name: T) -> Result<Handle> {
     build_with(file_name, LogLevel::Info, None)
 }
 
-pub fn build_with(file_name: &str, level: LogLevel, limit: Option<usize>) -> Result<Handle> {
+pub fn build_with<T: AsRef<Path>>(
+    file_name: T,
+    level: LogLevel,
+    limit: Option<usize>,
+) -> Result<Handle> {
     let config = configure(file_name, level, limit)?.build(
         Root::builder()
             .appender("console")
@@ -82,10 +88,6 @@ pub fn build_with(file_name: &str, level: LogLevel, limit: Option<usize>) -> Res
     log4rs::init_config(config).map_err(Into::into)
 }
 
-pub fn from_file(yaml_file_name: &str) -> Result<()> {
-    if yaml_file_name.is_empty() {
-        return Err(ArgumentIsNullOrEmptyError("yaml_file_name").into());
-    }
-
+pub fn from_file<T: AsRef<Path>>(yaml_file_name: T) -> Result<()> {
     log4rs::init_file(yaml_file_name, Default::default()).map_err(Into::into)
 }

@@ -1,14 +1,14 @@
 use chrono::Local;
 pub use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit, FileRotate};
-pub use slog::{self as lib};
+pub use slog::*;
 pub use slog_async::*;
 use slog_json::Json;
 pub use slog_scope::GlobalLoggerGuard;
 pub use slog_term::{Decorator, PlainSyncDecorator};
-use std::io;
+use std::{io, path::Path};
 
 use super::{LogLevel, LOG_DATE_FORMAT, LOG_SIZE_MAX, LOG_SIZE_MIN};
-use crate::{error::ArgumentIsNullOrEmptyError, Result};
+use crate::Result as CommonResult;
 
 impl From<LogLevel> for slog::Level {
     fn from(level: LogLevel) -> slog::Level {
@@ -34,30 +34,26 @@ impl<D: Decorator> CustomDecorator<D> {
     }
 }
 
-impl<D: Decorator> lib::Drain for CustomDecorator<D> {
+impl<D: Decorator> Drain for CustomDecorator<D> {
     type Ok = ();
     type Err = io::Error;
 
-    fn log(&self, record: &lib::Record, values: &lib::OwnedKVList) -> io::Result<()> {
+    fn log(&self, record: &Record, values: &OwnedKVList) -> io::Result<()> {
         self.decorator.with_record(record, values, |d| {
             writeln!(d, "{}| {} | {}", record.level(), record.tag(), record.msg())
         })
     }
 }
 
-pub fn build(file_name: &str) -> Result<GlobalLoggerGuard> {
+pub fn build<T: AsRef<Path>>(file_name: T) -> CommonResult<GlobalLoggerGuard> {
     build_with(file_name, LogLevel::Info, None)
 }
 
-pub fn build_with(
-    file_name: &str,
+pub fn build_with<T: AsRef<Path>>(
+    file_name: T,
     level: LogLevel,
     limit: Option<usize>,
-) -> Result<GlobalLoggerGuard> {
-    if file_name.is_empty() {
-        return Err(ArgumentIsNullOrEmptyError("file_name").into());
-    }
-
+) -> CommonResult<GlobalLoggerGuard> {
     let decorator = PlainSyncDecorator::new(io::stdout());
     let drain = CustomDecorator::new(decorator);
     let logger = FileRotate::new(
@@ -72,24 +68,24 @@ pub fn build_with(
         #[cfg(unix)]
         None,
     );
-    let file_drain = lib::Drain::fuse(
+    let file_drain = Drain::fuse(
         Json::new(logger)
-            .add_key_value(lib::o!("timestamp" => lib::FnValue(|_| {
+            .add_key_value(o!("timestamp" => FnValue(|_| {
                 Local::now().format(LOG_DATE_FORMAT).to_string()
             })))
-            .add_key_value(lib::o!("level" => lib::FnValue(|r| {
+            .add_key_value(o!("level" => FnValue(|r| {
                 r.level().as_str().to_string()
             })))
-            .add_key_value(lib::o!("tag" => lib::FnValue(|r| {
+            .add_key_value(o!("tag" => FnValue(|r| {
                 r.tag().to_string()
             })))
-            .add_key_value(lib::o!("message" => lib::FnValue(|r| {
+            .add_key_value(o!("message" => FnValue(|r| {
                 r.msg().to_string()
             })))
-            .add_key_value(lib::o!("arguments" => lib::FnValue(|_| {
+            .add_key_value(o!("arguments" => FnValue(|_| {
                 None::<&str>
             })))
-            .add_key_value(lib::o!("location" => lib::FnValue(|r| {
+            .add_key_value(o!("location" => FnValue(|r| {
                 if cfg!(debug_assertions) {
                     Some(format!("{}:{}", &r.file(), &r.line()))
                 } else {
@@ -98,15 +94,11 @@ pub fn build_with(
             })))
             .build(),
     );
-    let drain = lib::Drain::fuse(slog::Duplicate::new(drain, file_drain));
-    let drain = lib::Drain::fuse(
-        Async::new(lib::Drain::ignore_res(lib::Drain::filter_level(
-            drain,
-            level.into(),
-        )))
-        .build(),
+    let drain = Drain::fuse(slog::Duplicate::new(drain, file_drain));
+    let drain = Drain::fuse(
+        Async::new(Drain::ignore_res(Drain::filter_level(drain, level.into()))).build(),
     );
-    let logger = lib::Logger::root(drain, lib::o!());
+    let logger = Logger::root(drain, o!());
     let guard = slog_scope::set_global_logger(logger);
     slog_stdlog::init()?;
     Ok(guard)
