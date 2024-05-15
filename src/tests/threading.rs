@@ -1,6 +1,8 @@
 use rustmix::{threading::*, Result};
 use std::{
     collections,
+    future::Future,
+    pin::Pin,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -36,86 +38,11 @@ impl TaskHandler {
     }
 }
 
-impl TaskDelegationBase<ProducerConsumer<usize>, usize> for TaskHandler {
-    fn on_started(&self, _pc: &ProducerConsumer<usize>) {
-        println!("Producer/Consumer started");
-    }
-
-    fn on_completed(
-        &self,
-        _pc: &ProducerConsumer<usize>,
-        item: &usize,
-        result: &TaskResult,
-    ) -> bool {
-        self.done.fetch_add(1, Ordering::SeqCst);
-        println!("Result item: {}: {:?}", item, result);
-        true
-    }
-
-    fn on_cancelled(&self, _td: &ProducerConsumer<usize>) {
-        println!(
-            "Processing tasks was cancelled. Got: {} tasks and finished {} tasks.",
-            self.tasks(),
-            self.done()
-        );
-    }
-
-    fn on_finished(&self, _pc: &ProducerConsumer<usize>) {
-        println!(
-            "Got: {} tasks and finished {} tasks.",
-            self.tasks(),
-            self.done()
-        );
-    }
-}
-
-impl TaskDelegation<ProducerConsumer<usize>, usize> for TaskHandler {
-    fn process(&self, _pc: &ProducerConsumer<usize>, item: &usize) -> Result<TaskResult> {
-        self.tasks.fetch_add(1, Ordering::SeqCst);
-        println!("Item: {}", item);
-
-        if item % 5 == 0 {
-            return Ok(TaskResult::Error(format!(
-                "Item {}. Multiples of 5 are not allowed",
-                item
-            )));
-        } else if item % 3 == 0 {
-            return Ok(TaskResult::TimedOut);
-        }
-
-        Ok(TaskResult::Success)
-    }
-}
-
-impl TaskDelegationBase<Consumer<usize>, usize> for TaskHandler {
-    fn on_started(&self, _pc: &Consumer<usize>) {
+impl TaskDelegation<Consumer<usize>, usize> for TaskHandler {
+    fn on_started(&self) {
         println!("Consumer started");
     }
 
-    fn on_completed(&self, _pc: &Consumer<usize>, item: &usize, result: &TaskResult) -> bool {
-        self.done.fetch_add(1, Ordering::SeqCst);
-        println!("Result item: {}: {:?}", item, result);
-        true
-    }
-
-    fn on_cancelled(&self, _td: &Consumer<usize>) {
-        println!(
-            "Processing tasks was cancelled. Got: {} tasks and finished {} tasks.",
-            self.tasks(),
-            self.done()
-        );
-    }
-
-    fn on_finished(&self, _pc: &Consumer<usize>) {
-        println!(
-            "Got: {} tasks and finished {} tasks.",
-            self.tasks(),
-            self.done()
-        );
-    }
-}
-
-impl TaskDelegation<Consumer<usize>, usize> for TaskHandler {
     fn process(&self, _pc: &Consumer<usize>, item: &usize) -> Result<TaskResult> {
         self.tasks.fetch_add(1, Ordering::SeqCst);
         println!("Item: {}", item);
@@ -131,159 +58,28 @@ impl TaskDelegation<Consumer<usize>, usize> for TaskHandler {
 
         Ok(TaskResult::Success)
     }
-}
 
-impl TaskDelegationBase<InjectorWorker<usize>, usize> for TaskHandler {
-    fn on_started(&self, _pc: &InjectorWorker<usize>) {
-        println!("Injector/Worker started");
-    }
-
-    fn on_completed(&self, _pc: &InjectorWorker<usize>, item: &usize, result: &TaskResult) -> bool {
+    fn on_completed(&self, item: &usize, result: &TaskResult) -> bool {
         self.done.fetch_add(1, Ordering::SeqCst);
         println!("Result item: {}: {:?}", item, result);
         true
     }
 
-    fn on_cancelled(&self, _td: &InjectorWorker<usize>) {
+    fn on_cancelled(&self) {
         println!(
-            "Processing tasks was cancelled. Got: {} tasks and finished {} tasks.",
+            "Cancelled. Got: {} tasks and finished {} tasks.",
             self.tasks(),
             self.done()
         );
     }
 
-    fn on_finished(&self, _pc: &InjectorWorker<usize>) {
+    fn on_finished(&self) {
         println!(
-            "Got: {} tasks and finished {} tasks.",
+            "Finished. Got: {} tasks and finished {} tasks.",
             self.tasks(),
             self.done()
         );
     }
-}
-
-impl TaskDelegation<InjectorWorker<usize>, usize> for TaskHandler {
-    fn process(&self, _pc: &InjectorWorker<usize>, item: &usize) -> Result<TaskResult> {
-        self.tasks.fetch_add(1, Ordering::SeqCst);
-        println!("Item: {}", item);
-
-        if item % 5 == 0 {
-            return Ok(TaskResult::Error(format!(
-                "Item {}. Multiples of 5 are not allowed",
-                item
-            )));
-        } else if item % 3 == 0 {
-            return Ok(TaskResult::TimedOut);
-        }
-
-        Ok(TaskResult::Success)
-    }
-}
-
-impl TaskDelegationBase<Parallel<usize>, usize> for TaskHandler {
-    fn on_started(&self, _pc: &Parallel<usize>) {
-        println!("Parallel started");
-    }
-
-    fn on_completed(&self, _pc: &Parallel<usize>, item: &usize, result: &TaskResult) -> bool {
-        self.done.fetch_add(1, Ordering::SeqCst);
-        println!("Result item: {}: {:?}", item, result);
-        true
-    }
-
-    fn on_cancelled(&self, _td: &Parallel<usize>) {
-        println!(
-            "Processing tasks was cancelled. Got: {} tasks and finished {} tasks.",
-            self.tasks(),
-            self.done()
-        );
-    }
-
-    fn on_finished(&self, _pc: &Parallel<usize>) {
-        println!(
-            "Got: {} tasks and finished {} tasks.",
-            self.tasks(),
-            self.done()
-        );
-    }
-}
-
-impl TaskDelegation<Parallel<usize>, usize> for TaskHandler {
-    fn process(&self, _pc: &Parallel<usize>, item: &usize) -> Result<TaskResult> {
-        self.tasks.fetch_add(1, Ordering::SeqCst);
-        println!("Item: {}", item);
-
-        if item % 5 == 0 {
-            return Ok(TaskResult::Error(format!(
-                "Item {}. Multiples of 5 are not allowed",
-                item
-            )));
-        } else if item % 3 == 0 {
-            return Ok(TaskResult::TimedOut);
-        }
-
-        Ok(TaskResult::Success)
-    }
-}
-
-pub async fn test_producer_consumer(cancel_after: Duration) -> Result<()> {
-    println!("\nTesting Producer/Consumer with {} threads...", THREADS);
-
-    let now = Instant::now();
-    let handler = TaskHandler::new();
-    let options = ProducerConsumerOptions::new().with_threads(THREADS);
-    let prodcon = ProducerConsumer::<usize>::with_options(options);
-    let unit = TEST_SIZE / THREADS;
-    let mut handles = vec![];
-    prodcon.start(&handler.clone());
-
-    for n in 0..THREADS {
-        let pc = prodcon.clone();
-        let p = prodcon.new_producer();
-        let h = handler.clone();
-        let handle = thread::spawn(move || {
-            for i in 1..=unit {
-                if pc.is_cancelled() {
-                    break;
-                }
-                if let Err(e) = p.enqueue(i + unit * n) {
-                    println!("Enqueue error: {:?}", e);
-                    break;
-                }
-            }
-
-            drop(pc);
-            drop(h);
-        });
-        handles.push(handle);
-    }
-
-    if !cancel_after.is_zero() {
-        let ptr = prodcon.clone();
-        thread::spawn(move || {
-            thread::sleep(cancel_after);
-
-            if ptr.is_finished() {
-                return;
-            }
-
-            ptr.cancel();
-        });
-    }
-
-    for handle in handles {
-        if prodcon.is_cancelled() {
-            break;
-        }
-        handle.join().unwrap();
-    }
-
-    prodcon.complete();
-    match prodcon.wait_async().await {
-        Ok(_) => println!("Producer/Consumer finished"),
-        Err(e) => println!("Producer/Consumer error: {:?}", e),
-    }
-    println!("Elapsed time: {:?}", now.elapsed());
-    Ok(())
 }
 
 pub async fn test_consumer(cancel_after: Duration) -> Result<()> {
@@ -295,7 +91,7 @@ pub async fn test_consumer(cancel_after: Duration) -> Result<()> {
     let consumer = Consumer::<usize>::with_options(options);
 
     for _ in 0..THREADS {
-        consumer.start(&handler.clone());
+        consumer.start(&handler.clone())?;
     }
 
     for i in 1..=TEST_SIZE {
@@ -328,77 +124,338 @@ pub async fn test_consumer(cancel_after: Duration) -> Result<()> {
     Ok(())
 }
 
-pub async fn test_injector_worker(cancel_after: Duration) -> Result<()> {
-    println!("\nTesting Injector/Worker with {} threads...", THREADS);
+// impl TaskDelegation<usize> for ProducerConsumer<usize, TaskDelegation<usize>, TaskHandler> {
+//     type State = TaskHandler;
 
-    let now = Instant::now();
-    let handler = TaskHandler::new();
-    let options = InjectorWorkerOptions::new().with_threads(THREADS);
-    let injwork = InjectorWorker::<usize>::with_options(options);
-    injwork.start(&handler);
+//     fn on_started(&self, _pc: &ProducerConsumer<usize>) {
+//         println!("Producer/Consumer started");
+//     }
 
-    for i in 1..=TEST_SIZE {
-        if let Err(e) = injwork.enqueue(i) {
-            println!("Enqueue error: {:?}", e);
-            break;
-        }
-    }
+//     fn process(&self, item: &usize) -> Result<TaskResult> {
+//         {
+//             let state = self.state.lock().unwrap();
+//             state.tasks.fetch_add(1, Ordering::SeqCst);
+//         }
+//         println!("Item: {}", item);
 
-    injwork.complete();
+//         if item % 5 == 0 {
+//             return Ok(TaskResult::Error(format!(
+//                 "Item {}. Multiples of 5 are not allowed",
+//                 item
+//             )));
+//         } else if item % 3 == 0 {
+//             return Ok(TaskResult::TimedOut);
+//         }
 
-    if !cancel_after.is_zero() {
-        let ptr = injwork.clone();
-        thread::spawn(move || {
-            thread::sleep(cancel_after);
+//         Ok(TaskResult::Success)
+//     }
 
-            if ptr.is_finished() {
-                return;
-            }
+//     async fn process_async(&self, item: &usize) -> Result<TaskResult> {
+//         {
+//             let state = self.state.lock().unwrap();
+//             state.tasks.fetch_add(1, Ordering::SeqCst);
+//         }
+//         println!("Item: {}", item);
 
-            ptr.cancel();
-        });
-    }
+//         if item % 5 == 0 {
+//             return Ok(TaskResult::Error(format!(
+//                 "Item {}. Multiples of 5 are not allowed",
+//                 item
+//             )));
+//         } else if item % 3 == 0 {
+//             return Ok(TaskResult::TimedOut);
+//         }
 
-    match injwork.wait_async().await {
-        Ok(_) => println!("Injector/Worker finished"),
-        Err(e) => println!("Injector/Worker error: {:?}", e),
-    }
-    println!("Elapsed time: {:?}", now.elapsed());
-    Ok(())
-}
+//         Ok(TaskResult::Success)
+//     }
 
-pub async fn test_parallel(cancel_after: Duration) -> Result<()> {
-    println!("\nTesting Parallel with {} threads...", THREADS);
+//     fn on_completed(
+//         &self,
+//         _pc: &ProducerConsumer<usize>,
+//         item: &usize,
+//         result: &TaskResult,
+//     ) -> bool {
+//         self.done.fetch_add(1, Ordering::SeqCst);
+//         println!("Result item: {}: {:?}", item, result);
+//         true
+//     }
 
-    let now = Instant::now();
-    let handler = TaskHandler::new();
-    let options = ParallelOptions::new().with_threads(THREADS);
-    let parallel = Parallel::with_options(options);
-    let mut collection = collections::VecDeque::<usize>::with_capacity(TEST_SIZE);
+//     fn on_cancelled(&self, _td: &ProducerConsumer<usize>) {
+//         println!(
+//             "Processing tasks was cancelled. Got: {} tasks and finished {} tasks.",
+//             self.tasks(),
+//             self.done()
+//         );
+//     }
 
-    for i in 1..=TEST_SIZE {
-        collection.push_back(i);
-    }
+//     fn on_finished(&self, _pc: &ProducerConsumer<usize>) {
+//         println!(
+//             "Got: {} tasks and finished {} tasks.",
+//             self.tasks(),
+//             self.done()
+//         );
+//     }
+// }
 
-    parallel.start(collection, &handler);
+// impl TaskDelegation<usize> for InjectorWorker<usize, TaskDelegation<usize>, TaskHandler> {
+//     type State = TaskHandler;
 
-    if !cancel_after.is_zero() {
-        let ptr = parallel.clone();
-        thread::spawn(move || {
-            thread::sleep(cancel_after);
+//     fn on_started(&self, _pc: &ProducerConsumer<usize>) {
+//         println!("Injector/Worker started");
+//     }
 
-            if ptr.is_finished() {
-                return;
-            }
+//     fn process(&self, item: &usize) -> Result<TaskResult> {
+//         {
+//             let state = self.state.lock().unwrap();
+//             state.tasks.fetch_add(1, Ordering::SeqCst);
+//         }
+//         println!("Item: {}", item);
 
-            ptr.cancel();
-        });
-    }
+//         if item % 5 == 0 {
+//             return Ok(TaskResult::Error(format!(
+//                 "Item {}. Multiples of 5 are not allowed",
+//                 item
+//             )));
+//         } else if item % 3 == 0 {
+//             return Ok(TaskResult::TimedOut);
+//         }
 
-    match parallel.wait_async().await {
-        Ok(_) => println!("Parallel finished"),
-        Err(e) => println!("Parallel error: {:?}", e),
-    }
-    println!("Elapsed time: {:?}", now.elapsed());
-    Ok(())
-}
+//         Ok(TaskResult::Success)
+//     }
+
+//     async fn process_async(&self, item: &usize) -> Result<TaskResult> {
+//         self.tasks.fetch_add(1, Ordering::SeqCst);
+//         println!("Item: {}", item);
+
+//         if item % 5 == 0 {
+//             return Ok(TaskResult::Error(format!(
+//                 "Item {}. Multiples of 5 are not allowed",
+//                 item
+//             )));
+//         } else if item % 3 == 0 {
+//             return Ok(TaskResult::TimedOut);
+//         }
+
+//         Ok(TaskResult::Success)
+//     }
+
+//     fn on_completed(&self, _pc: &InjectorWorker<usize>, item: &usize, result: &TaskResult) -> bool {
+//         self.done.fetch_add(1, Ordering::SeqCst);
+//         println!("Result item: {}: {:?}", item, result);
+//         true
+//     }
+
+//     fn on_cancelled(&self, _td: &InjectorWorker<usize>) {
+//         println!(
+//             "Processing tasks was cancelled. Got: {} tasks and finished {} tasks.",
+//             self.tasks(),
+//             self.done()
+//         );
+//     }
+
+//     fn on_finished(&self, _pc: &InjectorWorker<usize>) {
+//         println!(
+//             "Got: {} tasks and finished {} tasks.",
+//             self.tasks(),
+//             self.done()
+//         );
+//     }
+// }
+
+// impl TaskDelegation<usize> for Parallel<usize, TaskDelegation<usize>, TaskHandler> {
+//     type State = TaskHandler;
+
+//     fn on_started(&self, _pc: &Parallel<usize>) {
+//         println!("Parallel started");
+//     }
+
+//     fn process(&self, _pc: &Parallel<usize>, item: &usize) -> Result<TaskResult> {
+//         self.tasks.fetch_add(1, Ordering::SeqCst);
+//         println!("Item: {}", item);
+
+//         if item % 5 == 0 {
+//             return Ok(TaskResult::Error(format!(
+//                 "Item {}. Multiples of 5 are not allowed",
+//                 item
+//             )));
+//         } else if item % 3 == 0 {
+//             return Ok(TaskResult::TimedOut);
+//         }
+
+//         Ok(TaskResult::Success)
+//     }
+
+//     async fn process_async(&self, _pc: &Parallel<usize>, item: &usize) -> Result<TaskResult> {
+//         self.tasks.fetch_add(1, Ordering::SeqCst);
+//         println!("Item: {}", item);
+
+//         if item % 5 == 0 {
+//             return Ok(TaskResult::Error(format!(
+//                 "Item {}. Multiples of 5 are not allowed",
+//                 item
+//             )));
+//         } else if item % 3 == 0 {
+//             return Ok(TaskResult::TimedOut);
+//         }
+
+//         Ok(TaskResult::Success)
+//     }
+
+//     fn on_completed(&self, _pc: &Parallel<usize>, item: &usize, result: &TaskResult) -> bool {
+//         self.done.fetch_add(1, Ordering::SeqCst);
+//         println!("Result item: {}: {:?}", item, result);
+//         true
+//     }
+
+//     fn on_cancelled(&self, _td: &Parallel<usize>) {
+//         println!(
+//             "Processing tasks was cancelled. Got: {} tasks and finished {} tasks.",
+//             self.tasks(),
+//             self.done()
+//         );
+//     }
+
+//     fn on_finished(&self, _pc: &Parallel<usize>) {
+//         println!(
+//             "Got: {} tasks and finished {} tasks.",
+//             self.tasks(),
+//             self.done()
+//         );
+//     }
+// }
+
+// pub async fn test_producer_consumer(cancel_after: Duration) -> Result<()> {
+//     println!("\nTesting Producer/Consumer with {} threads...", THREADS);
+
+//     let now = Instant::now();
+//     let handler = TaskHandler::new();
+//     let options = ProducerConsumerOptions::new().with_threads(THREADS);
+//     let prodcon = ProducerConsumer::<usize>::with_options(options);
+//     let unit = TEST_SIZE / THREADS;
+//     let mut handles = vec![];
+//     prodcon.start(&handler.clone());
+
+//     for n in 0..THREADS {
+//         let pc = prodcon.clone();
+//         let p = prodcon.new_producer();
+//         let h = handler.clone();
+//         let handle = thread::spawn(move || {
+//             for i in 1..=unit {
+//                 if pc.is_cancelled() {
+//                     break;
+//                 }
+//                 if let Err(e) = p.enqueue(i + unit * n) {
+//                     println!("Enqueue error: {:?}", e);
+//                     break;
+//                 }
+//             }
+
+//             drop(pc);
+//             drop(h);
+//         });
+//         handles.push(handle);
+//     }
+
+//     if !cancel_after.is_zero() {
+//         let ptr = prodcon.clone();
+//         thread::spawn(move || {
+//             thread::sleep(cancel_after);
+
+//             if ptr.is_finished() {
+//                 return;
+//             }
+
+//             ptr.cancel();
+//         });
+//     }
+
+//     for handle in handles {
+//         if prodcon.is_cancelled() {
+//             break;
+//         }
+//         handle.join().unwrap();
+//     }
+
+//     prodcon.complete();
+//     match prodcon.wait_async().await {
+//         Ok(_) => println!("Producer/Consumer finished"),
+//         Err(e) => println!("Producer/Consumer error: {:?}", e),
+//     }
+//     println!("Elapsed time: {:?}", now.elapsed());
+//     Ok(())
+// }
+
+// pub async fn test_injector_worker(cancel_after: Duration) -> Result<()> {
+//     println!("\nTesting Injector/Worker with {} threads...", THREADS);
+
+//     let now = Instant::now();
+//     let handler = TaskHandler::new();
+//     let options = InjectorWorkerOptions::new().with_threads(THREADS);
+//     let injwork = InjectorWorker::<usize>::with_options(options);
+//     injwork.start(&handler);
+
+//     for i in 1..=TEST_SIZE {
+//         if let Err(e) = injwork.enqueue(i) {
+//             println!("Enqueue error: {:?}", e);
+//             break;
+//         }
+//     }
+
+//     injwork.complete();
+
+//     if !cancel_after.is_zero() {
+//         let ptr = injwork.clone();
+//         thread::spawn(move || {
+//             thread::sleep(cancel_after);
+
+//             if ptr.is_finished() {
+//                 return;
+//             }
+
+//             ptr.cancel();
+//         });
+//     }
+
+//     match injwork.wait_async().await {
+//         Ok(_) => println!("Injector/Worker finished"),
+//         Err(e) => println!("Injector/Worker error: {:?}", e),
+//     }
+//     println!("Elapsed time: {:?}", now.elapsed());
+//     Ok(())
+// }
+
+// pub async fn test_parallel(cancel_after: Duration) -> Result<()> {
+//     println!("\nTesting Parallel with {} threads...", THREADS);
+
+//     let now = Instant::now();
+//     let handler = TaskHandler::new();
+//     let options = ParallelOptions::new().with_threads(THREADS);
+//     let parallel = Parallel::with_options(options);
+//     let mut collection = collections::VecDeque::<usize>::with_capacity(TEST_SIZE);
+
+//     for i in 1..=TEST_SIZE {
+//         collection.push_back(i);
+//     }
+
+//     parallel.start(collection, &handler);
+
+//     if !cancel_after.is_zero() {
+//         let ptr = parallel.clone();
+//         thread::spawn(move || {
+//             thread::sleep(cancel_after);
+
+//             if ptr.is_finished() {
+//                 return;
+//             }
+
+//             ptr.cancel();
+//         });
+//     }
+
+//     match parallel.wait_async().await {
+//         Ok(_) => println!("Parallel finished"),
+//         Err(e) => println!("Parallel error: {:?}", e),
+//     }
+//     println!("Elapsed time: {:?}", now.elapsed());
+//     Ok(())
+// }

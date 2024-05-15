@@ -60,7 +60,11 @@ pub struct InvalidOperationError(pub &'static str);
 pub struct TimedoutError;
 
 #[derive(Error, Debug)]
-#[error("Queue has been already completed")]
+#[error("Queue already started")]
+pub struct QueueStartedError;
+
+#[derive(Error, Debug)]
+#[error("Queue already completed")]
 pub struct QueueCompletedError;
 
 #[derive(Error, Debug)]
@@ -90,3 +94,7 @@ pub struct ElementNotFoundError(pub &'static str);
 #[derive(Error, Debug)]
 #[error("Invalid HTTP response")]
 pub struct InvalidResponseError;
+
+#[derive(Error, Debug)]
+#[error("Not implemented")]
+pub struct NotImplementedError;

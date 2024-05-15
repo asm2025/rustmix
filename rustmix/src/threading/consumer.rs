@@ -12,10 +12,7 @@ use tokio::{
 };
 
 use super::{cond::Mutcond, *};
-use crate::{
-    error::{CancelledError, ErrorEx, QueueCompletedError},
-    Result,
-};
+use crate::{error::*, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConsumerOptions {
@@ -66,8 +63,8 @@ impl ConsumerOptions {
 }
 
 #[derive(Clone, Debug)]
-pub struct Consumer<T: Send + Sync + Clone + 'static> {
-    options: ConsumerOptions,
+pub struct Consumer<T: StaticTaskItem> {
+    pub options: ConsumerOptions,
     items: Arc<SegQueue<T>>,
     items_cond: Arc<Mutcond>,
     started: Arc<Mutex<bool>>,
@@ -81,7 +78,7 @@ pub struct Consumer<T: Send + Sync + Clone + 'static> {
     running: Arc<AtomicUsize>,
 }
 
-impl<T: Send + Sync + Clone> Consumer<T> {
+impl<T: StaticTaskItem> Consumer<T> {
     pub fn new() -> Self {
         Consumer {
             options: Default::default(),
@@ -122,12 +119,7 @@ impl<T: Send + Sync + Clone> Consumer<T> {
 
     fn set_started(&self, value: bool) -> bool {
         let mut started = self.started.lock().unwrap();
-
-        if *started && value {
-            return false;
-        }
-
-        *started = true;
+        *started = value;
         true
     }
 
@@ -167,26 +159,20 @@ impl<T: Send + Sync + Clone> Consumer<T> {
         self.consumers.store(value, Ordering::SeqCst);
     }
 
-    fn dec_consumers(&self, td: &impl TaskDelegationBase<Consumer<T>, T>) {
+    fn dec_consumers(&self) -> bool {
         self.consumers.fetch_sub(1, Ordering::SeqCst);
-        self.check_finished(td);
+        self.consumers() == 0 && (self.is_completed() || self.is_cancelled())
     }
 
-    fn check_finished(&self, td: &impl TaskDelegationBase<Consumer<T>, T>) {
-        if self.consumers() > 0 || (!self.is_completed() && !self.is_cancelled()) {
+    fn finish(&self) {
+        if !self.is_completed() && !self.is_cancelled() {
             return;
         }
 
         self.completed.store(true, Ordering::SeqCst);
         self.finished.store(true, Ordering::SeqCst);
-
-        if self.is_cancelled() {
-            td.on_cancelled(self);
-        } else {
-            td.on_finished(self);
-        }
-
         self.set_started(false);
+        thread::sleep(Duration::ZERO);
         self.finished_cond.notify_one();
         self.finished_noti.notify_one();
     }
@@ -203,32 +189,29 @@ impl<T: Send + Sync + Clone> Consumer<T> {
         self.running.fetch_sub(1, Ordering::SeqCst);
     }
 
-    pub fn start<TD: TaskDelegation<Consumer<T>, T> + Send + Sync + Clone + 'static>(
-        &self,
-        delegate: &TD,
-    ) {
+    pub fn start<H: TaskDelegation<Consumer<T>, T>>(&self, handler: &H) -> Result<()> {
         if self.is_cancelled() {
-            panic!("Queue is already cancelled.")
+            return Err(CancelledError.into());
         }
 
         if self.is_completed() && self.is_empty() {
-            panic!("Queue is already completed.")
+            return Err(QueueCompletedError.into());
         }
 
         if !self.set_started(true) {
-            return;
+            return Err(QueueStartedError.into());
         }
 
         self.set_consumers(self.options.threads);
-        delegate.on_started(self);
+        handler.on_started();
 
         for _ in 0..self.options.threads {
-            let this = Arc::new(self.clone());
-            let delegate = delegate.clone();
+            let this = self.clone();
+            let handler = handler.clone();
             thread::spawn(move || {
                 if this.options.threshold.is_zero() {
                     loop {
-                        if this.is_cancelled() || (this.is_empty() && this.is_completed()) {
+                        if this.is_cancelled() || (!this.is_busy() && this.is_completed()) {
                             break;
                         }
 
@@ -237,160 +220,44 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                             continue;
                         }
 
-                        if let Some(item) = this.dequeue_wait() {
-                            this.inc_running();
-
-                            match delegate.process(&this, &item) {
-                                Ok(it) => {
-                                    if !delegate.on_completed(&this, &item, &it) {
-                                        this.dec_running();
-                                        break;
-                                    }
-                                }
-                                Err(e) => {
-                                    if !delegate.on_completed(
-                                        &this,
-                                        &item,
-                                        &TaskResult::Error(e.get_message()),
-                                    ) {
-                                        this.dec_running();
-                                        break;
-                                    }
-                                }
-                            }
-
-                            this.dec_running();
-                        }
-                    }
-
-                    this.dec_consumers(&delegate);
-                    drop(delegate);
-                    drop(this);
-                    return;
-                }
-
-                loop {
-                    if this.is_cancelled() || (this.is_empty() && this.is_completed()) {
-                        break;
-                    }
-
-                    if this.is_paused() {
-                        thread::sleep(this.options.pause_timeout);
-                        continue;
-                    }
-
-                    if let Some(item) = this.dequeue_wait() {
-                        this.inc_running();
-
-                        match delegate.process(&this, &item) {
-                            Ok(it) => {
-                                if !delegate.on_completed(&this, &item, &it) {
-                                    this.dec_running();
-                                    break;
-                                }
-
-                                if !this.options.threshold.is_zero() {
-                                    let time = Instant::now();
-
-                                    if time.elapsed() < this.options.threshold {
-                                        let remaining = this.options.threshold - time.elapsed();
-                                        thread::sleep(remaining);
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                if !delegate.on_completed(
-                                    &this,
-                                    &item,
-                                    &TaskResult::Error(e.get_message()),
-                                ) {
-                                    this.dec_running();
-                                    break;
-                                }
-                            }
-                        }
-
-                        this.dec_running();
-                    }
-                }
-
-                this.dec_consumers(&delegate);
-                drop(delegate);
-                drop(this);
-            });
-        }
-    }
-
-    pub async fn start_async<
-        TD: AsyncTaskDelegation<Consumer<T>, T> + Send + Sync + Clone + 'static,
-    >(
-        &self,
-        delegate: &TD,
-    ) {
-        if self.is_cancelled() {
-            panic!("Queue is already cancelled.")
-        }
-
-        if self.is_completed() && self.is_empty() {
-            panic!("Queue is already completed.")
-        }
-
-        if !self.set_started(true) {
-            return;
-        }
-
-        self.set_consumers(self.options.threads);
-        delegate.on_started(self);
-
-        for _ in 0..self.options.threads {
-            let this = Arc::new(self.clone());
-            let delegate = delegate.clone();
-            tokio::spawn(async move {
-                if this.options.threshold.is_zero() {
-                    loop {
-                        if this.is_cancelled() || (this.is_empty() && this.is_completed()) {
-                            break;
-                        }
-
-                        if this.is_paused() {
-                            thread::sleep(this.options.pause_timeout);
+                        let Some(item) = this.dequeue_wait() else {
                             continue;
-                        }
-
-                        if let Some(item) = this.dequeue_wait() {
-                            this.inc_running();
-
-                            match delegate.process(&this, &item).await {
-                                Ok(it) => {
-                                    if !delegate.on_completed(&this, &item, &it) {
-                                        this.dec_running();
-                                        break;
-                                    }
-                                }
-                                Err(e) => {
-                                    if !delegate.on_completed(
-                                        &this,
-                                        &item,
-                                        &TaskResult::Error(e.get_message()),
-                                    ) {
-                                        this.dec_running();
-                                        break;
-                                    }
+                        };
+                        this.inc_running();
+                        match handler.process(&this, &item) {
+                            Ok(it) => {
+                                if !handler.on_completed(&item, &it) {
+                                    this.dec_running();
+                                    break;
                                 }
                             }
-
-                            this.dec_running();
+                            Err(e) => {
+                                if !handler.on_completed(&item, &TaskResult::Error(e.get_message()))
+                                {
+                                    this.dec_running();
+                                    break;
+                                }
+                            }
                         }
+                        this.dec_running();
                     }
 
-                    this.dec_consumers(&delegate);
-                    drop(delegate);
-                    drop(this);
+                    if !this.dec_consumers() {
+                        return;
+                    }
+
+                    if this.is_cancelled() {
+                        handler.on_cancelled();
+                    } else {
+                        handler.on_finished();
+                    }
+
+                    this.finish();
                     return;
                 }
 
                 loop {
-                    if this.is_cancelled() || (this.is_empty() && this.is_completed()) {
+                    if this.is_cancelled() || (!this.is_busy() && this.is_completed()) {
                         break;
                     }
 
@@ -399,46 +266,51 @@ impl<T: Send + Sync + Clone> Consumer<T> {
                         continue;
                     }
 
-                    if let Some(item) = this.dequeue_wait() {
-                        this.inc_running();
-
-                        match delegate.process(&this, &item).await {
-                            Ok(it) => {
-                                if !delegate.on_completed(&this, &item, &it) {
-                                    this.dec_running();
-                                    break;
-                                }
-
-                                if !this.options.threshold.is_zero() {
-                                    let time = Instant::now();
-
-                                    if time.elapsed() < this.options.threshold {
-                                        let remaining = this.options.threshold - time.elapsed();
-                                        thread::sleep(remaining);
-                                    }
-                                }
+                    let Some(item) = this.dequeue_wait() else {
+                        continue;
+                    };
+                    this.inc_running();
+                    match handler.process(&this, &item) {
+                        Ok(it) => {
+                            if !handler.on_completed(&item, &it) {
+                                this.dec_running();
+                                break;
                             }
-                            Err(e) => {
-                                if !delegate.on_completed(
-                                    &this,
-                                    &item,
-                                    &TaskResult::Error(e.get_message()),
-                                ) {
-                                    this.dec_running();
-                                    break;
+
+                            if !this.options.threshold.is_zero() {
+                                let time = Instant::now();
+
+                                if time.elapsed() < this.options.threshold {
+                                    let remaining = this.options.threshold - time.elapsed();
+                                    thread::sleep(remaining);
                                 }
                             }
                         }
-
-                        this.dec_running();
+                        Err(e) => {
+                            if !handler.on_completed(&item, &TaskResult::Error(e.get_message())) {
+                                this.dec_running();
+                                break;
+                            }
+                        }
                     }
+                    this.dec_running();
                 }
 
-                this.dec_consumers(&delegate);
-                drop(delegate);
-                drop(this);
+                if !this.dec_consumers() {
+                    return;
+                }
+
+                if this.is_cancelled() {
+                    handler.on_cancelled();
+                } else {
+                    handler.on_finished();
+                }
+
+                this.finish();
             });
         }
+
+        Ok(())
     }
 
     pub fn stop(&self, enforce: bool) {
@@ -537,11 +409,9 @@ impl<T: Send + Sync + Clone> Consumer<T> {
         wait_until(self, &self.finished_cond, cond)
     }
 
-    pub async fn wait_until_async<
-        F: Fn(&Consumer<T>) -> Pin<Box<dyn Future<Output = bool> + Send>>,
-    >(
+    pub async fn wait_until_async(
         &self,
-        cond: F,
+        cond: impl Fn(&Consumer<T>) -> Pin<Box<dyn Future<Output = bool> + Send>>,
     ) -> Result<()> {
         wait_until_async(self, &self.finished_noti, cond).await
     }
@@ -573,7 +443,7 @@ impl<T: Send + Sync + Clone> Consumer<T> {
     }
 }
 
-impl<T: Send + Sync + Clone> AwaitableConsumer for Consumer<T> {
+impl<T: StaticTaskItem> AwaitableConsumer<T> for Consumer<T> {
     fn is_cancelled(&self) -> bool {
         Consumer::is_cancelled(self)
     }

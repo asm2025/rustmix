@@ -12,7 +12,11 @@ mod spinner;
 pub use self::spinner::*;
 
 use futures::Future;
-use std::{fmt, pin::Pin, sync::Arc};
+use std::{
+    fmt,
+    pin::Pin,
+    sync::{Arc, RwLock},
+};
 use tokio::{
     select,
     sync::Notify,
@@ -78,31 +82,29 @@ impl fmt::Display for QueueBehavior {
     }
 }
 
-pub trait TaskDelegationBase<TD: Send + Sync + Clone + 'static, T: Send + Clone + 'static> {
-    fn on_started(&self, td: &TD);
-    fn on_completed(&self, td: &TD, item: &T, result: &TaskResult) -> bool;
-    fn on_cancelled(&self, td: &TD);
-    fn on_finished(&self, td: &TD);
+pub trait TaskItem: Clone + Send + Sync + fmt::Debug {}
+impl<T: Clone + Send + Sync + fmt::Debug> TaskItem for T {}
+
+pub trait StaticTaskItem: TaskItem + 'static {}
+impl<T: TaskItem + 'static> StaticTaskItem for T {}
+
+pub trait TaskDelegation<TPC: AwaitableConsumer<T>, T: StaticTaskItem>: StaticTaskItem {
+    fn on_started(&self);
+    fn process(&self, pc: &TPC, item: &T) -> Result<TaskResult>;
+    fn on_completed(&self, item: &T, result: &TaskResult) -> bool;
+    fn on_cancelled(&self);
+    fn on_finished(&self);
 }
 
-pub trait TaskDelegation<TD: Send + Sync + Clone + 'static, T: Send + Clone + 'static>:
-    TaskDelegationBase<TD, T>
-{
-    fn process(&self, td: &TD, item: &T) -> Result<TaskResult>;
-}
-
-pub trait AsyncTaskDelegation<TD: Send + Sync + Clone + 'static, T: Send + Clone + 'static>:
-    TaskDelegationBase<TD, T>
-{
-    fn process(&self, td: &TD, item: &T) -> impl Future<Output = Result<TaskResult>> + Send;
-}
-
-pub trait AwaitableConsumer {
+pub trait AwaitableConsumer<T: TaskItem>: StaticTaskItem {
     fn is_cancelled(&self) -> bool;
     fn is_finished(&self) -> bool;
 }
 
-fn wait<T: AwaitableConsumer>(this: &T, finished: &Arc<Mutcond>) -> Result<()> {
+fn wait<TPC: AwaitableConsumer<T>, T: StaticTaskItem>(
+    this: &TPC,
+    finished: &Arc<Mutcond>,
+) -> Result<()> {
     match finished.wait_while(|| !this.is_cancelled() && !this.is_finished()) {
         Ok(_) => {
             if this.is_cancelled() {
@@ -115,7 +117,10 @@ fn wait<T: AwaitableConsumer>(this: &T, finished: &Arc<Mutcond>) -> Result<()> {
     }
 }
 
-async fn wait_async<T: AwaitableConsumer>(this: &T, finished: &Arc<Notify>) -> Result<()> {
+async fn wait_async<TPC: AwaitableConsumer<T>, T: StaticTaskItem>(
+    this: &TPC,
+    finished: &Arc<Notify>,
+) -> Result<()> {
     while !this.is_finished() && !this.is_cancelled() {
         select! {
             _ = finished.notified() => {},
@@ -130,10 +135,10 @@ async fn wait_async<T: AwaitableConsumer>(this: &T, finished: &Arc<Notify>) -> R
     Ok(())
 }
 
-fn wait_until<T: AwaitableConsumer>(
-    this: &T,
+fn wait_until<TPC: AwaitableConsumer<T>, T: StaticTaskItem>(
+    this: &TPC,
     finished: &Arc<Mutcond>,
-    cond: impl Fn(&T) -> bool,
+    cond: impl Fn(&TPC) -> bool,
 ) -> Result<()> {
     match finished.wait_while(|| !this.is_cancelled() && !this.is_finished() && !cond(this)) {
         Ok(_) => {
@@ -148,10 +153,11 @@ fn wait_until<T: AwaitableConsumer>(
 }
 
 async fn wait_until_async<
-    T: AwaitableConsumer,
-    F: Fn(&T) -> Pin<Box<dyn Future<Output = bool> + Send>>,
+    TPC: AwaitableConsumer<T>,
+    T: StaticTaskItem,
+    F: Fn(&TPC) -> Pin<Box<dyn Future<Output = bool> + Send>>,
 >(
-    this: &T,
+    this: &TPC,
     finished: &Arc<Notify>,
     cond: F,
 ) -> Result<()> {
@@ -170,8 +176,8 @@ async fn wait_until_async<
     Ok(())
 }
 
-fn wait_for<T: AwaitableConsumer>(
-    this: &T,
+fn wait_for<TPC: AwaitableConsumer<T>, T: StaticTaskItem>(
+    this: &TPC,
     timeout: Duration,
     finished: &Arc<Mutcond>,
 ) -> Result<()> {
@@ -191,8 +197,8 @@ fn wait_for<T: AwaitableConsumer>(
     }
 }
 
-async fn wait_for_async<T: AwaitableConsumer>(
-    this: &T,
+async fn wait_for_async<TPC: AwaitableConsumer<T>, T: StaticTaskItem>(
+    this: &TPC,
     timeout: Duration,
     finished: &Arc<Notify>,
 ) -> Result<()> {
@@ -212,11 +218,11 @@ async fn wait_for_async<T: AwaitableConsumer>(
     }
 }
 
-fn wait_for_until<T: AwaitableConsumer>(
-    this: &T,
+fn wait_for_until<TPC: AwaitableConsumer<T>, T: StaticTaskItem>(
+    this: &TPC,
     timeout: Duration,
     finished: &Arc<Mutcond>,
-    cond: impl Fn(&T) -> bool,
+    cond: impl Fn(&TPC) -> bool,
 ) -> Result<()> {
     if timeout.is_zero() {
         return Err(TimedoutError.into());
@@ -237,10 +243,11 @@ fn wait_for_until<T: AwaitableConsumer>(
 }
 
 async fn wait_for_until_async<
-    T: AwaitableConsumer,
-    F: Fn(&T) -> Pin<Box<dyn Future<Output = bool> + Send>>,
+    TPC: AwaitableConsumer<T>,
+    T: StaticTaskItem,
+    F: Fn(&TPC) -> Pin<Box<dyn Future<Output = bool> + Send>>,
 >(
-    this: &T,
+    this: &TPC,
     timeout: Duration,
     finished: &Arc<Notify>,
     cond: F,
