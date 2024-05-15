@@ -68,6 +68,10 @@ pub struct QueueStartedError;
 pub struct QueueCompletedError;
 
 #[derive(Error, Debug)]
+#[error("Queue already dropped")]
+pub struct QueueDroppedError;
+
+#[derive(Error, Debug)]
 #[error("No input provided")]
 pub struct NoInputError;
 

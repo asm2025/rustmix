@@ -33,9 +33,9 @@ async fn main() -> Result<()> {
 
     //tests::test_tempmail().await?;
 
-    tests::test_consumer(Duration::ZERO).await?;
+    //tests::test_consumer(Duration::ZERO).await?;
     //tests::test_consumer(Duration::from_millis(150)).await?;
-    //tests::test_producer_consumer(Duration::ZERO).await?;
+    tests::test_producer_consumer(Duration::ZERO).await?;
     //tests::test_producer_consumer(Duration::from_millis(150)).await?;
     //tests::test_injector_worker(Duration::ZERO).await?;
     //tests::test_injector_worker(Duration::from_millis(150)).await?;

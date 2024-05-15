@@ -1,5 +1,6 @@
 use crossbeam::queue::SegQueue;
 use std::{
+    mem,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Mutex,
@@ -374,8 +375,8 @@ impl<T: StaticTaskItem> Consumer<T> {
         self.items.pop()
     }
 
-    pub fn clear(&self) {
-        while self.items.pop().is_some() {}
+    pub fn clear(&mut self) {
+        self.items = mem::replace(&mut self.items, Arc::new(SegQueue::new()));
     }
 
     pub fn complete(&self) {

@@ -89,10 +89,7 @@ pub async fn test_consumer(cancel_after: Duration) -> Result<()> {
     let handler = TaskHandler::new();
     let options = ConsumerOptions::new();
     let consumer = Consumer::<usize>::with_options(options);
-
-    for _ in 0..THREADS {
-        consumer.start(&handler.clone())?;
-    }
+    consumer.start(&handler.clone())?;
 
     for i in 1..=TEST_SIZE {
         if let Err(e) = consumer.enqueue(i) {
@@ -124,78 +121,110 @@ pub async fn test_consumer(cancel_after: Duration) -> Result<()> {
     Ok(())
 }
 
-// impl TaskDelegation<usize> for ProducerConsumer<usize, TaskDelegation<usize>, TaskHandler> {
-//     type State = TaskHandler;
+impl TaskDelegation<ProducerConsumer<usize>, usize> for TaskHandler {
+    fn on_started(&self) {
+        println!("Producer/Consumer started");
+    }
 
-//     fn on_started(&self, _pc: &ProducerConsumer<usize>) {
-//         println!("Producer/Consumer started");
-//     }
+    fn process(&self, _pc: &ProducerConsumer<usize>, item: &usize) -> Result<TaskResult> {
+        self.tasks.fetch_add(1, Ordering::SeqCst);
+        println!("Item: {}", item);
 
-//     fn process(&self, item: &usize) -> Result<TaskResult> {
-//         {
-//             let state = self.state.lock().unwrap();
-//             state.tasks.fetch_add(1, Ordering::SeqCst);
-//         }
-//         println!("Item: {}", item);
+        if item % 5 == 0 {
+            return Ok(TaskResult::Error(format!(
+                "Item {}. Multiples of 5 are not allowed",
+                item
+            )));
+        } else if item % 3 == 0 {
+            return Ok(TaskResult::TimedOut);
+        }
 
-//         if item % 5 == 0 {
-//             return Ok(TaskResult::Error(format!(
-//                 "Item {}. Multiples of 5 are not allowed",
-//                 item
-//             )));
-//         } else if item % 3 == 0 {
-//             return Ok(TaskResult::TimedOut);
-//         }
+        Ok(TaskResult::Success)
+    }
 
-//         Ok(TaskResult::Success)
-//     }
+    fn on_completed(&self, item: &usize, result: &TaskResult) -> bool {
+        self.done.fetch_add(1, Ordering::SeqCst);
+        println!("Result item: {}: {:?}", item, result);
+        true
+    }
 
-//     async fn process_async(&self, item: &usize) -> Result<TaskResult> {
-//         {
-//             let state = self.state.lock().unwrap();
-//             state.tasks.fetch_add(1, Ordering::SeqCst);
-//         }
-//         println!("Item: {}", item);
+    fn on_cancelled(&self) {
+        println!(
+            "Cancelled. Got: {} tasks and finished {} tasks.",
+            self.tasks(),
+            self.done()
+        );
+    }
 
-//         if item % 5 == 0 {
-//             return Ok(TaskResult::Error(format!(
-//                 "Item {}. Multiples of 5 are not allowed",
-//                 item
-//             )));
-//         } else if item % 3 == 0 {
-//             return Ok(TaskResult::TimedOut);
-//         }
+    fn on_finished(&self) {
+        println!(
+            "Finished. Got: {} tasks and finished {} tasks.",
+            self.tasks(),
+            self.done()
+        );
+    }
+}
 
-//         Ok(TaskResult::Success)
-//     }
+pub async fn test_producer_consumer(cancel_after: Duration) -> Result<()> {
+    println!("\nTesting Producer/Consumer with {} threads...", THREADS);
 
-//     fn on_completed(
-//         &self,
-//         _pc: &ProducerConsumer<usize>,
-//         item: &usize,
-//         result: &TaskResult,
-//     ) -> bool {
-//         self.done.fetch_add(1, Ordering::SeqCst);
-//         println!("Result item: {}: {:?}", item, result);
-//         true
-//     }
+    let now = Instant::now();
+    let handler = TaskHandler::new();
+    let options = ProducerConsumerOptions::new().with_threads(THREADS);
+    let prodcon = ProducerConsumer::<usize>::with_options(options);
+    let unit = TEST_SIZE / THREADS;
+    let mut handles = vec![];
+    prodcon.start(&handler.clone())?;
 
-//     fn on_cancelled(&self, _td: &ProducerConsumer<usize>) {
-//         println!(
-//             "Processing tasks was cancelled. Got: {} tasks and finished {} tasks.",
-//             self.tasks(),
-//             self.done()
-//         );
-//     }
+    for n in 0..THREADS {
+        let pc = prodcon.clone();
+        let p = prodcon.new_producer()?;
+        let h = handler.clone();
+        let handle = thread::spawn(move || {
+            for i in 1..=unit {
+                if pc.is_cancelled() {
+                    break;
+                }
+                if let Err(e) = p.enqueue(i + unit * n) {
+                    println!("Enqueue error: {:?}", e);
+                    break;
+                }
+            }
 
-//     fn on_finished(&self, _pc: &ProducerConsumer<usize>) {
-//         println!(
-//             "Got: {} tasks and finished {} tasks.",
-//             self.tasks(),
-//             self.done()
-//         );
-//     }
-// }
+            drop(pc);
+            drop(h);
+        });
+        handles.push(handle);
+    }
+
+    if !cancel_after.is_zero() {
+        let ptr = prodcon.clone();
+        thread::spawn(move || {
+            thread::sleep(cancel_after);
+
+            if ptr.is_finished() {
+                return;
+            }
+
+            ptr.cancel();
+        });
+    }
+
+    for handle in handles {
+        if prodcon.is_cancelled() {
+            break;
+        }
+        handle.join().unwrap();
+    }
+
+    prodcon.complete();
+    match prodcon.wait_async().await {
+        Ok(_) => println!("Producer/Consumer finished"),
+        Err(e) => println!("Producer/Consumer error: {:?}", e),
+    }
+    println!("Elapsed time: {:?}", now.elapsed());
+    Ok(())
+}
 
 // impl TaskDelegation<usize> for InjectorWorker<usize, TaskDelegation<usize>, TaskHandler> {
 //     type State = TaskHandler;
@@ -322,67 +351,6 @@ pub async fn test_consumer(cancel_after: Duration) -> Result<()> {
 //             self.done()
 //         );
 //     }
-// }
-
-// pub async fn test_producer_consumer(cancel_after: Duration) -> Result<()> {
-//     println!("\nTesting Producer/Consumer with {} threads...", THREADS);
-
-//     let now = Instant::now();
-//     let handler = TaskHandler::new();
-//     let options = ProducerConsumerOptions::new().with_threads(THREADS);
-//     let prodcon = ProducerConsumer::<usize>::with_options(options);
-//     let unit = TEST_SIZE / THREADS;
-//     let mut handles = vec![];
-//     prodcon.start(&handler.clone());
-
-//     for n in 0..THREADS {
-//         let pc = prodcon.clone();
-//         let p = prodcon.new_producer();
-//         let h = handler.clone();
-//         let handle = thread::spawn(move || {
-//             for i in 1..=unit {
-//                 if pc.is_cancelled() {
-//                     break;
-//                 }
-//                 if let Err(e) = p.enqueue(i + unit * n) {
-//                     println!("Enqueue error: {:?}", e);
-//                     break;
-//                 }
-//             }
-
-//             drop(pc);
-//             drop(h);
-//         });
-//         handles.push(handle);
-//     }
-
-//     if !cancel_after.is_zero() {
-//         let ptr = prodcon.clone();
-//         thread::spawn(move || {
-//             thread::sleep(cancel_after);
-
-//             if ptr.is_finished() {
-//                 return;
-//             }
-
-//             ptr.cancel();
-//         });
-//     }
-
-//     for handle in handles {
-//         if prodcon.is_cancelled() {
-//             break;
-//         }
-//         handle.join().unwrap();
-//     }
-
-//     prodcon.complete();
-//     match prodcon.wait_async().await {
-//         Ok(_) => println!("Producer/Consumer finished"),
-//         Err(e) => println!("Producer/Consumer error: {:?}", e),
-//     }
-//     println!("Elapsed time: {:?}", now.elapsed());
-//     Ok(())
 // }
 
 // pub async fn test_injector_worker(cancel_after: Duration) -> Result<()> {
