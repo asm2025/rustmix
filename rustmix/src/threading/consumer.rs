@@ -173,9 +173,9 @@ impl<T: StaticTaskItem> Consumer<T> {
         self.completed.store(true, Ordering::SeqCst);
         self.finished.store(true, Ordering::SeqCst);
         self.set_started(false);
+        self.finished_cond.notify_all();
+        self.finished_noti.notify_waiters();
         thread::sleep(Duration::ZERO);
-        self.finished_cond.notify_one();
-        self.finished_noti.notify_one();
     }
 
     pub fn running(&self) -> usize {
@@ -314,14 +314,6 @@ impl<T: StaticTaskItem> Consumer<T> {
         Ok(())
     }
 
-    pub fn stop(&self, enforce: bool) {
-        if enforce {
-            self.cancel();
-        } else {
-            self.complete();
-        }
-    }
-
     pub fn enqueue(&self, item: T) -> Result<()> {
         if self.is_cancelled() {
             return Err(CancelledError.into());
@@ -337,7 +329,7 @@ impl<T: StaticTaskItem> Consumer<T> {
             thread::sleep(self.options.sleep_after_send);
         }
 
-        self.items_cond.notify_one();
+        self.items_cond.notify_all();
         Ok(())
     }
 
@@ -377,6 +369,14 @@ impl<T: StaticTaskItem> Consumer<T> {
 
     pub fn clear(&mut self) {
         self.items = mem::replace(&mut self.items, Arc::new(SegQueue::new()));
+    }
+
+    pub fn stop(&self, enforce: bool) {
+        if enforce {
+            self.cancel();
+        } else {
+            self.complete();
+        }
     }
 
     pub fn complete(&self) {

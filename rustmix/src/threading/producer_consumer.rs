@@ -72,47 +72,6 @@ impl ProducerConsumerOptions {
 }
 
 #[derive(Clone, Debug)]
-pub struct Producer<T: StaticTaskItem> {
-    options: ProducerConsumerOptions,
-    pc: Arc<ProducerConsumer<T>>,
-    sender: Arc<channel::Sender<T>>,
-}
-
-impl<T: StaticTaskItem> Producer<T> {
-    fn new(pc: &ProducerConsumer<T>, sender: &channel::Sender<T>) -> Self {
-        Producer {
-            options: pc.options.clone(),
-            pc: Arc::new(pc.clone()),
-            sender: Arc::new(sender.clone()),
-        }
-    }
-
-    pub fn enqueue(&self, item: T) -> Result<()> {
-        if self.pc.is_cancelled() {
-            return Err(CancelledError.into());
-        }
-
-        if self.pc.is_completed() {
-            return Err(QueueCompletedError.into());
-        }
-
-        self.sender.send(item)?;
-
-        if !self.options.sleep_after_send.is_zero() {
-            thread::sleep(self.options.sleep_after_send);
-        }
-
-        Ok(())
-    }
-}
-
-impl<T: StaticTaskItem> Drop for Producer<T> {
-    fn drop(&mut self) {
-        self.pc.dec_producers();
-    }
-}
-
-#[derive(Clone, Debug)]
 pub struct ProducerConsumer<T: StaticTaskItem> {
     options: ProducerConsumerOptions,
     started: Arc<Mutex<bool>>,
@@ -122,7 +81,6 @@ pub struct ProducerConsumer<T: StaticTaskItem> {
     completed: Arc<AtomicBool>,
     paused: Arc<AtomicBool>,
     cancelled: Arc<AtomicBool>,
-    producers: Arc<AtomicUsize>,
     consumers: Arc<AtomicUsize>,
     running: Arc<AtomicUsize>,
     sender: channel::Sender<T>,
@@ -144,7 +102,6 @@ impl<T: StaticTaskItem> ProducerConsumer<T> {
             completed: Arc::new(AtomicBool::new(false)),
             paused: Arc::new(AtomicBool::new(false)),
             cancelled: Arc::new(AtomicBool::new(false)),
-            producers: Arc::new(AtomicUsize::new(0)),
             consumers: Arc::new(AtomicUsize::new(0)),
             running: Arc::new(AtomicUsize::new(0)),
         }
@@ -163,7 +120,6 @@ impl<T: StaticTaskItem> ProducerConsumer<T> {
             completed: Arc::new(AtomicBool::new(false)),
             paused: Arc::new(AtomicBool::new(false)),
             cancelled: Arc::new(AtomicBool::new(false)),
-            producers: Arc::new(AtomicUsize::new(0)),
             consumers: Arc::new(AtomicUsize::new(0)),
             running: Arc::new(AtomicUsize::new(0)),
         }
@@ -212,18 +168,6 @@ impl<T: StaticTaskItem> ProducerConsumer<T> {
         self.sender.len() + self.receiver.len()
     }
 
-    pub fn producers(&self) -> usize {
-        self.producers.load(Ordering::SeqCst)
-    }
-
-    fn inc_producers(&self) {
-        self.producers.fetch_add(1, Ordering::SeqCst);
-    }
-
-    fn dec_producers(&self) {
-        self.producers.fetch_sub(1, Ordering::SeqCst);
-    }
-
     pub fn consumers(&self) -> usize {
         self.consumers.load(Ordering::SeqCst)
     }
@@ -244,9 +188,9 @@ impl<T: StaticTaskItem> ProducerConsumer<T> {
 
         self.completed.store(true, Ordering::SeqCst);
         self.set_started(false);
+        self.finished_cond.notify_all();
+        self.finished_noti.notify_waiters();
         thread::sleep(Duration::ZERO);
-        self.finished_cond.notify_one();
-        self.finished_noti.notify_one();
     }
 
     pub fn running(&self) -> usize {
@@ -259,20 +203,6 @@ impl<T: StaticTaskItem> ProducerConsumer<T> {
 
     fn dec_running(&self) {
         self.running.fetch_sub(1, Ordering::SeqCst);
-    }
-
-    pub fn new_producer(&self) -> Result<Producer<T>> {
-        if self.is_cancelled() {
-            return Err(CancelledError.into());
-        }
-
-        if self.is_completed() {
-            return Err(QueueCompletedError.into());
-        }
-
-        self.inc_producers();
-        let this = Arc::new(self.clone());
-        Ok(Producer::new(&this, &self.sender))
     }
 
     pub fn start<H: TaskDelegation<ProducerConsumer<T>, T>>(&self, handler: &H) -> Result<()> {
@@ -394,6 +324,24 @@ impl<T: StaticTaskItem> ProducerConsumer<T> {
 
                 this.finish();
             });
+        }
+
+        Ok(())
+    }
+
+    pub fn enqueue(&self, item: T) -> Result<()> {
+        if self.is_cancelled() {
+            return Err(CancelledError.into());
+        }
+
+        if self.is_completed() {
+            return Err(QueueCompletedError.into());
+        }
+
+        self.sender.send(item)?;
+
+        if !self.options.sleep_after_send.is_zero() {
+            thread::sleep(self.options.sleep_after_send);
         }
 
         Ok(())

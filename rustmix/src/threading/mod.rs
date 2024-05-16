@@ -12,15 +12,10 @@ mod spinner;
 pub use self::spinner::*;
 
 use futures::Future;
-use std::{
-    fmt,
-    pin::Pin,
-    sync::{Arc, RwLock},
-};
+use std::{fmt, pin::Pin, sync::Arc, thread};
 use tokio::{
-    select,
     sync::Notify,
-    time::{sleep, Duration},
+    time::{self, Duration},
 };
 
 use crate::{
@@ -121,11 +116,12 @@ async fn wait_async<TPC: AwaitableConsumer<T>, T: StaticTaskItem>(
     this: &TPC,
     finished: &Arc<Notify>,
 ) -> Result<()> {
-    while !this.is_finished() && !this.is_cancelled() {
-        select! {
-            _ = finished.notified() => {},
-            else => {},
-        }
+    let mut notified = false;
+
+    while !notified && !this.is_finished() && !this.is_cancelled() {
+        thread::sleep(Duration::ZERO);
+        finished.notified().await;
+        notified = true;
     }
 
     if this.is_cancelled() {
@@ -161,12 +157,11 @@ async fn wait_until_async<
     finished: &Arc<Notify>,
     cond: F,
 ) -> Result<()> {
-    while !this.is_cancelled() && !this.is_finished() {
-        select! {
-            _ = finished.notified() => {},
-            _ = cond(this) => {},
-            _ = sleep(SELECT_TIMEOUT) => {}
-        }
+    let mut notified = false;
+
+    while !cond(this).await && !notified && !this.is_cancelled() && !this.is_finished() {
+        finished.notified().await;
+        notified = true;
     }
 
     if this.is_cancelled() {
@@ -206,15 +201,16 @@ async fn wait_for_async<TPC: AwaitableConsumer<T>, T: StaticTaskItem>(
         return Err(TimedoutError.into());
     }
 
-    select! {
-        _ = finished.notified() => {
+    let result = time::timeout(timeout, finished.notified()).await;
+    match result {
+        Ok(_) => {
             if this.is_cancelled() {
                 Err(CancelledError.into())
             } else {
-            Ok(())
+                Ok(())
             }
-        },
-        _ = sleep(timeout) => Err(TimedoutError.into()),
+        }
+        Err(_) => Err(TimedoutError.into()),
     }
 }
 
@@ -256,21 +252,32 @@ async fn wait_for_until_async<
         return Err(TimedoutError.into());
     }
 
-    select! {
-        _ = finished.notified() => {
-            if this.is_cancelled() {
-                Err(CancelledError.into())
-            } else {
-                Ok(())
+    let start = time::Instant::now();
+
+    while !cond(this).await {
+        if this.is_cancelled() {
+            return Err(CancelledError.into());
+        }
+
+        if time::Instant::now().duration_since(start) > timeout {
+            return Err(TimedoutError.into());
+        }
+
+        match time::timeout(PEEK_TIMEOUT_DEF, finished.notified()).await {
+            Ok(_) => {
+                if this.is_cancelled() {
+                    return Err(CancelledError.into());
+                }
+
+                return Ok(());
             }
-        },
-        _ = cond(this) => {
-            if this.is_cancelled() {
-                Err(CancelledError.into())
-            } else {
-                Ok(())
+            Err(_) => {
+                if time::Instant::now().duration_since(start) > timeout {
+                    return Err(TimedoutError.into());
+                }
             }
-        },
-        _ = sleep(timeout) => Err(TimedoutError.into())
+        }
     }
+
+    Ok(())
 }

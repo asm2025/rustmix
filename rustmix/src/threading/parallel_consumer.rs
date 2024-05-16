@@ -212,8 +212,8 @@
 //             }
 //         }
 //         self.set_started(false);
-//         self.finished_cond.notify_one();
-//         self.finished_noti.notify_one();
+//         self.finished_cond.notify_all();
+//         self.finished_noti.notify_waiters();
 //     }
 
 //     pub fn start<I: IntoParallelIterator<Item = T> + Len + Send + 'static>(
