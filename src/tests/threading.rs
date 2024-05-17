@@ -289,100 +289,82 @@ pub async fn test_injector_worker(cancel_after: Duration) -> Result<()> {
     Ok(())
 }
 
-// impl TaskDelegation<usize> for Parallel<usize, TaskDelegation<usize>, TaskHandler> {
-//     type State = TaskHandler;
+impl TaskDelegation<Parallel<usize>, usize> for TaskHandler {
+    fn on_started(&self) {
+        println!("Parallel started");
+    }
 
-//     fn on_started(&self, _pc: &Parallel<usize>) {
-//         println!("Parallel started");
-//     }
+    fn process(&self, _pc: &Parallel<usize>, item: &usize) -> Result<TaskResult> {
+        self.tasks.fetch_add(1, Ordering::SeqCst);
+        println!("Item: {}", item);
 
-//     fn process(&self, _pc: &Parallel<usize>, item: &usize) -> Result<TaskResult> {
-//         self.tasks.fetch_add(1, Ordering::SeqCst);
-//         println!("Item: {}", item);
+        if item % 5 == 0 {
+            return Ok(TaskResult::Error(format!(
+                "Item {}. Multiples of 5 are not allowed",
+                item
+            )));
+        } else if item % 3 == 0 {
+            return Ok(TaskResult::TimedOut);
+        }
 
-//         if item % 5 == 0 {
-//             return Ok(TaskResult::Error(format!(
-//                 "Item {}. Multiples of 5 are not allowed",
-//                 item
-//             )));
-//         } else if item % 3 == 0 {
-//             return Ok(TaskResult::TimedOut);
-//         }
+        Ok(TaskResult::Success)
+    }
 
-//         Ok(TaskResult::Success)
-//     }
+    fn on_completed(&self, item: &usize, result: &TaskResult) -> bool {
+        self.done.fetch_add(1, Ordering::SeqCst);
+        println!("Result item: {}: {:?}", item, result);
+        true
+    }
 
-//     async fn process_async(&self, _pc: &Parallel<usize>, item: &usize) -> Result<TaskResult> {
-//         self.tasks.fetch_add(1, Ordering::SeqCst);
-//         println!("Item: {}", item);
+    fn on_cancelled(&self) {
+        println!(
+            "Processing tasks was cancelled. Got: {} tasks and finished {} tasks.",
+            self.tasks(),
+            self.done()
+        );
+    }
 
-//         if item % 5 == 0 {
-//             return Ok(TaskResult::Error(format!(
-//                 "Item {}. Multiples of 5 are not allowed",
-//                 item
-//             )));
-//         } else if item % 3 == 0 {
-//             return Ok(TaskResult::TimedOut);
-//         }
+    fn on_finished(&self) {
+        println!(
+            "Got: {} tasks and finished {} tasks.",
+            self.tasks(),
+            self.done()
+        );
+    }
+}
 
-//         Ok(TaskResult::Success)
-//     }
+pub async fn test_parallel(cancel_after: Duration) -> Result<()> {
+    println!("\nTesting Parallel with {} threads...", THREADS);
 
-//     fn on_completed(&self, _pc: &Parallel<usize>, item: &usize, result: &TaskResult) -> bool {
-//         self.done.fetch_add(1, Ordering::SeqCst);
-//         println!("Result item: {}: {:?}", item, result);
-//         true
-//     }
+    let now = Instant::now();
+    let handler = TaskHandler::new();
+    let options = ParallelOptions::new().with_threads(THREADS);
+    let parallel = Parallel::with_options(options);
+    let mut collection = collections::VecDeque::<usize>::with_capacity(TEST_SIZE);
 
-//     fn on_cancelled(&self, _td: &Parallel<usize>) {
-//         println!(
-//             "Processing tasks was cancelled. Got: {} tasks and finished {} tasks.",
-//             self.tasks(),
-//             self.done()
-//         );
-//     }
+    for i in 1..=TEST_SIZE {
+        collection.push_back(i);
+    }
 
-//     fn on_finished(&self, _pc: &Parallel<usize>) {
-//         println!(
-//             "Got: {} tasks and finished {} tasks.",
-//             self.tasks(),
-//             self.done()
-//         );
-//     }
-// }
+    parallel.start(collection, &handler);
 
-// pub async fn test_parallel(cancel_after: Duration) -> Result<()> {
-//     println!("\nTesting Parallel with {} threads...", THREADS);
+    if !cancel_after.is_zero() {
+        let ptr = parallel.clone();
+        thread::spawn(move || {
+            thread::sleep(cancel_after);
 
-//     let now = Instant::now();
-//     let handler = TaskHandler::new();
-//     let options = ParallelOptions::new().with_threads(THREADS);
-//     let parallel = Parallel::with_options(options);
-//     let mut collection = collections::VecDeque::<usize>::with_capacity(TEST_SIZE);
+            if ptr.is_finished() {
+                return;
+            }
 
-//     for i in 1..=TEST_SIZE {
-//         collection.push_back(i);
-//     }
+            ptr.cancel();
+        });
+    }
 
-//     parallel.start(collection, &handler);
-
-//     if !cancel_after.is_zero() {
-//         let ptr = parallel.clone();
-//         thread::spawn(move || {
-//             thread::sleep(cancel_after);
-
-//             if ptr.is_finished() {
-//                 return;
-//             }
-
-//             ptr.cancel();
-//         });
-//     }
-
-//     match parallel.wait_async().await {
-//         Ok(_) => println!("Parallel finished"),
-//         Err(e) => println!("Parallel error: {:?}", e),
-//     }
-//     println!("Elapsed time: {:?}", now.elapsed());
-//     Ok(())
-// }
+    match parallel.wait_async().await {
+        Ok(_) => println!("Parallel finished"),
+        Err(e) => println!("Parallel error: {:?}", e),
+    }
+    println!("Elapsed time: {:?}", now.elapsed());
+    Ok(())
+}
