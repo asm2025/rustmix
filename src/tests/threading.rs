@@ -38,7 +38,7 @@ impl TaskHandler {
 }
 
 impl TaskDelegation<Consumer<usize>, usize> for TaskHandler {
-    fn on_started(&self) {
+    fn on_started(&self, _pc: &Consumer<usize>) {
         println!("Consumer started");
     }
 
@@ -58,13 +58,13 @@ impl TaskDelegation<Consumer<usize>, usize> for TaskHandler {
         Ok(TaskResult::Success)
     }
 
-    fn on_completed(&self, item: &usize, result: &TaskResult) -> bool {
+    fn on_completed(&self, _pc: &Consumer<usize>, item: &usize, result: &TaskResult) -> bool {
         self.done.fetch_add(1, Ordering::SeqCst);
         println!("Result item: {}: {:?}", item, result);
         true
     }
 
-    fn on_cancelled(&self) {
+    fn on_cancelled(&self, _pc: &Consumer<usize>) {
         println!(
             "Cancelled. Got: {} tasks and finished {} tasks.",
             self.tasks(),
@@ -72,7 +72,7 @@ impl TaskDelegation<Consumer<usize>, usize> for TaskHandler {
         );
     }
 
-    fn on_finished(&self) {
+    fn on_finished(&self, _pc: &Consumer<usize>) {
         println!(
             "Finished. Got: {} tasks and finished {} tasks.",
             self.tasks(),
@@ -121,7 +121,7 @@ pub async fn test_consumer(cancel_after: Duration) -> Result<()> {
 }
 
 impl TaskDelegation<ProducerConsumer<usize>, usize> for TaskHandler {
-    fn on_started(&self) {
+    fn on_started(&self, _pc: &ProducerConsumer<usize>) {
         println!("Producer/Consumer started");
     }
 
@@ -141,13 +141,18 @@ impl TaskDelegation<ProducerConsumer<usize>, usize> for TaskHandler {
         Ok(TaskResult::Success)
     }
 
-    fn on_completed(&self, item: &usize, result: &TaskResult) -> bool {
+    fn on_completed(
+        &self,
+        _pc: &ProducerConsumer<usize>,
+        item: &usize,
+        result: &TaskResult,
+    ) -> bool {
         self.done.fetch_add(1, Ordering::SeqCst);
         println!("Result item: {}: {:?}", item, result);
         true
     }
 
-    fn on_cancelled(&self) {
+    fn on_cancelled(&self, _pc: &ProducerConsumer<usize>) {
         println!(
             "Cancelled. Got: {} tasks and finished {} tasks.",
             self.tasks(),
@@ -155,7 +160,7 @@ impl TaskDelegation<ProducerConsumer<usize>, usize> for TaskHandler {
         );
     }
 
-    fn on_finished(&self) {
+    fn on_finished(&self, _pc: &ProducerConsumer<usize>) {
         println!(
             "Finished. Got: {} tasks and finished {} tasks.",
             self.tasks(),
@@ -206,7 +211,7 @@ pub async fn test_producer_consumer(cancel_after: Duration) -> Result<()> {
 }
 
 impl TaskDelegation<InjectorWorker<usize>, usize> for TaskHandler {
-    fn on_started(&self) {
+    fn on_started(&self, _pc: &InjectorWorker<usize>) {
         println!("Injector/Worker started");
     }
 
@@ -226,13 +231,13 @@ impl TaskDelegation<InjectorWorker<usize>, usize> for TaskHandler {
         Ok(TaskResult::Success)
     }
 
-    fn on_completed(&self, item: &usize, result: &TaskResult) -> bool {
+    fn on_completed(&self, _pc: &InjectorWorker<usize>, item: &usize, result: &TaskResult) -> bool {
         self.done.fetch_add(1, Ordering::SeqCst);
         println!("Result item: {}: {:?}", item, result);
         true
     }
 
-    fn on_cancelled(&self) {
+    fn on_cancelled(&self, _pc: &InjectorWorker<usize>) {
         println!(
             "Processing tasks was cancelled. Got: {} tasks and finished {} tasks.",
             self.tasks(),
@@ -240,7 +245,7 @@ impl TaskDelegation<InjectorWorker<usize>, usize> for TaskHandler {
         );
     }
 
-    fn on_finished(&self) {
+    fn on_finished(&self, _pc: &InjectorWorker<usize>) {
         println!(
             "Got: {} tasks and finished {} tasks.",
             self.tasks(),

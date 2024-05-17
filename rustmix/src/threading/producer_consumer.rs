@@ -219,7 +219,7 @@ impl<T: StaticTaskItem> ProducerConsumer<T> {
         }
 
         self.set_consumers(self.options.threads);
-        handler.on_started();
+        handler.on_started(self);
 
         for _ in 0..self.options.threads {
             let this = self.clone();
@@ -242,14 +242,17 @@ impl<T: StaticTaskItem> ProducerConsumer<T> {
                         this.inc_running();
                         match handler.process(&this, &item) {
                             Ok(it) => {
-                                if !handler.on_completed(&item, &it) {
+                                if !handler.on_completed(&this, &item, &it) {
                                     this.dec_running();
                                     break;
                                 }
                             }
                             Err(e) => {
-                                if !handler.on_completed(&item, &TaskResult::Error(e.get_message()))
-                                {
+                                if !handler.on_completed(
+                                    &this,
+                                    &item,
+                                    &TaskResult::Error(e.get_message()),
+                                ) {
                                     this.dec_running();
                                     break;
                                 }
@@ -263,9 +266,9 @@ impl<T: StaticTaskItem> ProducerConsumer<T> {
                     }
 
                     if this.is_cancelled() {
-                        handler.on_cancelled();
+                        handler.on_cancelled(&this);
                     } else {
-                        handler.on_finished();
+                        handler.on_finished(&this);
                     }
 
                     this.finish();
@@ -288,7 +291,7 @@ impl<T: StaticTaskItem> ProducerConsumer<T> {
                     this.inc_running();
                     match handler.process(&this, &item) {
                         Ok(it) => {
-                            if !handler.on_completed(&item, &it) {
+                            if !handler.on_completed(&this, &item, &it) {
                                 this.dec_running();
                                 break;
                             }
@@ -303,7 +306,11 @@ impl<T: StaticTaskItem> ProducerConsumer<T> {
                             }
                         }
                         Err(e) => {
-                            if !handler.on_completed(&item, &TaskResult::Error(e.get_message())) {
+                            if !handler.on_completed(
+                                &this,
+                                &item,
+                                &TaskResult::Error(e.get_message()),
+                            ) {
                                 this.dec_running();
                                 break;
                             }
@@ -317,9 +324,9 @@ impl<T: StaticTaskItem> ProducerConsumer<T> {
                 }
 
                 if this.is_cancelled() {
-                    handler.on_cancelled();
+                    handler.on_cancelled(&this);
                 } else {
-                    handler.on_finished();
+                    handler.on_finished(&this);
                 }
 
                 this.finish();
