@@ -39,8 +39,6 @@ async fn main() -> Result<()> {
     //tests::test_producer_consumer(Duration::from_millis(150)).await?;
     //tests::test_injector_worker(Duration::ZERO).await?;
     //tests::test_injector_worker(Duration::from_millis(150)).await?;
-    //tests::test_parallel(Duration::ZERO).await?;
-    //tests::test_parallel(Duration::from_millis(150)).await?;
 
     //tests::test_python()?;
 

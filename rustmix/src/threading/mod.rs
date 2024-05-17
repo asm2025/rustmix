@@ -4,8 +4,6 @@ mod consumer;
 pub use self::consumer::*;
 mod injector_consumer;
 pub use self::injector_consumer::*;
-mod parallel_consumer;
-pub use self::parallel_consumer::*;
 mod producer_consumer;
 pub use self::producer_consumer::*;
 mod spinner;
@@ -36,7 +34,6 @@ const PEEK_TIMEOUT_MAX: Duration = Duration::from_secs(5);
 const PAUSE_TIMEOUT_DEF: Duration = Duration::from_millis(50);
 const PAUSE_TIMEOUT_MIN: Duration = Duration::from_millis(10);
 const PAUSE_TIMEOUT_MAX: Duration = Duration::from_secs(5);
-const SELECT_TIMEOUT: Duration = Duration::from_millis(10);
 pub const INTERVAL: u64 = 100;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

@@ -1,6 +1,5 @@
 use rustmix::{threading::*, Result};
 use std::{
-    collections,
     future::Future,
     pin::Pin,
     sync::{
@@ -284,86 +283,6 @@ pub async fn test_injector_worker(cancel_after: Duration) -> Result<()> {
     match injwork.wait_async().await {
         Ok(_) => println!("Injector/Worker finished"),
         Err(e) => println!("Injector/Worker error: {:?}", e),
-    }
-    println!("Elapsed time: {:?}", now.elapsed());
-    Ok(())
-}
-
-impl TaskDelegation<Parallel<usize>, usize> for TaskHandler {
-    fn on_started(&self) {
-        println!("Parallel started");
-    }
-
-    fn process(&self, _pc: &Parallel<usize>, item: &usize) -> Result<TaskResult> {
-        self.tasks.fetch_add(1, Ordering::SeqCst);
-        println!("Item: {}", item);
-
-        if item % 5 == 0 {
-            return Ok(TaskResult::Error(format!(
-                "Item {}. Multiples of 5 are not allowed",
-                item
-            )));
-        } else if item % 3 == 0 {
-            return Ok(TaskResult::TimedOut);
-        }
-
-        Ok(TaskResult::Success)
-    }
-
-    fn on_completed(&self, item: &usize, result: &TaskResult) -> bool {
-        self.done.fetch_add(1, Ordering::SeqCst);
-        println!("Result item: {}: {:?}", item, result);
-        true
-    }
-
-    fn on_cancelled(&self) {
-        println!(
-            "Processing tasks was cancelled. Got: {} tasks and finished {} tasks.",
-            self.tasks(),
-            self.done()
-        );
-    }
-
-    fn on_finished(&self) {
-        println!(
-            "Got: {} tasks and finished {} tasks.",
-            self.tasks(),
-            self.done()
-        );
-    }
-}
-
-pub async fn test_parallel(cancel_after: Duration) -> Result<()> {
-    println!("\nTesting Parallel with {} threads...", THREADS);
-
-    let now = Instant::now();
-    let handler = TaskHandler::new();
-    let options = ParallelOptions::new().with_threads(THREADS);
-    let parallel = Parallel::with_options(options);
-    let mut collection = collections::VecDeque::<usize>::with_capacity(TEST_SIZE);
-
-    for i in 1..=TEST_SIZE {
-        collection.push_back(i);
-    }
-
-    parallel.start(collection, &handler);
-
-    if !cancel_after.is_zero() {
-        let ptr = parallel.clone();
-        thread::spawn(move || {
-            thread::sleep(cancel_after);
-
-            if ptr.is_finished() {
-                return;
-            }
-
-            ptr.cancel();
-        });
-    }
-
-    match parallel.wait_async().await {
-        Ok(_) => println!("Parallel finished"),
-        Err(e) => println!("Parallel error: {:?}", e),
     }
     println!("Elapsed time: {:?}", now.elapsed());
     Ok(())
