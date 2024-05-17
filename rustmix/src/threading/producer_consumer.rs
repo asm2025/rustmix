@@ -12,10 +12,7 @@ use tokio::{
 };
 
 use super::{cond::Mutcond, *};
-use crate::{
-    error::{CancelledError, QueueCompletedError},
-    Result,
-};
+use crate::{error::*, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProducerConsumerOptions {
@@ -75,40 +72,7 @@ impl ProducerConsumerOptions {
 }
 
 #[derive(Clone, Debug)]
-pub struct Producer<T: Send + Sync + Clone + 'static> {
-    pc: Arc<ProducerConsumer<T>>,
-    sender: Arc<channel::Sender<T>>,
-}
-
-impl<T: Send + Sync + Clone> Producer<T> {
-    fn new(pc: &ProducerConsumer<T>, sender: &channel::Sender<T>) -> Self {
-        Producer {
-            pc: Arc::new(pc.clone()),
-            sender: Arc::new(sender.clone()),
-        }
-    }
-
-    pub fn enqueue(&self, item: T) -> Result<()> {
-        if self.pc.is_cancelled() {
-            return Err(CancelledError.into());
-        }
-
-        if self.pc.is_completed() {
-            return Err(QueueCompletedError.into());
-        }
-
-        self.sender.send(item).unwrap();
-
-        if !self.pc.options.sleep_after_send.is_zero() {
-            thread::sleep(self.pc.options.sleep_after_send);
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct ProducerConsumer<T: Send + Sync + Clone + 'static> {
+pub struct ProducerConsumer<T: StaticTaskItem> {
     options: ProducerConsumerOptions,
     started: Arc<Mutex<bool>>,
     finished: Arc<AtomicBool>,
@@ -123,7 +87,7 @@ pub struct ProducerConsumer<T: Send + Sync + Clone + 'static> {
     receiver: channel::Receiver<T>,
 }
 
-impl<T: Send + Sync + Clone> ProducerConsumer<T> {
+impl<T: StaticTaskItem> ProducerConsumer<T> {
     pub fn new() -> Self {
         let options: ProducerConsumerOptions = Default::default();
         let (sender, receiver) = channel::bounded::<T>(options.capacity);
@@ -201,7 +165,7 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
     }
 
     pub fn len(&self) -> usize {
-        self.sender.len()
+        self.sender.len() + self.receiver.len()
     }
 
     pub fn consumers(&self) -> usize {
@@ -212,28 +176,21 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
         self.consumers.store(value, Ordering::SeqCst);
     }
 
-    fn dec_consumers(&self, td: &impl TaskDelegationBase<ProducerConsumer<T>, T>) {
+    fn dec_consumers(&self) -> bool {
         self.consumers.fetch_sub(1, Ordering::SeqCst);
-        self.check_finished(td);
+        self.consumers() == 0 && (self.is_completed() || self.is_cancelled())
     }
 
-    fn check_finished(&self, td: &impl TaskDelegationBase<ProducerConsumer<T>, T>) {
-        if self.consumers() > 0 || (!self.is_completed() && !self.is_cancelled()) {
+    fn finish(&self) {
+        if !self.is_completed() && !self.is_cancelled() {
             return;
         }
 
         self.completed.store(true, Ordering::SeqCst);
-        self.finished.store(true, Ordering::SeqCst);
-
-        if self.is_cancelled() {
-            td.on_cancelled(self);
-        } else {
-            td.on_finished(self);
-        }
-
         self.set_started(false);
-        self.finished_cond.notify_one();
-        self.finished_noti.notify_one();
+        self.finished_cond.notify_all();
+        self.finished_noti.notify_waiters();
+        thread::sleep(Duration::ZERO);
     }
 
     pub fn running(&self) -> usize {
@@ -248,44 +205,29 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
         self.running.fetch_sub(1, Ordering::SeqCst);
     }
 
-    pub fn new_producer(&self) -> Producer<T> {
+    pub fn start<H: TaskDelegation<ProducerConsumer<T>, T>>(&self, handler: &H) -> Result<()> {
         if self.is_cancelled() {
-            panic!("Queue is already cancelled.")
-        }
-
-        if self.is_completed() {
-            panic!("Queue is already completed.")
-        }
-
-        Producer::new(self, &self.sender)
-    }
-
-    pub fn start<TD: TaskDelegation<ProducerConsumer<T>, T> + Send + Sync + Clone + 'static>(
-        &self,
-        delegate: &TD,
-    ) {
-        if self.is_cancelled() {
-            panic!("Queue is already cancelled.")
+            return Err(CancelledError.into());
         }
 
         if self.is_completed() && self.is_empty() {
-            panic!("Queue is already completed.")
+            return Err(QueueCompletedError.into());
         }
 
         if !self.set_started(true) {
-            return;
+            return Err(QueueStartedError.into());
         }
 
         self.set_consumers(self.options.threads);
-        delegate.on_started(self);
+        handler.on_started();
 
         for _ in 0..self.options.threads {
-            let this = Arc::new(self.clone());
-            let delegate = delegate.clone();
+            let this = self.clone();
+            let handler = handler.clone();
             thread::spawn(move || {
                 if this.options.threshold.is_zero() {
                     loop {
-                        if this.is_cancelled() || (this.is_empty() && this.is_completed()) {
+                        if this.is_cancelled() || (!this.is_busy() && this.is_completed()) {
                             break;
                         }
 
@@ -298,37 +240,40 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
                             continue;
                         };
                         this.inc_running();
-
-                        match delegate.process(&this, &item) {
+                        match handler.process(&this, &item) {
                             Ok(it) => {
-                                if !delegate.on_completed(&this, &item, &it) {
+                                if !handler.on_completed(&item, &it) {
                                     this.dec_running();
                                     break;
                                 }
                             }
                             Err(e) => {
-                                if !delegate.on_completed(
-                                    &this,
-                                    &item,
-                                    &TaskResult::Error(e.to_string()),
-                                ) {
+                                if !handler.on_completed(&item, &TaskResult::Error(e.get_message()))
+                                {
                                     this.dec_running();
                                     break;
                                 }
                             }
                         }
-
                         this.dec_running();
                     }
 
-                    this.dec_consumers(&delegate);
-                    drop(delegate);
-                    drop(this);
+                    if !this.dec_consumers() {
+                        return;
+                    }
+
+                    if this.is_cancelled() {
+                        handler.on_cancelled();
+                    } else {
+                        handler.on_finished();
+                    }
+
+                    this.finish();
                     return;
                 }
 
                 loop {
-                    if this.is_cancelled() || (this.is_empty() && this.is_completed()) {
+                    if this.is_cancelled() || (this.is_busy() && this.is_completed()) {
                         break;
                     }
 
@@ -341,10 +286,9 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
                         continue;
                     };
                     this.inc_running();
-
-                    match delegate.process(&this, &item) {
+                    match handler.process(&this, &item) {
                         Ok(it) => {
-                            if !delegate.on_completed(&this, &item, &it) {
+                            if !handler.on_completed(&item, &it) {
                                 this.dec_running();
                                 break;
                             }
@@ -359,147 +303,48 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
                             }
                         }
                         Err(e) => {
-                            if !delegate.on_completed(
-                                &this,
-                                &item,
-                                &TaskResult::Error(e.to_string()),
-                            ) {
+                            if !handler.on_completed(&item, &TaskResult::Error(e.get_message())) {
                                 this.dec_running();
                                 break;
                             }
                         }
                     }
-
                     this.dec_running();
                 }
 
-                this.dec_consumers(&delegate);
-                drop(delegate);
-                drop(this);
+                if !this.dec_consumers() {
+                    return;
+                }
+
+                if this.is_cancelled() {
+                    handler.on_cancelled();
+                } else {
+                    handler.on_finished();
+                }
+
+                this.finish();
             });
         }
+
+        Ok(())
     }
 
-    pub async fn start_async<
-        TD: AsyncTaskDelegation<ProducerConsumer<T>, T> + Send + Sync + Clone + 'static,
-    >(
-        &self,
-        delegate: &TD,
-    ) {
+    pub fn enqueue(&self, item: T) -> Result<()> {
         if self.is_cancelled() {
-            panic!("Queue is already cancelled.")
+            return Err(CancelledError.into());
         }
 
-        if self.is_completed() && self.is_empty() {
-            panic!("Queue is already completed.")
+        if self.is_completed() {
+            return Err(QueueCompletedError.into());
         }
 
-        if !self.set_started(true) {
-            return;
+        self.sender.send(item)?;
+
+        if !self.options.sleep_after_send.is_zero() {
+            thread::sleep(self.options.sleep_after_send);
         }
 
-        self.set_consumers(self.options.threads);
-        delegate.on_started(self);
-
-        for _ in 0..self.options.threads {
-            let this = Arc::new(self.clone());
-            let delegate = delegate.clone();
-            tokio::spawn(async move {
-                if this.options.threshold.is_zero() {
-                    loop {
-                        if this.is_cancelled() || (this.is_empty() && this.is_completed()) {
-                            break;
-                        }
-
-                        if this.is_paused() {
-                            thread::sleep(this.options.pause_timeout);
-                            continue;
-                        }
-
-                        let Ok(item) = this.receiver.recv_timeout(this.options.peek_timeout) else {
-                            continue;
-                        };
-                        this.inc_running();
-
-                        match delegate.process(&this, &item).await {
-                            Ok(it) => {
-                                if !delegate.on_completed(&this, &item, &it) {
-                                    this.dec_running();
-                                    break;
-                                }
-                            }
-                            Err(e) => {
-                                if !delegate.on_completed(
-                                    &this,
-                                    &item,
-                                    &TaskResult::Error(e.to_string()),
-                                ) {
-                                    this.dec_running();
-                                    break;
-                                }
-                            }
-                        }
-
-                        this.dec_running();
-                    }
-
-                    this.dec_consumers(&delegate);
-                    drop(delegate);
-                    drop(this);
-                    return;
-                }
-
-                loop {
-                    if this.is_cancelled() || (this.is_empty() && this.is_completed()) {
-                        break;
-                    }
-
-                    if this.is_paused() {
-                        thread::sleep(this.options.pause_timeout);
-                        continue;
-                    }
-
-                    let Ok(item) = this.receiver.recv_timeout(this.options.peek_timeout) else {
-                        continue;
-                    };
-                    this.inc_running();
-
-                    match delegate.process(&this, &item).await {
-                        Ok(it) => {
-                            if !delegate.on_completed(&this, &item, &it) {
-                                this.dec_running();
-                                break;
-                            }
-
-                            if !this.options.threshold.is_zero() {
-                                let time = Instant::now();
-
-                                if time.elapsed() < this.options.threshold {
-                                    let remaining = this.options.threshold - time.elapsed();
-                                    thread::sleep(remaining);
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            if !delegate.on_completed(
-                                &this,
-                                &item,
-                                &TaskResult::Error(e.to_string()),
-                            ) {
-                                this.dec_running();
-                                break;
-                            }
-                        }
-                    }
-
-                    this.dec_running();
-                }
-
-                this.dec_consumers(&delegate);
-                drop(delegate);
-                drop(this);
-            });
-        }
+        Ok(())
     }
 
     pub fn stop(&self, enforce: bool) {
@@ -538,11 +383,9 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
         wait_until(self, &self.finished_cond, cond)
     }
 
-    pub async fn wait_until_async<
-        F: Fn(&ProducerConsumer<T>) -> Pin<Box<dyn Future<Output = bool> + Send>>,
-    >(
+    pub async fn wait_until_async(
         &self,
-        cond: F,
+        cond: impl Fn(&ProducerConsumer<T>) -> Pin<Box<dyn Future<Output = bool> + Send>>,
     ) -> Result<()> {
         wait_until_async(self, &self.finished_noti, cond).await
     }
@@ -574,7 +417,7 @@ impl<T: Send + Sync + Clone> ProducerConsumer<T> {
     }
 }
 
-impl<T: Send + Sync + Clone> AwaitableConsumer for ProducerConsumer<T> {
+impl<T: StaticTaskItem> AwaitableConsumer<T> for ProducerConsumer<T> {
     fn is_cancelled(&self) -> bool {
         ProducerConsumer::is_cancelled(self)
     }

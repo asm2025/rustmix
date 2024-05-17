@@ -1,5 +1,6 @@
 use crossbeam::deque::{Injector, Steal, Stealer, Worker};
 use std::{
+    mem,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Mutex,
@@ -12,10 +13,7 @@ use tokio::{
 };
 
 use super::{cond::Mutcond, *};
-use crate::{
-    error::{CancelledError, ErrorEx, QueueCompletedError},
-    Result,
-};
+use crate::{error::*, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InjectorWorkerOptions {
@@ -73,10 +71,11 @@ impl InjectorWorkerOptions {
 }
 
 #[derive(Debug, Clone)]
-pub struct InjectorWorker<T: Send + Sync + Clone + 'static> {
-    options: InjectorWorkerOptions,
+pub struct InjectorWorker<T: StaticTaskItem> {
+    pub options: InjectorWorkerOptions,
     injector: Arc<Injector<T>>,
     stealers: Arc<Mutex<Vec<Stealer<T>>>>,
+    len: Arc<AtomicUsize>,
     started: Arc<Mutex<bool>>,
     finished: Arc<AtomicBool>,
     finished_cond: Arc<Mutcond>,
@@ -88,13 +87,13 @@ pub struct InjectorWorker<T: Send + Sync + Clone + 'static> {
     running: Arc<AtomicUsize>,
 }
 
-impl<T: Send + Sync + Clone> InjectorWorker<T> {
+impl<T: StaticTaskItem> InjectorWorker<T> {
     pub fn new() -> Self {
-        let options: InjectorWorkerOptions = Default::default();
         InjectorWorker {
-            options,
+            options: Default::default(),
             injector: Arc::new(Injector::new()),
             stealers: Arc::new(Mutex::new(Vec::new())),
+            len: Arc::new(AtomicUsize::new(0)),
             started: Arc::new(Mutex::new(false)),
             finished: Arc::new(AtomicBool::new(false)),
             finished_cond: Arc::new(Mutcond::new()),
@@ -112,6 +111,7 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
             options,
             injector: Arc::new(Injector::new()),
             stealers: Arc::new(Mutex::new(Vec::new())),
+            len: Arc::new(AtomicUsize::new(0)),
             started: Arc::new(Mutex::new(false)),
             finished: Arc::new(AtomicBool::new(false)),
             finished_cond: Arc::new(Mutcond::new()),
@@ -164,7 +164,7 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
     }
 
     pub fn len(&self) -> usize {
-        self.injector.len()
+        self.len.load(Ordering::SeqCst)
     }
 
     pub fn workers(&self) -> usize {
@@ -175,28 +175,22 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
         self.workers.store(value, Ordering::SeqCst);
     }
 
-    fn dec_workers(&self, td: &impl TaskDelegationBase<InjectorWorker<T>, T>) {
+    fn dec_workers(&self) -> bool {
         self.workers.fetch_sub(1, Ordering::SeqCst);
-        self.check_finished(td);
+        self.workers() == 0 && (self.is_completed() || self.is_cancelled())
     }
 
-    fn check_finished(&self, td: &impl TaskDelegationBase<InjectorWorker<T>, T>) {
-        if self.workers() > 0 || (!self.is_completed() && !self.is_cancelled()) {
+    fn finish(&self) {
+        if !self.is_completed() && !self.is_cancelled() {
             return;
         }
 
         self.completed.store(true, Ordering::SeqCst);
         self.finished.store(true, Ordering::SeqCst);
-
-        if self.is_cancelled() {
-            td.on_cancelled(self);
-        } else {
-            td.on_finished(self);
-        }
-
         self.set_started(false);
-        self.finished_cond.notify_one();
-        self.finished_noti.notify_one();
+        self.finished_cond.notify_all();
+        self.finished_noti.notify_waiters();
+        thread::sleep(Duration::ZERO);
     }
 
     pub fn running(&self) -> usize {
@@ -211,25 +205,23 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
         self.running.fetch_sub(1, Ordering::SeqCst);
     }
 
-    pub fn start<TD: TaskDelegation<InjectorWorker<T>, T> + Send + Sync + Clone + 'static>(
-        &self,
-        delegate: &TD,
-    ) {
+    pub fn start<H: TaskDelegation<InjectorWorker<T>, T>>(&self, handler: &H) -> Result<()> {
         if self.is_cancelled() {
-            panic!("Queue is already cancelled.")
+            return Err(CancelledError.into());
         }
 
         if self.is_completed() && self.is_empty() {
-            panic!("Queue is already completed.")
+            return Err(QueueCompletedError.into());
         }
 
         if !self.set_started(true) {
-            return;
+            return Err(QueueStartedError.into());
         }
 
         self.set_workers(self.options.threads);
-        delegate.on_started(self);
+        handler.on_started();
         let mut mutstealers = self.stealers.lock().unwrap();
+        mutstealers.clear();
 
         for _ in 0..self.options.threads {
             let worker = if self.options.behavior == QueueBehavior::LIFO {
@@ -240,10 +232,10 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
             let stealer = worker.stealer();
             mutstealers.push(stealer);
             let this = self.clone();
+            let handler = handler.clone();
             let global = self.injector.clone();
             let local = Arc::new(Mutex::new(worker));
             let stealers = self.stealers.clone();
-            let delegate = delegate.clone();
             thread::spawn(move || {
                 if this.options.threshold.is_zero() {
                     loop {
@@ -256,174 +248,39 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
                             continue;
                         }
 
-                        if let Some(item) = this.dequeue_wait(&global, &local, &stealers) {
-                            this.inc_running();
-
-                            match delegate.process(&this, &item) {
-                                Ok(it) => {
-                                    if !delegate.on_completed(&this, &item, &it) {
-                                        this.dec_running();
-                                        break;
-                                    }
-                                }
-                                Err(e) => {
-                                    if !delegate.on_completed(
-                                        &this,
-                                        &item,
-                                        &TaskResult::Error(e.get_message()),
-                                    ) {
-                                        this.dec_running();
-                                        break;
-                                    }
-                                }
-                            }
-
-                            this.dec_running();
-                        }
-                    }
-
-                    this.dec_workers(&delegate);
-                    drop(stealers);
-                    drop(local);
-                    drop(global);
-                    drop(delegate);
-                    drop(this);
-                    return;
-                }
-
-                loop {
-                    if this.is_cancelled() || (this.is_empty() && this.is_completed()) {
-                        break;
-                    }
-
-                    if this.is_paused() {
-                        thread::sleep(this.options.pause_timeout);
-                        continue;
-                    }
-
-                    if let Some(item) = this.dequeue_wait(&global, &local, &stealers) {
-                        this.inc_running();
-
-                        match delegate.process(&this, &item) {
-                            Ok(it) => {
-                                if !delegate.on_completed(&this, &item, &it) {
-                                    this.dec_running();
-                                    break;
-                                }
-
-                                if !this.options.threshold.is_zero() {
-                                    let time = Instant::now();
-
-                                    if time.elapsed() < this.options.threshold {
-                                        let remaining = this.options.threshold - time.elapsed();
-                                        thread::sleep(remaining);
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                if !delegate.on_completed(
-                                    &this,
-                                    &item,
-                                    &TaskResult::Error(e.get_message()),
-                                ) {
-                                    this.dec_running();
-                                    break;
-                                }
-                            }
-                        }
-
-                        this.dec_running();
-                    }
-                }
-
-                this.dec_workers(&delegate);
-                drop(stealers);
-                drop(local);
-                drop(global);
-                drop(delegate);
-                drop(this);
-            });
-        }
-    }
-
-    pub async fn start_async<
-        TD: AsyncTaskDelegation<InjectorWorker<T>, T> + Send + Sync + Clone + 'static,
-    >(
-        &self,
-        delegate: &TD,
-    ) {
-        if self.is_cancelled() {
-            panic!("Queue is already cancelled.")
-        }
-
-        if self.is_completed() && self.is_empty() {
-            panic!("Queue is already completed.")
-        }
-
-        if !self.set_started(true) {
-            return;
-        }
-
-        self.set_workers(self.options.threads);
-        delegate.on_started(self);
-        let mut mutstealers = self.stealers.lock().unwrap();
-
-        for _ in 0..self.options.threads {
-            let worker = if self.options.behavior == QueueBehavior::LIFO {
-                Worker::<T>::new_lifo()
-            } else {
-                Worker::<T>::new_fifo()
-            };
-            let stealer = worker.stealer();
-            mutstealers.push(stealer);
-            let this = self.clone();
-            let global = self.injector.clone();
-            let local = Arc::new(Mutex::new(worker));
-            let stealers = self.stealers.clone();
-            let delegate = delegate.clone();
-            tokio::spawn(async move {
-                if this.options.threshold.is_zero() {
-                    loop {
-                        if this.is_cancelled() || (this.is_empty() && this.is_completed()) {
-                            break;
-                        }
-
-                        if this.is_paused() {
-                            thread::sleep(this.options.pause_timeout);
+                        let Some(item) = this.dequeue_wait(&global, &local, &stealers) else {
                             continue;
-                        }
-
-                        if let Some(item) = this.dequeue_wait(&global, &local, &stealers) {
-                            this.inc_running();
-
-                            match delegate.process(&this, &item).await {
-                                Ok(it) => {
-                                    if !delegate.on_completed(&this, &item, &it) {
-                                        this.dec_running();
-                                        break;
-                                    }
-                                }
-                                Err(e) => {
-                                    if !delegate.on_completed(
-                                        &this,
-                                        &item,
-                                        &TaskResult::Error(e.get_message()),
-                                    ) {
-                                        this.dec_running();
-                                        break;
-                                    }
+                        };
+                        this.inc_running();
+                        match handler.process(&this, &item) {
+                            Ok(it) => {
+                                if !handler.on_completed(&item, &it) {
+                                    this.dec_running();
+                                    break;
                                 }
                             }
-
-                            this.dec_running();
+                            Err(e) => {
+                                if !handler.on_completed(&item, &TaskResult::Error(e.get_message()))
+                                {
+                                    this.dec_running();
+                                    break;
+                                }
+                            }
                         }
+                        this.dec_running();
                     }
 
-                    this.dec_workers(&delegate);
-                    drop(stealers);
-                    drop(local);
-                    drop(global);
-                    drop(this);
+                    if !this.dec_workers() {
+                        return;
+                    }
+
+                    if this.is_cancelled() {
+                        handler.on_cancelled();
+                    } else {
+                        handler.on_finished();
+                    }
+
+                    this.finish();
                     return;
                 }
 
@@ -437,48 +294,51 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
                         continue;
                     }
 
-                    if let Some(item) = this.dequeue_wait(&global, &local, &stealers) {
-                        this.inc_running();
-
-                        match delegate.process(&this, &item).await {
-                            Ok(it) => {
-                                if !delegate.on_completed(&this, &item, &it) {
-                                    this.dec_running();
-                                    break;
-                                }
-
-                                if !this.options.threshold.is_zero() {
-                                    let time = Instant::now();
-
-                                    if time.elapsed() < this.options.threshold {
-                                        let remaining = this.options.threshold - time.elapsed();
-                                        thread::sleep(remaining);
-                                    }
-                                }
+                    let Some(item) = this.dequeue_wait(&global, &local, &stealers) else {
+                        continue;
+                    };
+                    this.inc_running();
+                    match handler.process(&this, &item) {
+                        Ok(it) => {
+                            if !handler.on_completed(&item, &it) {
+                                this.dec_running();
+                                break;
                             }
-                            Err(e) => {
-                                if !delegate.on_completed(
-                                    &this,
-                                    &item,
-                                    &TaskResult::Error(e.get_message()),
-                                ) {
-                                    this.dec_running();
-                                    break;
+
+                            if !this.options.threshold.is_zero() {
+                                let time = Instant::now();
+
+                                if time.elapsed() < this.options.threshold {
+                                    let remaining = this.options.threshold - time.elapsed();
+                                    thread::sleep(remaining);
                                 }
                             }
                         }
-
-                        this.dec_running();
+                        Err(e) => {
+                            if !handler.on_completed(&item, &TaskResult::Error(e.get_message())) {
+                                this.dec_running();
+                                break;
+                            }
+                        }
                     }
+                    this.dec_running();
                 }
 
-                this.dec_workers(&delegate);
-                drop(stealers);
-                drop(local);
-                drop(global);
-                drop(this);
+                if !this.dec_workers() {
+                    return;
+                }
+
+                if this.is_cancelled() {
+                    handler.on_cancelled();
+                } else {
+                    handler.on_finished();
+                }
+
+                this.finish();
             });
         }
+
+        Ok(())
     }
 
     pub fn enqueue(&self, item: T) -> Result<()> {
@@ -491,6 +351,7 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
         }
 
         self.injector.push(item);
+        self.len.fetch_add(1, Ordering::SeqCst);
 
         if !self.options.sleep_after_send.is_zero() {
             thread::sleep(self.options.sleep_after_send);
@@ -526,7 +387,7 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
     ) -> Option<T> {
         let local = local.lock().unwrap();
         // Pop a task from the local queue, if not empty.
-        local.pop().or_else(|| {
+        let item = local.pop().or_else(|| {
             // Otherwise, we need to look for a task elsewhere.
             if self.is_cancelled() {
                 return None;
@@ -551,7 +412,21 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
                         .unwrap_or_else(|| Steal::Empty)
                 })
                 .success()
-        })
+        });
+
+        if item.is_some() {
+            self.len.fetch_sub(1, Ordering::SeqCst);
+            return item;
+        }
+
+        None
+    }
+
+    pub fn clear(&mut self) {
+        self.injector = mem::replace(&mut self.injector, Arc::new(Injector::new()));
+        let mut stealers = self.stealers.lock().unwrap();
+        stealers.clear();
+        self.len.store(0, Ordering::SeqCst);
     }
 
     pub fn stop(&self, enforce: bool) {
@@ -626,7 +501,7 @@ impl<T: Send + Sync + Clone> InjectorWorker<T> {
     }
 }
 
-impl<T: Send + Sync + Clone> AwaitableConsumer for InjectorWorker<T> {
+impl<T: StaticTaskItem> AwaitableConsumer<T> for InjectorWorker<T> {
     fn is_cancelled(&self) -> bool {
         self.is_cancelled()
     }
