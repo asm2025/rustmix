@@ -81,11 +81,11 @@ pub trait StaticTaskItem: TaskItem + 'static {}
 impl<T: TaskItem + 'static> StaticTaskItem for T {}
 
 pub trait TaskDelegation<TPC: AwaitableConsumer<T>, T: StaticTaskItem>: StaticTaskItem {
-    fn on_started(&self);
+    fn on_started(&self, pc: &TPC);
     fn process(&self, pc: &TPC, item: &T) -> Result<TaskResult>;
-    fn on_completed(&self, item: &T, result: &TaskResult) -> bool;
-    fn on_cancelled(&self);
-    fn on_finished(&self);
+    fn on_completed(&self, pc: &TPC, item: &T, result: &TaskResult) -> bool;
+    fn on_cancelled(&self, pc: &TPC);
+    fn on_finished(&self, pc: &TPC);
 }
 
 pub trait AwaitableConsumer<T: TaskItem>: StaticTaskItem {
