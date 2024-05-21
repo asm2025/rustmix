@@ -207,7 +207,7 @@ impl<T: StaticTaskItem> ProducerConsumer<T> {
 
     pub fn start<H: TaskDelegation<ProducerConsumer<T>, T>>(&self, handler: &H) -> Result<()> {
         if self.is_cancelled() {
-            return Err(CancelledError.into());
+            return Err(CanceledError.into());
         }
 
         if self.is_completed() && self.is_empty() {
@@ -338,7 +338,7 @@ impl<T: StaticTaskItem> ProducerConsumer<T> {
 
     pub fn enqueue(&self, item: T) -> Result<()> {
         if self.is_cancelled() {
-            return Err(CancelledError.into());
+            return Err(CanceledError.into());
         }
 
         if self.is_completed() {

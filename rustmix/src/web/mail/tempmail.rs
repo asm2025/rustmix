@@ -42,8 +42,9 @@ struct NewNameLength {
     max: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SecMailDomain {
+    #[default]
     SecMailCom,
     SecMailOrg,
     SecMailNet,
@@ -77,17 +78,12 @@ impl Display for SecMailDomain {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TempMailProvider {
+    #[default]
     Tempmail,
     EmailFake,
     SecMail(SecMailDomain),
-}
-
-impl Default for TempMailProvider {
-    fn default() -> Self {
-        TempMailProvider::Tempmail
-    }
 }
 
 #[derive(Deserialize)]
@@ -208,17 +204,17 @@ impl TempMail {
 
         let start = match body.find("fem coserch") {
             Some(index) => index,
-            None => return Err(ElementNotFoundError("coserch").into()),
+            None => return Err(ElementNotFoundError("coserch".to_string()).into()),
         };
         let body = &body[start..];
         let end = match body.find("fem dropselect") {
             Some(index) => index,
-            None => return Err(ElementNotFoundError("dropselect").into()),
+            None => return Err(ElementNotFoundError("dropselect".to_string()).into()),
         };
         let body = &body[..end];
         let captures = match RGX_EMAIL_FAKE_GENERATE.captures(&body) {
             Some(captures) => captures,
-            None => return Err(ElementNotFoundError("username and domain").into()),
+            None => return Err(ElementNotFoundError("username and domain".to_string()).into()),
         };
         let username = captures.get(1).unwrap().as_str();
         let domain = captures.get(2).unwrap().as_str();

@@ -45,5 +45,7 @@ async fn main() -> Result<()> {
     //tests::test_sound().await?;
     //tests::test_image().await?;
 
+    tests::test_expressvpn().await?;
+
     Ok(())
 }

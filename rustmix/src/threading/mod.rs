@@ -17,7 +17,7 @@ use tokio::{
 };
 
 use crate::{
-    error::{CancelledError, TimedoutError},
+    error::{CanceledError, TimedoutError},
     Result,
 };
 
@@ -58,7 +58,7 @@ impl fmt::Display for TaskResult {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum QueueBehavior {
     #[default]
     FIFO,
@@ -100,12 +100,12 @@ fn wait<TPC: AwaitableConsumer<T>, T: StaticTaskItem>(
     match finished.wait_while(|| !this.is_cancelled() && !this.is_finished()) {
         Ok(_) => {
             if this.is_cancelled() {
-                Err(CancelledError.into())
+                Err(CanceledError.into())
             } else {
                 Ok(())
             }
         }
-        Err(_) => Err(CancelledError.into()),
+        Err(_) => Err(CanceledError.into()),
     }
 }
 
@@ -122,7 +122,7 @@ async fn wait_async<TPC: AwaitableConsumer<T>, T: StaticTaskItem>(
     }
 
     if this.is_cancelled() {
-        return Err(CancelledError.into());
+        return Err(CanceledError.into());
     }
 
     Ok(())
@@ -136,12 +136,12 @@ fn wait_until<TPC: AwaitableConsumer<T>, T: StaticTaskItem>(
     match finished.wait_while(|| !this.is_cancelled() && !this.is_finished() && !cond(this)) {
         Ok(_) => {
             if this.is_cancelled() {
-                Err(CancelledError.into())
+                Err(CanceledError.into())
             } else {
                 Ok(())
             }
         }
-        Err(_) => Err(CancelledError.into()),
+        Err(_) => Err(CanceledError.into()),
     }
 }
 
@@ -162,7 +162,7 @@ async fn wait_until_async<
     }
 
     if this.is_cancelled() {
-        return Err(CancelledError.into());
+        return Err(CanceledError.into());
     }
 
     Ok(())
@@ -180,7 +180,7 @@ fn wait_for<TPC: AwaitableConsumer<T>, T: StaticTaskItem>(
     match finished.wait_timeout_while(|| !this.is_cancelled() && !this.is_finished(), timeout) {
         Ok(_) => {
             if this.is_cancelled() {
-                Err(CancelledError.into())
+                Err(CanceledError.into())
             } else {
                 Ok(())
             }
@@ -202,7 +202,7 @@ async fn wait_for_async<TPC: AwaitableConsumer<T>, T: StaticTaskItem>(
     match result {
         Ok(_) => {
             if this.is_cancelled() {
-                Err(CancelledError.into())
+                Err(CanceledError.into())
             } else {
                 Ok(())
             }
@@ -226,7 +226,7 @@ fn wait_for_until<TPC: AwaitableConsumer<T>, T: StaticTaskItem>(
     ) {
         Ok(_) => {
             if this.is_cancelled() {
-                Err(CancelledError.into())
+                Err(CanceledError.into())
             } else {
                 Ok(())
             }
@@ -253,7 +253,7 @@ async fn wait_for_until_async<
 
     while !cond(this).await {
         if this.is_cancelled() {
-            return Err(CancelledError.into());
+            return Err(CanceledError.into());
         }
 
         if time::Instant::now().duration_since(start) > timeout {
@@ -263,7 +263,7 @@ async fn wait_for_until_async<
         match time::timeout(PEEK_TIMEOUT_DEF, finished.notified()).await {
             Ok(_) => {
                 if this.is_cancelled() {
-                    return Err(CancelledError.into());
+                    return Err(CanceledError.into());
                 }
 
                 return Ok(());

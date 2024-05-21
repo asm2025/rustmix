@@ -11,7 +11,9 @@ license = "MIT"
 chrono = "0"
 crossbeam = { version = "0", optional = true }
 csv = "1"
+dirs = "5"
 dotenv = "0"
+execute = "0"
 fake = { version = "2", features = [
     "derive",
     "uuid",
@@ -42,7 +44,7 @@ pyo3 = { version = "0", features = [
 rand = "0"
 randua = "0"
 rayon = { version = "1", optional = true }
-regex = { version = "1", optional = true }
+regex = "1"
 reqwest = { version = "0", features = [
     "blocking",
     "cookies",
@@ -77,7 +79,7 @@ metal = ["kalosm?/metal"]
 cublas = ["kalosm?/cublas"]
 mkl = ["kalosm?/mkl"]
 language = ["kalosm/language"]
-mail = ["dep:html-entities", "dep:lettre", "dep:once_cell", "dep:regex"]
+mail = ["dep:html-entities", "dep:lettre", "dep:once_cell"]
 threading = ["dep:crossbeam", "dep:rayon"]
 log4rs = ["dep:log4rs"]
 slog = [

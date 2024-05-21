@@ -40,6 +40,14 @@ pub async fn test_sound() -> Result<()> {
     spinner.finish_and_clear()?;
     println!("Sound transcription: {}", result);
 
+    let file_name = (curdir.as_str(), "captcha", "fbn.mp3").as_path();
+    spinner.reset()?;
+    spinner.set_message(format!("Transcribing file [text]: {}", &file_name));
+    let snd = sound.clone();
+    let result = spinner.run(move || snd.transcribe_file(&file_name).unwrap())?;
+    spinner.finish_and_clear()?;
+    println!("Sound transcription: {}", result);
+
     let file_name = (curdir.as_str(), "listen1.mp3").as_path();
     spinner.reset()?;
     spinner.set_message(format!("Transcribing file [callback]: {}", &file_name));
