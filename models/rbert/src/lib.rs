@@ -164,27 +164,114 @@ impl BertSource {
                 "config.json".to_string(),
             ))
     }
+
+    /// Create a new [`BertSource`] with the [snowflake-arctic-embed-xs](https://huggingface.co/Snowflake/snowflake-arctic-embed-xs) model
+    pub fn snowflake_arctic_embed_extra_small() -> Self {
+        Self::default()
+            .with_model(FileSource::huggingface(
+                "Snowflake/snowflake-arctic-embed-xs".to_string(),
+                "main".to_string(),
+                "model.safetensors".to_string(),
+            ))
+            .with_tokenizer(FileSource::huggingface(
+                "Snowflake/snowflake-arctic-embed-xs".to_string(),
+                "main".to_string(),
+                "tokenizer.json".to_string(),
+            ))
+            .with_config(FileSource::huggingface(
+                "Snowflake/snowflake-arctic-embed-xs".to_string(),
+                "main".to_string(),
+                "config.json".to_string(),
+            ))
+    }
+
+    /// Create a new [`BertSource`] with the [snowflake-arctic-embed-s](https://huggingface.co/Snowflake/snowflake-arctic-embed-s) model
+    pub fn snowflake_arctic_embed_small() -> Self {
+        Self::default()
+            .with_model(FileSource::huggingface(
+                "Snowflake/snowflake-arctic-embed-s".to_string(),
+                "main".to_string(),
+                "model.safetensors".to_string(),
+            ))
+            .with_tokenizer(FileSource::huggingface(
+                "Snowflake/snowflake-arctic-embed-s".to_string(),
+                "main".to_string(),
+                "tokenizer.json".to_string(),
+            ))
+            .with_config(FileSource::huggingface(
+                "Snowflake/snowflake-arctic-embed-s".to_string(),
+                "main".to_string(),
+                "config.json".to_string(),
+            ))
+}
+
+    /// Create a new [`BertSource`] with the [snowflake-arctic-embed-m](https://huggingface.co/Snowflake/snowflake-arctic-embed-m) model
+    pub fn snowflake_arctic_embed_medium() -> Self {
+        Self {
+            config: FileSource::huggingface(
+                "Snowflake/snowflake-arctic-embed-m".to_string(),
+                "main".to_string(),
+                "config.json".to_string(),
+            ),
+            tokenizer: FileSource::huggingface(
+                "Snowflake/snowflake-arctic-embed-m".to_string(),
+                "main".to_string(),
+                "tokenizer.json".to_string(),
+            ),
+            model: FileSource::huggingface(
+                "Snowflake/snowflake-arctic-embed-m".to_string(),
+                "main".to_string(),
+                "model.safetensors".to_string(),
+            ),
+        }
+    }
+
+    /// Create a new [`BertSource`] with the [snowflake-arctic-embed-m-long](https://huggingface.co/Snowflake/snowflake-arctic-embed-m-long) model
+    ///
+    /// This model is slightly larger than [`Self::snowflake_arctic_embed_medium`] and supports longer contexts (up to 2048 tokens).
+    pub fn snowflake_arctic_embed_medium_long() -> Self {
+        Self::default()
+            .with_model(FileSource::huggingface(
+                "Snowflake/snowflake-arctic-embed-m-long".to_string(),
+                "main".to_string(),
+                "model.safetensors".to_string(),
+            ))
+            .with_tokenizer(FileSource::huggingface(
+                "Snowflake/snowflake-arctic-embed-m-long".to_string(),
+                "main".to_string(),
+                "tokenizer.json".to_string(),
+            ))
+            .with_config(FileSource::huggingface(
+                "Snowflake/snowflake-arctic-embed-m-long".to_string(),
+                "main".to_string(),
+                "config.json".to_string(),
+            ))
+    }
+
+    /// Create a new [`BertSource`] with the [snowflake-arctic-embed-l](https://huggingface.co/Snowflake/snowflake-arctic-embed-l) model
+    pub fn snowflake_arctic_embed_large() -> Self {
+        Self::default()
+            .with_model(FileSource::huggingface(
+                "Snowflake/snowflake-arctic-embed-l".to_string(),
+                "main".to_string(),
+                "model.safetensors".to_string(),
+            ))
+            .with_tokenizer(FileSource::huggingface(
+                "Snowflake/snowflake-arctic-embed-l".to_string(),
+                "main".to_string(),
+                "tokenizer.json".to_string(),
+            ))
+            .with_config(FileSource::huggingface(
+                "Snowflake/snowflake-arctic-embed-l".to_string(),
+                "main".to_string(),
+                "config.json".to_string(),
+            ))
+    }
 }
 
 impl Default for BertSource {
     fn default() -> Self {
-        Self {
-            config: FileSource::huggingface(
-                "sentence-transformers/all-MiniLM-L6-v2".to_string(),
-                "refs/pr/21".to_string(),
-                "config.json".to_string(),
-            ),
-            tokenizer: FileSource::huggingface(
-                "sentence-transformers/all-MiniLM-L6-v2".to_string(),
-                "refs/pr/21".to_string(),
-                "tokenizer.json".to_string(),
-            ),
-            model: FileSource::huggingface(
-                "sentence-transformers/all-MiniLM-L6-v2".to_string(),
-                "refs/pr/21".to_string(),
-                "model.safetensors".to_string(),
-            ),
-        }
+        Self::snowflake_arctic_embed_medium()
     }
 }
 
@@ -217,6 +304,7 @@ impl BertBuilder {
 }
 
 /// A bert model
+#[derive(Debug)]
 pub struct Bert {
     model: BertModel,
     tokenizer: RwLock<Tokenizer>,
