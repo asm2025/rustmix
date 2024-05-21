@@ -7,6 +7,8 @@ pub trait StringEx {
     fn trim_end_many(&self, ch: &[char]) -> &str;
     fn prefix(&self, ch: char) -> String;
     fn suffix(&self, ch: char) -> String;
+    fn find_first(&self, predicate: impl Fn(char) -> bool) -> Option<(char, usize)>;
+    fn find_last(&self, predicate: impl Fn(char) -> bool) -> Option<(char, usize)>;
 }
 
 impl StringEx for str {
@@ -142,5 +144,33 @@ impl StringEx for str {
         } else {
             self.to_owned()
         }
+    }
+
+    fn find_first(&self, predicate: impl Fn(char) -> bool) -> Option<(char, usize)> {
+        if self.len() == 0 {
+            return None;
+        }
+
+        for (i, c) in self.chars().enumerate() {
+            if predicate(c) {
+                return Some((c, i));
+            }
+        }
+
+        None
+    }
+
+    fn find_last(&self, predicate: impl Fn(char) -> bool) -> Option<(char, usize)> {
+        if self.len() == 0 {
+            return None;
+        }
+
+        for (i, c) in self.chars().rev().enumerate() {
+            if predicate(c) {
+                return Some((c, self.len() - i));
+            }
+        }
+
+        None
     }
 }

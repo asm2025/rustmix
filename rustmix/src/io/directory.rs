@@ -1,3 +1,4 @@
+pub use dirs::*;
 use std::fs::{self, DirEntry};
 pub use std::path::{Path, PathBuf};
 

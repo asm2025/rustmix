@@ -2,10 +2,20 @@
 pub mod mail;
 pub mod reqwest;
 
+use lazy_static::lazy_static;
 use url::{ParseError, Url};
 use urlencoding::{decode, encode};
 
-use crate::Result;
+use crate::{
+    web::reqwest::{build_blocking_client, build_client},
+    Result,
+};
+
+lazy_static! {
+    static ref CLIENT: reqwest::Client = build_client().build().unwrap();
+    static ref CLIENT_BLOCKING: reqwest::blocking::Client =
+        build_blocking_client().build().unwrap();
+}
 
 pub fn url_encode<T: AsRef<str>>(value: T) -> String {
     encode(value.as_ref()).to_string()
@@ -112,4 +122,30 @@ pub fn remove<T: AsRef<str>>(url: &mut Url, value: T) {
         return;
     }
     url.set_path(&url.path().replace(value, ""));
+}
+
+pub fn get_public_ip() -> Result<String> {
+    const URL: &'static str = "https://api.ipify.org";
+
+    let response = CLIENT_BLOCKING.get(URL).send()?;
+
+    if !response.status().is_success() {
+        return Err(response.error_for_status().unwrap_err().into());
+    }
+
+    let text = response.text()?;
+    Ok(text)
+}
+
+pub async fn get_public_ip_async() -> Result<String> {
+    const URL: &'static str = "https://api.ipify.org";
+
+    let response = CLIENT.get(URL).send().await?;
+
+    if !response.status().is_success() {
+        return Err(response.error_for_status().unwrap_err().into());
+    }
+
+    let text = response.text().await?;
+    Ok(text)
 }

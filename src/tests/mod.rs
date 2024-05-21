@@ -22,6 +22,8 @@ mod vision;
 pub(crate) use self::vision::*;
 mod random;
 pub(crate) use self::random::*;
+mod vpn;
+pub(crate) use self::vpn::*;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Employee {

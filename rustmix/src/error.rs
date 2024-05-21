@@ -44,8 +44,8 @@ impl<E: StdError + ?Sized> ErrorEx for E {
 }
 
 #[derive(Error, Debug)]
-#[error("Operation is cancelled")]
-pub struct CancelledError;
+#[error("Operation is canceled")]
+pub struct CanceledError;
 
 #[derive(Error, Debug)]
 #[error("Operation is not supported")]
@@ -53,7 +53,7 @@ pub struct NotSupportedError;
 
 #[derive(Error, Debug)]
 #[error("Invalid operation. {0}")]
-pub struct InvalidOperationError(pub &'static str);
+pub struct InvalidOperationError(pub String);
 
 #[derive(Error, Debug)]
 #[error("Operation timed out")]
@@ -84,16 +84,16 @@ pub struct InvalidInputError;
 pub struct NotConfirmError;
 
 #[derive(Error, Debug)]
-#[error("Argument is null or empty: {0}")]
-pub struct ArgumentIsNullOrEmptyError(pub &'static str);
+#[error("Argument '{0}' is null or empty")]
+pub struct ArgumentIsNullOrEmptyError(pub String);
 
 #[derive(Error, Debug)]
 #[error("No content")]
 pub struct NoContentError;
 
 #[derive(Error, Debug)]
-#[error("HtmlElement not found: {0}")]
-pub struct ElementNotFoundError(pub &'static str);
+#[error("HtmlElement '{0}' not found")]
+pub struct ElementNotFoundError(pub String);
 
 #[derive(Error, Debug)]
 #[error("Invalid HTTP response")]
@@ -102,3 +102,19 @@ pub struct InvalidResponseError;
 #[derive(Error, Debug)]
 #[error("Not implemented")]
 pub struct NotImplementedError;
+
+#[derive(Error, Debug)]
+#[error("Error {0}. {1}")]
+pub struct CommandError(pub i32, pub String);
+
+#[derive(Error, Debug)]
+#[error("Invalid command response")]
+pub struct InvalidCommandResponseError;
+
+#[derive(Error, Debug)]
+#[error("VPN error. {0}")]
+pub struct VPNError(pub String);
+
+#[derive(Error, Debug)]
+#[error("Unknown VPN response {0}")]
+pub struct UnknownVPNResponseError(pub String);

@@ -47,10 +47,9 @@ impl TaskDelegation<Consumer<usize>, usize> for TaskHandler {
         println!("Item: {}", item);
 
         if item % 5 == 0 {
-            return Ok(TaskResult::Error(format!(
-                "Item {}. Multiples of 5 are not allowed",
-                item
-            )));
+            return Ok(TaskResult::Error(
+                format!("Item {}. Multiples of 5 are not allowed", item).into(),
+            ));
         } else if item % 3 == 0 {
             return Ok(TaskResult::TimedOut);
         }
@@ -130,10 +129,9 @@ impl TaskDelegation<ProducerConsumer<usize>, usize> for TaskHandler {
         println!("Item: {}", item);
 
         if item % 5 == 0 {
-            return Ok(TaskResult::Error(format!(
-                "Item {}. Multiples of 5 are not allowed",
-                item
-            )));
+            return Ok(TaskResult::Error(
+                format!("Item {}. Multiples of 5 are not allowed", item).into(),
+            ));
         } else if item % 3 == 0 {
             return Ok(TaskResult::TimedOut);
         }
@@ -220,10 +218,9 @@ impl TaskDelegation<InjectorWorker<usize>, usize> for TaskHandler {
         println!("Item: {}", item);
 
         if item % 5 == 0 {
-            return Ok(TaskResult::Error(format!(
-                "Item {}. Multiples of 5 are not allowed",
-                item
-            )));
+            return Ok(TaskResult::Error(
+                format!("Item {}. Multiples of 5 are not allowed", item).into(),
+            ));
         } else if item % 3 == 0 {
             return Ok(TaskResult::TimedOut);
         }

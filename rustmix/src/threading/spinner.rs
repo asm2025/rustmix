@@ -156,7 +156,7 @@ impl Spinner {
 
     pub fn spin(&self) -> Result<()> {
         if self.is_finished() {
-            return Err(InvalidOperationError(ERR_FINISHED).into());
+            return Err(InvalidOperationError(ERR_FINISHED.to_string()).into());
         }
 
         let is_finished = self.is_finished.clone();
@@ -248,7 +248,7 @@ impl Spinner {
 
     pub fn finish(&self) -> Result<()> {
         if self.is_finished() {
-            return Err(InvalidOperationError(ERR_FINISHED).into());
+            return Err(InvalidOperationError(ERR_FINISHED.to_string()).into());
         }
 
         self.is_finished.store(true, Ordering::Relaxed);
@@ -258,7 +258,7 @@ impl Spinner {
 
     pub fn finish_with_message(&self, message: impl Into<Cow<'static, str>>) -> Result<()> {
         if self.is_finished() {
-            return Err(InvalidOperationError(ERR_FINISHED).into());
+            return Err(InvalidOperationError(ERR_FINISHED.to_string()).into());
         }
 
         self.is_finished.store(true, Ordering::Relaxed);
@@ -268,7 +268,7 @@ impl Spinner {
 
     pub fn finish_using_style(&self) -> Result<()> {
         if self.is_finished() {
-            return Err(InvalidOperationError(ERR_FINISHED).into());
+            return Err(InvalidOperationError(ERR_FINISHED.to_string()).into());
         }
 
         self.is_finished.store(true, Ordering::Relaxed);
@@ -278,7 +278,7 @@ impl Spinner {
 
     pub fn finish_and_clear(&self) -> Result<()> {
         if self.is_finished() {
-            return Err(InvalidOperationError(ERR_FINISHED).into());
+            return Err(InvalidOperationError(ERR_FINISHED.to_string()).into());
         }
 
         self.is_finished.store(true, Ordering::Relaxed);
@@ -288,7 +288,7 @@ impl Spinner {
 
     pub fn abandon(&self) -> Result<()> {
         if self.is_finished() {
-            return Err(InvalidOperationError(ERR_FINISHED).into());
+            return Err(InvalidOperationError(ERR_FINISHED.to_string()).into());
         }
 
         self.is_finished.store(true, Ordering::Relaxed);
@@ -298,7 +298,7 @@ impl Spinner {
 
     pub fn abandon_with_message(&self, message: String) -> Result<()> {
         if self.is_finished() {
-            return Err(InvalidOperationError(ERR_FINISHED).into());
+            return Err(InvalidOperationError(ERR_FINISHED.to_string()).into());
         }
 
         self.is_finished.store(true, Ordering::Relaxed);

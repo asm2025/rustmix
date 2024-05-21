@@ -18,6 +18,7 @@ pub mod python;
 pub mod random;
 pub mod string;
 pub mod threading;
+pub mod vpn;
 pub mod web;
 
 use lazy_static::lazy_static;
@@ -34,9 +35,10 @@ lazy_static! {
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum LogLevel {
     Off,
+    #[default]
     Default,
     Trace,
     Debug,
