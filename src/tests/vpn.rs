@@ -4,12 +4,16 @@ use std::{thread, time::Duration};
 
 use rustmix::{
     vpn::{self, ExpressVPNStatus},
-    web::get_public_ip_async,
+    web::{
+        get_public_ip_async,
+        reqwest::{build_client, Client},
+    },
     Result,
 };
 
 lazy_static! {
     static ref WAIT_TIME: Duration = Duration::from_secs(2);
+    static ref CLIENT: Client = build_client().build().unwrap();
 }
 
 pub async fn test_expressvpn() -> Result<()> {
@@ -79,7 +83,7 @@ async fn print_ip() {
     println!("fetching IP address...");
 
     while tries < 3 {
-        match get_public_ip_async().await {
+        match get_public_ip_async(&CLIENT).await {
             Ok(ip) => {
                 println!("IP {}", ip);
                 break;
