@@ -1,10 +1,7 @@
 use execute::Execute;
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::{
-    process::{Command, Stdio},
-    time::Duration,
-};
+use std::process::{Command, Stdio};
 
 use crate::{error::*, string::*, Result};
 

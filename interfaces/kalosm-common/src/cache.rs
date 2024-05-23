@@ -76,7 +76,8 @@ impl ModelLoadingProgress {
         let sty = ProgressStyle::with_template(
             "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] ({pos}/{len}, ETA {eta})",
         )
-        .unwrap();
+        .unwrap()
+        .tick_chars("⣾⣽⣻⢿⡿⣟⣯⣷");
         let mut progress_bars = HashMap::new();
 
         move |progress| match progress {

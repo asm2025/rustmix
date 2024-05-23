@@ -32,10 +32,9 @@ impl Default for SpinnerOptions {
             tab_width: Default::default(),
             position: Default::default(),
             style: Some(
-                ProgressStyle::default_spinner()
-                    .tick_chars("⣾⣽⣻⢿⡿⣟⣯⣷")
-                    .template("{spinner:.green} {prefix}{msg}")
-                    .unwrap(),
+                ProgressStyle::with_template("{spinner:.green} {prefix}{msg}")
+                    .unwrap()
+                    .tick_chars("⣾⣽⣻⢿⡿⣟⣯⣷"),
             ),
             steady_ticks: Some(INTERVAL),
         }

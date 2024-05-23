@@ -1,13 +1,6 @@
-use rustmix::{
-    io::{
-        directory,
-        path::{AsPath, PathEx},
-    },
-    sound::*,
-    threading::Spinner,
-    Result,
-};
-use std::io::Write;
+use humantime::format_duration;
+use rustmix::{io::directory, sound::*, threading::Spinner, Result};
+use std::{io::Write, time};
 use tokio::sync::mpsc::unbounded_channel;
 
 pub async fn test_sound() -> Result<()> {
@@ -19,66 +12,97 @@ pub async fn test_sound() -> Result<()> {
 
     let spinner = Spinner::new();
     spinner.set_message("Initializing audio model...");
-    let sound = Audio::with_source(WhisperSource::BaseEn).await?;
+    let sound = Audio::with_source(WhisperSource::DistilLargeV3).await?;
     spinner.finish_with_message("Audio model initialized")?;
+    println!();
 
-    let curdir = (directory::current().as_str(), "files", "audio").as_path();
+    let curdir = directory::current().join("files/audio");
 
-    let file_name = (curdir.as_str(), "captcha", "fb1.mp3").as_path();
+    let file_name = curdir.join("awz1.mp3");
+    let base_name = file_name.file_name().unwrap().to_string_lossy().to_string();
     spinner.reset()?;
-    spinner.set_message(format!("Transcribing file [text]: {}", &file_name));
+    spinner.set_message(format!("Transcribing file [text]: {}", &base_name));
     let snd = sound.clone();
+    let timer = time::Instant::now();
     let result = spinner.run(move || snd.transcribe_file(&file_name).unwrap())?;
-    spinner.finish_and_clear()?;
-    println!("Sound transcription: {}", result);
+    spinner.finish_with_message(format!(
+        "Sound transcription [{}]: '{}'",
+        &base_name, result
+    ))?;
+    println!("Time elapsed: {}", format_duration(timer.elapsed()));
 
-    let file_name = (curdir.as_str(), "captcha", "fb2.mp3").as_path();
+    let file_name = curdir.join("fb1.mp3");
+    let base_name = file_name.file_name().unwrap().to_string_lossy().to_string();
     spinner.reset()?;
-    spinner.set_message(format!("Transcribing file [text]: {}", &file_name));
+    spinner.set_message(format!("Transcribing file [text]: {}", &base_name));
     let snd = sound.clone();
+    let timer = time::Instant::now();
     let result = spinner.run(move || snd.transcribe_file(&file_name).unwrap())?;
-    spinner.finish_and_clear()?;
-    println!("Sound transcription: {}", result);
+    spinner.finish_with_message(format!(
+        "Sound transcription [{}]: '{}'",
+        &base_name, result
+    ))?;
+    println!("Time elapsed: {}", format_duration(timer.elapsed()));
 
-    let file_name = (curdir.as_str(), "captcha", "fbn.mp3").as_path();
+    let file_name = curdir.join("fbn.mp3");
+    let base_name = file_name.file_name().unwrap().to_string_lossy().to_string();
     spinner.reset()?;
-    spinner.set_message(format!("Transcribing file [text]: {}", &file_name));
+    spinner.set_message(format!("Transcribing file [text]: {}", &base_name));
     let snd = sound.clone();
+    let timer = time::Instant::now();
     let result = spinner.run(move || snd.transcribe_file(&file_name).unwrap())?;
-    spinner.finish_and_clear()?;
-    println!("Sound transcription: {}", result);
+    spinner.finish_with_message(format!(
+        "Sound transcription [{}]: '{}'",
+        &base_name, result
+    ))?;
+    println!("Time elapsed: {}", format_duration(timer.elapsed()));
 
-    let file_name = (curdir.as_str(), "listen1.mp3").as_path();
+    let file_name = curdir.join("pinless.wav");
+    let base_name = file_name.file_name().unwrap().to_string_lossy().to_string();
     spinner.reset()?;
-    spinner.set_message(format!("Transcribing file [callback]: {}", &file_name));
+    spinner.set_message(format!("Transcribing file [text]: {}", &base_name));
     let snd = sound.clone();
-    spinner.run(move || {
-        print!("Sound transcription: ");
+    let timer = time::Instant::now();
+    let result = spinner.run(move || snd.transcribe_file(&file_name).unwrap())?;
+    spinner.finish_with_message(format!(
+        "Sound transcription [{}]: '{}'",
+        &base_name, result
+    ))?;
+    println!("Time elapsed: {}", format_duration(timer.elapsed()));
+
+    let file_name = curdir.join("listen1.mp3");
+    let base_name = file_name.file_name().unwrap().to_string_lossy().to_string();
+    println!("Transcribing file [callback]: {}", &base_name);
+    let snd = sound.clone();
+    let timer = time::Instant::now();
+    print!("Sound transcription [{}]: '", &base_name);
+    std::io::stdout().flush().unwrap();
+    snd.transcribe_file_callback(&file_name, move |e| {
+        print!("{}", e);
         std::io::stdout().flush().unwrap();
-        snd.transcribe_file_callback(&file_name, move |e| {
-            print!("{}", e);
-        })
-        .unwrap();
-        println!();
-    })?;
-    spinner.finish_and_clear()?;
+    })
+    .unwrap();
+    println!("'");
+    println!("Time elapsed: {}", format_duration(timer.elapsed()));
 
-    let file_name = (curdir.as_str(), "listen2.mp3").as_path();
-    spinner.reset()?;
-    spinner.set_message(format!("Transcribing file [stream]: {}", &file_name));
+    let file_name = curdir.join("listen2.mp3");
+    let base_name = file_name.file_name().unwrap().to_string_lossy().to_string();
+    println!("Transcribing file [stream]: {}", &base_name);
     let (tx, mut rx) = unbounded_channel::<Segment>();
     let handle = tokio::spawn(async move {
-        print!("Sound transcription: ");
+        print!("Sound transcription [{}]: '", &base_name);
         std::io::stdout().flush().unwrap();
 
         while let Some(result) = rx.recv().await {
             print!("{}", result.text());
+            std::io::stdout().flush().unwrap();
         }
-
-        println!();
     });
+    let timer = time::Instant::now();
     sound.transcribe_stream(&file_name, tx)?;
     handle.await?;
-    spinner.finish_and_clear()?;
+    println!("'");
+    println!("Time elapsed: {}", format_duration(timer.elapsed()));
+
     Ok(())
 }
