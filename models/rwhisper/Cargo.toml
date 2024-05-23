@@ -40,7 +40,7 @@ half = { version = "2", features = [
     "use-intrinsics",
     "rand_distr",
 ], optional = true }
-kalosm-common = { version = "0", workspace = true }
+kalosm-common = { workspace = true }
 kalosm-language-model = { workspace = true }
 
 [dev-dependencies]

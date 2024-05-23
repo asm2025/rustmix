@@ -7,7 +7,7 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'testapp'",
+            "name": "Debug",
             "cargo": {
                 "args": ["build", "--bin=testapp"],
                 "filter": {
@@ -21,7 +21,7 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in library 'rustmix'",
+            "name": "Test 'rustmix'",
             "cargo": {
                 "args": ["test", "--no-run", "--lib", "--package=rustmix"],
                 "filter": {
