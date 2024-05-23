@@ -186,9 +186,10 @@ impl ExpressVPN {
         Err(UnknownVPNResponseError(text).into())
     }
 
-    pub fn locations(&self) -> Result<Vec<String>> {
+    pub fn recent(&self) -> Result<Vec<String>> {
         let output = Command::new(Self::CMD)
             .arg("list")
+            .arg("recent")
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .execute_output()?;
@@ -203,28 +204,33 @@ impl ExpressVPN {
             return Err(CommandError(ret, String::from_utf8(output.stderr)?).into());
         }
 
-        let mut text = String::from_utf8(output.stdout)?;
-        let n = text.rfind("--").unwrap_or(0);
-        let l = text.rfind("Type ").unwrap_or(text.len());
-
-        if n > 0 || l < text.len() {
-            text = text[n + 2..l].trim().to_string();
-        }
-
-        let mut locations = Vec::new();
-
-        for line in text.lines() {
-            if line.is_empty() {
-                continue;
-            }
-
-            locations.push(self.clean_location(line));
-        }
-
-        Ok(locations)
+        let text = String::from_utf8(output.stdout)?;
+        Ok(self.locations_from_string(&text))
     }
 
-    pub fn all_locations(&self) -> Result<Vec<String>> {
+    pub fn recommended(&self) -> Result<Vec<String>> {
+        let output = Command::new(Self::CMD)
+            .arg("list")
+            .arg("recommended")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .execute_output()?;
+        let ret = match output.status.code() {
+            Some(ret) => ret,
+            None => {
+                return Err(CommandError(-1, String::from_utf8(output.stderr)?).into());
+            }
+        };
+
+        if ret != 0 {
+            return Err(CommandError(ret, String::from_utf8(output.stderr)?).into());
+        }
+
+        let text = String::from_utf8(output.stdout)?;
+        Ok(self.locations_from_string(&text))
+    }
+
+    pub fn list(&self) -> Result<Vec<String>> {
         let output = Command::new(Self::CMD)
             .arg("list")
             .arg("all")
@@ -242,36 +248,28 @@ impl ExpressVPN {
             return Err(CommandError(ret, String::from_utf8(output.stderr)?).into());
         }
 
-        let mut text = String::from_utf8(output.stdout)?;
-        let n = text.rfind("--").unwrap_or(0);
-
-        if n > 0 {
-            text = text[n + 2..].trim().to_string();
-        }
-
-        let mut locations = Vec::new();
-
-        for line in text.lines() {
-            if line.is_empty() {
-                continue;
-            }
-
-            locations.push(self.clean_location(line));
-        }
-
-        Ok(locations)
+        let text = String::from_utf8(output.stdout)?;
+        Ok(self.locations_from_string(&text))
     }
 
-    fn clean_location(&self, location: &str) -> String {
-        if location.is_empty() {
-            return location.to_owned();
+    fn locations_from_string(&self, text: &str) -> Vec<String> {
+        let mut locations = Vec::with_capacity(0);
+
+        if text.is_empty() {
+            return locations;
         }
 
-        let location = location.replacen(" ", "\t", 1);
-        LOCATION_CLEAN
-            .replace_all(&location, "\t")
-            .trim()
-            .to_string()
+        let n = text.find("-\n").unwrap_or(0);
+        let l = text[n..].rfind("\n\n").unwrap_or(text.len());
+        let text = text[n + 2..l].trim().to_string();
+
+        for line in text.lines().filter(|line| !line.is_empty()) {
+            let n = line.find(|c: char| c.is_whitespace()).unwrap_or(line.len());
+            let line = line[..n].to_string();
+            locations.push(line);
+        }
+
+        locations
     }
 
     pub fn refresh(&self) -> Result<()> {
