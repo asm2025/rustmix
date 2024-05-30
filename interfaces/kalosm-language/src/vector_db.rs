@@ -139,7 +139,7 @@ impl<S: VectorSpace + Sync> VectorDB<S> {
 
         let mut wtxn = self.env.write_txn()?;
 
-        let writer = Writer::<Euclidean>::new(self.database, 0, dims);
+        let writer = Writer::<Euclidean>::new(self.database, 0, dims)?;
 
         writer.del_item(&mut wtxn, embedding_id.0)?;
         self.recycle_id(embedding_id);
@@ -163,7 +163,7 @@ impl<S: VectorSpace + Sync> VectorDB<S> {
 
         let mut wtxn = self.env.write_txn()?;
 
-        let writer = Writer::<Euclidean>::new(self.database, 0, embedding.len());
+        let writer = Writer::<Euclidean>::new(self.database, 0, embedding.len())?;
 
         let id = self.take_id();
 
@@ -191,7 +191,7 @@ impl<S: VectorSpace + Sync> VectorDB<S> {
         self.set_dim(first_embedding.len());
 
         let mut wtxn = self.env.write_txn()?;
-        let writer = Writer::<Euclidean>::new(self.database, 0, first_embedding.len());
+        let writer = Writer::<Euclidean>::new(self.database, 0, first_embedding.len())?;
 
         let mut ids: Vec<_> = Vec::with_capacity(embeddings.size_hint().0 + 1);
 
