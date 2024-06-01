@@ -15,17 +15,18 @@ dirs = "5"
 dotenv = "0"
 execute = "0"
 fake = { version = "2", features = [
-    "derive",
-    "uuid",
-    "always-true-rng",
-    "random_color",
-    "chrono",
-    "time",
-    "http",
-    "geo",
+	"derive",
+	"uuid",
+	"always-true-rng",
+	"random_color",
+	"chrono",
+	"time",
+	"http",
+	"geo",
 ] }
 file-rotate = { version = "0", optional = true }
 futures = "0"
+glob = "0"
 html-entities = { version = "0", optional = true }
 http-body-util = "0"
 image = { version = "0", optional = true }
@@ -38,22 +39,22 @@ log4rs = { version = "1", optional = true }
 num_cpus = "1"
 once_cell = { version = "1", optional = true }
 pyo3 = { version = "0", features = [
-    "auto-initialize",
-    "abi3",
+	"auto-initialize",
+	"abi3",
 ], optional = true }
 rand = "0"
 randua = "0"
 rayon = { version = "1", optional = true }
 regex = "1"
 reqwest = { version = "0", features = [
-    "blocking",
-    "cookies",
-    "json",
-    "gzip",
-    "deflate",
-    "multipart",
-    "socks",
-    "stream",
+	"blocking",
+	"cookies",
+	"json",
+	"gzip",
+	"deflate",
+	"multipart",
+	"socks",
+	"stream",
 ] }
 rodio = { version = "0", optional = true }
 rpassword = "7"
@@ -83,13 +84,13 @@ mail = ["dep:html-entities", "dep:lettre", "dep:once_cell"]
 threading = ["dep:crossbeam", "dep:rayon"]
 log4rs = ["dep:log4rs"]
 slog = [
-    "dep:slog",
-    "dep:slog-async",
-    "dep:slog-scope",
-    "dep:slog-stdlog",
-    "dep:slog-term",
-    "dep:slog-json",
-    "dep:file-rotate",
+	"dep:slog",
+	"dep:slog-async",
+	"dep:slog-scope",
+	"dep:slog-stdlog",
+	"dep:slog-term",
+	"dep:slog-json",
+	"dep:file-rotate",
 ]
 python = ["dep:pyo3"]
 audio = ["kalosm/sound", "dep:rodio"]
