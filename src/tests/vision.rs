@@ -41,7 +41,7 @@ pub async fn test_image() -> Result<()> {
                 return Ok(());
             }
 
-            directory::clear(&curdir)?;
+            directory::remove(&curdir)?;
         } else {
             directory::ensure(&curdir)?;
         }

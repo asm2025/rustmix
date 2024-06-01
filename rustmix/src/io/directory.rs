@@ -1,6 +1,10 @@
 pub use dirs::*;
-use std::fs::{self, DirEntry};
-pub use std::path::{Path, PathBuf};
+use glob::glob;
+use std::{fs, rc::Rc};
+pub use std::{
+    fs::DirEntry,
+    path::{Path, PathBuf},
+};
 
 use crate::Result;
 
@@ -75,6 +79,57 @@ pub fn list_filtered<T: AsRef<Path>, F: Fn(&DirEntry) -> bool + 'static>(
     Ok(Box::new(iter) as Box<dyn Iterator<Item = _>>)
 }
 
+pub fn list_match<T: AsRef<Path>>(path: T, pattern: &str) -> Result<impl Iterator<Item = String>> {
+    let path = path.as_ref();
+
+    if !path.is_dir() {
+        return Ok(Box::new(std::iter::empty()) as Box<dyn Iterator<Item = _>>);
+    }
+
+    glob(pattern)
+        .and_then(|paths| {
+            let iter = paths.filter_map(|e| match e {
+                Ok(it) => Some(it.to_string_lossy().into_owned()),
+                Err(_) => None,
+            });
+
+            Ok(Box::new(iter) as Box<dyn Iterator<Item = _>>)
+        })
+        .map_err(Into::into)
+}
+
+pub fn list_match_filtered<T: AsRef<Path>, F: Fn(&PathBuf) -> bool + 'static>(
+    path: T,
+    pattern: &str,
+    filter: F,
+) -> Result<impl Iterator<Item = String>> {
+    let path = path.as_ref();
+
+    if !path.is_dir() {
+        return Ok(Box::new(std::iter::empty()) as Box<dyn Iterator<Item = _>>);
+    }
+
+    let filter = Rc::new(filter);
+    let iter = match glob(pattern) {
+        Ok(it) => it.filter_map({
+            let filter = Rc::clone(&filter);
+            move |e| match e {
+                Ok(it) => {
+                    if filter(&it) {
+                        Some(it.to_string_lossy().into_owned())
+                    } else {
+                        None
+                    }
+                }
+                Err(_) => None,
+            }
+        }),
+        Err(_) => return Ok(Box::new(std::iter::empty()) as Box<dyn Iterator<Item = _>>),
+    };
+
+    Ok(Box::new(iter) as Box<dyn Iterator<Item = _>>)
+}
+
 pub fn rename<T: AsRef<Path>, U: AsRef<Path>>(from: T, to: U) -> Result<()> {
     fs::rename(from, to).map_err(Into::into)
 }
@@ -96,7 +151,7 @@ pub fn move_to<T: AsRef<Path>, U: AsRef<Path>>(from: T, to: U) -> Result<()> {
     }
 }
 
-pub fn clear<T: AsRef<Path>>(path: T) -> Result<()> {
+pub fn remove<T: AsRef<Path>>(path: T) -> Result<()> {
     let path = path.as_ref();
 
     if !path.is_dir() {
@@ -115,6 +170,28 @@ pub fn clear<T: AsRef<Path>>(path: T) -> Result<()> {
     }
 
     Ok(())
+}
+
+pub fn remove_match<T: AsRef<Path>>(path: T, pattern: &str) -> Result<()> {
+    let path = path.as_ref();
+
+    if !path.is_dir() {
+        return Ok(());
+    }
+
+    glob(pattern)
+        .and_then(|paths| {
+            for entry in paths.filter_map(|e| e.ok()) {
+                if entry.is_dir() {
+                    fs::remove_dir_all(entry).unwrap();
+                } else {
+                    fs::remove_file(entry).unwrap();
+                }
+            }
+
+            Ok(())
+        })
+        .map_err(Into::into)
 }
 
 pub fn delete<T: AsRef<Path>>(path: T) -> Result<()> {
