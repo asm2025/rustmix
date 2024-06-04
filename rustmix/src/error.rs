@@ -118,3 +118,11 @@ pub struct VPNError(pub String);
 #[derive(Error, Debug)]
 #[error("Unknown VPN response {0}")]
 pub struct UnknownVPNResponseError(pub String);
+
+#[derive(Error, Debug)]
+#[error("Item not found. {0}")]
+pub struct NotFoundError(pub String);
+
+#[derive(Error, Debug)]
+#[error("Directory not found or source is not a directory. {0}")]
+pub struct InvalidDirectoryError(pub String);

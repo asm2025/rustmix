@@ -8,7 +8,7 @@ use std::fmt::{Display, Result as DisplayResult};
 
 use crate::{
     date::{parse_date, parse_date_ftz, utc_today},
-    error::{ElementNotFoundError, NoContentError},
+    error::*,
     random,
     web::reqwest::build_client_for_api,
     Result,
@@ -204,17 +204,17 @@ impl TempMail {
 
         let start = match body.find("fem coserch") {
             Some(index) => index,
-            None => return Err(ElementNotFoundError("coserch".to_string()).into()),
+            None => return Err(ElementNotFoundError("coserch".into()).into()),
         };
         let body = &body[start..];
         let end = match body.find("fem dropselect") {
             Some(index) => index,
-            None => return Err(ElementNotFoundError("dropselect".to_string()).into()),
+            None => return Err(ElementNotFoundError("dropselect".into()).into()),
         };
         let body = &body[..end];
         let captures = match RGX_EMAIL_FAKE_GENERATE.captures(&body) {
             Some(captures) => captures,
-            None => return Err(ElementNotFoundError("username and domain".to_string()).into()),
+            None => return Err(ElementNotFoundError("username and domain".into()).into()),
         };
         let username = captures.get(1).unwrap().as_str();
         let domain = captures.get(2).unwrap().as_str();

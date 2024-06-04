@@ -3,7 +3,7 @@ use rustmix::{
     input,
     io::{
         directory,
-        path::{AsPath, PathEx},
+        path::{self, AsPath, PathEx},
     },
     string::StringEx,
     threading::{Spinner, INTERVAL},
@@ -41,7 +41,7 @@ pub async fn test_image() -> Result<()> {
                 return Ok(());
             }
 
-            directory::remove(&curdir)?;
+            path::del(&curdir)?;
         } else {
             directory::ensure(&curdir)?;
         }

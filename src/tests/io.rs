@@ -9,7 +9,7 @@ use rustmix::{
 };
 use std::{
     io::{stdin, LineWriter, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use super::*;
@@ -29,6 +29,60 @@ pub fn test_path() -> Result<()> {
     let path: PathBuf = [curdir.as_str(), "My Folder", "My Subfolder", "", "NonEmpty"].into_path();
     println!("{}", path.display());
 
+    let path = "./files/audio";
+    println!("\nI will find SOME files in '{}'.", &path);
+
+    for entry in path::lst_match(format!("{}/*.mp3", &path)).unwrap() {
+        println!("{}", entry.display());
+    }
+
+    println!(
+        "\nI will find some files in '{}' that start with f and end with n.",
+        &path
+    );
+
+    for entry in path::lst_match_filtered(format!("{}/*.mp3", &path), |e| {
+        let fname = e.file_stem().unwrap().to_str().unwrap();
+        fname.starts_with('f') && fname.ends_with('n')
+    })
+    .unwrap()
+    {
+        println!("{}", entry.display());
+    }
+
+    println!("\nI will create a temp folder to test a few things.");
+    let tmpdir = curdir.join("tmp");
+    directory::create(&tmpdir)?;
+    println!("Temp folder created.");
+
+    println!(
+        "I will copy ALL files from './files/audio' to '{}'.",
+        &tmpdir.display()
+    );
+    path::cpy("./files/audio/*.*", &tmpdir)?;
+    println!("I will print ALL the new files.");
+
+    for entry in path::lst(&tmpdir).unwrap() {
+        println!("{}", entry.display());
+    }
+
+    let new_folder = tmpdir.join("new_folder");
+    println!(
+        "\nI will move SOME files to a new folder '{}'.",
+        new_folder.display()
+    );
+    path::mov(&format!("{}/*.wav", tmpdir.display()), &new_folder)?;
+
+    for entry in path::lst(&new_folder).unwrap() {
+        println!("{}", entry.display());
+    }
+
+    println!("\nI will rename the new folder.");
+    path::ren(&new_folder, "new_folder_renamed")?;
+
+    println!("\nI will delete the temp folder.");
+    path::del(&tmpdir)?;
+
     Ok(())
 }
 
@@ -37,6 +91,7 @@ pub fn test_directory() -> Result<()> {
 
     let curdir = directory::current();
     let original_path_len = curdir.components().count();
+    // could use that or simply curdir.join()
     let path = (curdir.as_str(), "My Folder", "My Subfolder", "NonEmpty").into_path();
 
     println!(
@@ -76,7 +131,7 @@ pub fn test_directory() -> Result<()> {
         println!("{}", &part);
     }
 
-    println!("\n{}", "I will delete the directory.");
+    println!("\nI will delete the directory.");
     let path = path.take(original_path_len + 1);
     println!("The path is now '{}'", &path.display());
     delete_dir(&path)?;
@@ -89,7 +144,7 @@ pub fn test_file() -> Result<()> {
 
     let curdir = directory::current();
     let original_path_len = curdir.components().count();
-    let mut path = (curdir.as_str(), "My Folder", "My Subfolder", "NonEmpty").into_path();
+    let mut path = curdir.join("My Folder/My Subfolder/NonEmpty");
 
     println!(
         "\n\nCurrent Dir: '{}'. It has {} components.",
@@ -243,7 +298,7 @@ fn delete_dir(path: &PathBuf) -> Result<()> {
     stdin().read_line(&mut input)?;
 
     if input.trim().to_lowercase() == "y" {
-        match directory::delete(&path) {
+        match path::del(&path) {
             Ok(_) => println!("Folder deleted."),
             Err(e) => println!("Error: {}", e),
         }
