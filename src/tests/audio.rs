@@ -19,7 +19,11 @@ pub async fn test_sound() -> Result<()> {
     let curdir = directory::current().join("files/audio");
 
     let file_name = curdir.join("awz1.mp3");
-    let base_name = file_name.file_name().unwrap().to_string_lossy().to_string();
+    let base_name = file_name
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .into_owned();
     spinner.reset()?;
     spinner.set_message(format!("Transcribing file [text]: {}", &base_name));
     let snd = sound.clone();
@@ -32,7 +36,11 @@ pub async fn test_sound() -> Result<()> {
     println!("Time elapsed: {}", format_duration(timer.elapsed()));
 
     let file_name = curdir.join("fb1.mp3");
-    let base_name = file_name.file_name().unwrap().to_string_lossy().to_string();
+    let base_name = file_name
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .into_owned();
     spinner.reset()?;
     spinner.set_message(format!("Transcribing file [text]: {}", &base_name));
     let snd = sound.clone();
@@ -45,7 +53,11 @@ pub async fn test_sound() -> Result<()> {
     println!("Time elapsed: {}", format_duration(timer.elapsed()));
 
     let file_name = curdir.join("fbn.mp3");
-    let base_name = file_name.file_name().unwrap().to_string_lossy().to_string();
+    let base_name = file_name
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .into_owned();
     spinner.reset()?;
     spinner.set_message(format!("Transcribing file [text]: {}", &base_name));
     let snd = sound.clone();
@@ -58,7 +70,11 @@ pub async fn test_sound() -> Result<()> {
     println!("Time elapsed: {}", format_duration(timer.elapsed()));
 
     let file_name = curdir.join("pinless.wav");
-    let base_name = file_name.file_name().unwrap().to_string_lossy().to_string();
+    let base_name = file_name
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .into_owned();
     spinner.reset()?;
     spinner.set_message(format!("Transcribing file [text]: {}", &base_name));
     let snd = sound.clone();
@@ -71,7 +87,11 @@ pub async fn test_sound() -> Result<()> {
     println!("Time elapsed: {}", format_duration(timer.elapsed()));
 
     let file_name = curdir.join("listen1.mp3");
-    let base_name = file_name.file_name().unwrap().to_string_lossy().to_string();
+    let base_name = file_name
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .into_owned();
     println!("Transcribing file [callback]: {}", &base_name);
     let snd = sound.clone();
     let timer = time::Instant::now();
@@ -86,7 +106,11 @@ pub async fn test_sound() -> Result<()> {
     println!("Time elapsed: {}", format_duration(timer.elapsed()));
 
     let file_name = curdir.join("listen2.mp3");
-    let base_name = file_name.file_name().unwrap().to_string_lossy().to_string();
+    let base_name = file_name
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .into_owned();
     println!("Transcribing file [stream]: {}", &base_name);
     let (tx, mut rx) = unbounded_channel::<Segment>();
     let handle = tokio::spawn(async move {

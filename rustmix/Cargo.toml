@@ -26,6 +26,7 @@ fake = { version = "2", features = [
 ] }
 file-rotate = { version = "0", optional = true }
 futures = "0"
+fs_extra = "1"
 glob = "0"
 html-entities = { version = "0", optional = true }
 http-body-util = "0"
