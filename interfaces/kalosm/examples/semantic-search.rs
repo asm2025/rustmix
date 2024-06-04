@@ -17,7 +17,7 @@ async fn main() {
 
     let chunker = SemanticChunker::new();
 
-    let mut document_table = db
+    let document_table = db
         .document_table_builder("documents")
         .with_embedding_model(
             Bert::builder()
@@ -61,7 +61,7 @@ async fn main() {
             user_question
         );
         let user_question_embedding = document_table
-            .embedding_model_mut()
+            .embedding_model()
             .embed(&user_question)
             .await
             .unwrap();
