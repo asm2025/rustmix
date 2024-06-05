@@ -50,9 +50,12 @@ regex = "1"
 reqwest = { version = "0", features = [
 	"blocking",
 	"cookies",
+	"http2",
 	"json",
 	"gzip",
 	"deflate",
+	"brotli",
+	"zstd",
 	"multipart",
 	"socks",
 	"stream",
