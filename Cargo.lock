@@ -734,7 +734,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "regex",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "shlex",
  "syn 2.0.68",
 ]
@@ -754,7 +754,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "regex",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "shlex",
  "syn 2.0.68",
 ]
@@ -4073,7 +4073,7 @@ dependencies = [
  "llm-samplers",
  "num-traits",
  "once_cell",
- "rand 0.8.5",
+ "rand 0.7.3",
  "scraper",
  "serde",
  "surrealdb",
@@ -4133,13 +4133,13 @@ dependencies = [
  "pdf",
  "pdf_text",
  "pulldown-cmark",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rbert",
  "readability",
  "reqwest 0.12.5",
  "rphi",
  "rss",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "scraper",
  "serde",
  "serde_json",
@@ -4170,9 +4170,9 @@ dependencies = [
  "llm-samplers",
  "log",
  "once_cell",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rayon",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "serde",
  "tokio",
  "tracing",
@@ -4189,7 +4189,7 @@ dependencies = [
  "kalosm-common",
  "kalosm-language-model",
  "kalosm-learning-macro",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rbert",
  "tokio",
  "tokio-util",
@@ -4224,7 +4224,7 @@ dependencies = [
  "kalosm-streams",
  "llm-samplers",
  "once_cell",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rayon",
  "tokenizers 0.19.1",
  "tokio",
@@ -4262,9 +4262,9 @@ dependencies = [
  "anyhow",
  "candle-core",
  "llm-samplers",
- "rand 0.8.5",
+ "rand 0.7.3",
  "regex-automata 0.4.7",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "thiserror",
  "tokenizers 0.19.1",
  "tracing",
@@ -4285,7 +4285,7 @@ dependencies = [
  "hound",
  "itertools 0.13.0",
  "kalosm-streams",
- "rand 0.8.5",
+ "rand 0.7.3",
  "ringbuf",
  "ringbuffer",
  "rodio",
@@ -4553,7 +4553,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e310b3a6b5907f99202fcdb4960ff45b93735d7c7d96b760fcff8db2dc0e103d"
 dependencies = [
  "cfg-if 1.0.0",
- "windows-targets 0.52.5",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
@@ -6473,7 +6473,7 @@ dependencies = [
  "pin-project-lite",
  "quinn-proto",
  "quinn-udp",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "rustls 0.23.10",
  "thiserror",
  "tokio",
@@ -6482,14 +6482,14 @@ dependencies = [
 
 [[package]]
 name = "quinn-proto"
-version = "0.11.3"
+version = "0.11.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ddf517c03a109db8100448a4be38d498df8a210a99fe0e1b9eaf39e78c640efe"
+checksum = "fadfaed2cd7f389d0161bb73eeb07b7b78f8691047a6f3e73caaeae55310a4a6"
 dependencies = [
  "bytes",
  "rand 0.8.5",
  "ring 0.17.8",
- "rustc-hash",
+ "rustc-hash 2.0.0",
  "rustls 0.23.10",
  "slab",
  "thiserror",
@@ -7230,7 +7230,7 @@ dependencies = [
  "kalosm-sample",
  "kalosm-streams",
  "llm-samplers",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde_json",
  "tokenizers 0.19.1",
  "tokio",
@@ -7327,6 +7327,12 @@ name = "rustc-hash"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
+
+[[package]]
+name = "rustc-hash"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "583034fd73374156e66797ed8e5b0d5690409c9226b22d87cb7f19821c05d152"
 
 [[package]]
 name = "rustc_lexer"
@@ -7485,7 +7491,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "pyo3",
- "rand 0.8.5",
+ "rand 0.7.3",
  "randua",
  "rayon",
  "regex",
@@ -7537,7 +7543,7 @@ dependencies = [
  "kalosm-language-model",
  "kalosm-sound",
  "kalosm-streams",
- "rand 0.8.5",
+ "rand 0.7.3",
  "ringbuf",
  "rodio",
  "serde_json",
@@ -8781,7 +8787,7 @@ dependencies = [
  "rayon",
  "regex",
  "rust-stemmers",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "serde",
  "serde_json",
  "sketches-ddsketch",
@@ -8970,7 +8976,7 @@ dependencies = [
  "lazy_static 1.5.0",
  "log",
  "pyo3",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rustmix",
  "serde",
  "serde_json",
@@ -9515,7 +9521,7 @@ version = "1.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
- "cfg-if 1.0.0",
+ "cfg-if 0.1.10",
  "static_assertions",
 ]
 
