@@ -9,7 +9,7 @@ use crate::{BertDistance, Metric, TestCases};
 pub struct PromptAnnealerBuilder<
     'a,
     M: Model,
-    P = ChannelTextStream<String>,
+    P = ChannelTextStream,
     Met: Metric<String> = BertDistance,
 > where
     <<M as Model>::SyncModel as SyncModel>::Session: Sync + Send,
@@ -123,7 +123,7 @@ where
             (self.train, self.test)
         };
 
-        let bert = Bert::builder().build().await?;
+        let bert = Bert::new().await?;
 
         // Calculate embeddings for all examples
         let mut embedded_train_set = Vec::new();
@@ -216,12 +216,8 @@ where
 }
 
 /// A prompt annealer that takes a set of examples and tries to find the best combination and order of examples to use as a prompt for a given task.
-pub struct PromptAnnealer<
-    'a,
-    M: Model,
-    P = ChannelTextStream<String>,
-    Met: Metric<String> = BertDistance,
-> where
+pub struct PromptAnnealer<'a, M: Model, P = ChannelTextStream, Met: Metric<String> = BertDistance>
+where
     <<M as Model>::SyncModel as SyncModel>::Session: Sync + Send,
 {
     task: TaskBuilder<P>,
@@ -408,10 +404,10 @@ where
         .iter()
         .filter_map(|example| {
             llm.tokenizer()
-                .encode(example.input, true)
+                .encode(example.input, false)
                 .ok()
                 .map(|x| x.len())
-                .and_then(|x| Some(x + llm.tokenizer().encode(example.output, true).ok()?.len()))
+                .and_then(|x| Some(x + llm.tokenizer().encode(example.output, false).ok()?.len()))
         })
         .sum();
 
@@ -426,7 +422,7 @@ where
     let mut llama_test_cases = TestCases::new();
 
     for example in test {
-        let actual = task.run(example.input, llm);
+        let mut actual = task.run(example.input, llm);
 
         let all_text = actual.all_text().await;
 

@@ -1,9 +1,13 @@
-use std::{fmt::Display, path::PathBuf, sync::OnceLock};
+use std::{fmt::Display, future::Future, path::PathBuf, pin::Pin, sync::OnceLock};
 
-use candle_core::{utils::*, Device};
+use candle_core::{backend::BackendStorage, utils::*, Device, Storage, Tensor, WithDType};
 
 mod cache;
 pub use cache::*;
+mod kv_cache;
+pub use kv_cache::*;
+mod mask;
+pub use mask::*;
 
 /// Create a candle device that uses any available accelerator.
 pub fn accelerated_device_if_available() -> candle_core::Result<Device> {
@@ -61,11 +65,15 @@ impl Display for FileSource {
 
 impl FileSource {
     /// Create a new source for a file from Hugging Face
-    pub fn huggingface(model_id: String, revision: String, file: String) -> Self {
+    pub fn huggingface(
+        model_id: impl ToString,
+        revision: impl ToString,
+        file: impl ToString,
+    ) -> Self {
         Self::HuggingFace {
-            model_id,
-            revision,
-            file,
+            model_id: model_id.to_string(),
+            revision: revision.to_string(),
+            file: file.to_string(),
         }
     }
 
@@ -91,5 +99,36 @@ pub fn maybe_autoreleasepool<T>(f: impl FnOnce() -> T) -> T {
     #[cfg(not(feature = "metal"))]
     {
         f()
+    }
+}
+
+/// A future that is boxed and pinned.
+pub type BoxedFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+
+/// Clear a `Vec<T>` and copy the contents of a tensor into it.
+pub fn copy_tensor_into_vec<T: WithDType>(
+    tensor: &Tensor,
+    into: &mut Vec<T>,
+) -> candle_core::Result<()> {
+    into.clear();
+    assert_eq!(tensor.rank(), 1);
+    let mut from_cpu_storage = |cpu_storage: &candle_core::CpuStorage,
+                                layout: &candle_core::Layout| {
+        let data = cpu_storage.as_slice()?;
+        match layout.contiguous_offsets() {
+            Some((o1, o2)) => into.extend_from_slice(&data[o1..o2]),
+            None => {
+                for logit in tensor.strided_index().map(|i| data[i]) {
+                    into.push(logit);
+                }
+            }
+        };
+        candle_core::Result::Ok(())
+    };
+    let (storage, layout) = tensor.storage_and_layout();
+    match &*storage {
+        Storage::Cpu(storage) => from_cpu_storage(storage, layout),
+        Storage::Cuda(storage) => from_cpu_storage(&storage.to_cpu_storage()?, layout),
+        Storage::Metal(storage) => from_cpu_storage(&storage.to_cpu_storage()?, layout),
     }
 }

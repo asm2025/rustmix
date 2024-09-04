@@ -1,0 +1,27 @@
+[package]
+name = "kalosm-parse-macro"
+version = "0.3.2"
+edition = "2021"
+description = "A macro to derive kalosm parsing traits"
+license = "MIT/Apache-2.0"
+repository = "https://github.com/floneum/floneum"
+authors = ["Evan Almloff"]
+keywords = ["ai", "bert", "nlp", "machine-learning", "transformers"]
+
+[dependencies]
+syn = "2"
+quote = "1"
+proc-macro2 = "1"
+
+[dev-dependencies]
+kalosm = { workspace = true, features = ["language"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+pretty_assertions = "1"
+
+[features]
+metal = ["kalosm/metal"]
+cuda = ["kalosm/cuda"]
+
+[lib]
+proc-macro = true
