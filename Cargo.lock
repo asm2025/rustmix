@@ -2504,7 +2504,7 @@ checksum = "531e46835a22af56d1e3b66f04844bed63158bc094a628bec1d321d9b4c44bf2"
 dependencies = [
  "bit-set",
  "regex-automata 0.4.7",
- "regex-syntax",
+ "regex-syntax 0.8.4",
 ]
 
 [[package]]
@@ -3083,7 +3083,7 @@ version = "0.7.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ff16065e5720f376fbced200a5ae0f47ace85fd70b7e54269790281353b6d61"
 dependencies = [
- "approx 0.5.1",
+ "approx 0.4.0",
  "arbitrary",
  "num-traits",
  "rstar",
@@ -4073,7 +4073,7 @@ dependencies = [
  "llm-samplers",
  "num-traits",
  "once_cell",
- "rand 0.8.5",
+ "rand 0.7.3",
  "scraper",
  "serde",
  "surrealdb",
@@ -4133,7 +4133,7 @@ dependencies = [
  "pdf",
  "pdf_text",
  "pulldown-cmark",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rbert",
  "readability",
  "reqwest 0.12.5",
@@ -4170,7 +4170,7 @@ dependencies = [
  "llm-samplers",
  "log",
  "once_cell",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rayon",
  "rustc-hash",
  "serde",
@@ -4189,7 +4189,7 @@ dependencies = [
  "kalosm-common",
  "kalosm-language-model",
  "kalosm-learning-macro",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rbert",
  "tokio",
  "tokio-util",
@@ -4224,7 +4224,7 @@ dependencies = [
  "kalosm-streams",
  "llm-samplers",
  "once_cell",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rayon",
  "tokenizers 0.19.1",
  "tokio",
@@ -4262,8 +4262,8 @@ dependencies = [
  "anyhow",
  "candle-core",
  "llm-samplers",
- "rand 0.8.5",
- "regex-automata 0.4.7",
+ "rand 0.7.3",
+ "regex-automata 0.1.10",
  "rustc-hash",
  "thiserror",
  "tokenizers 0.19.1",
@@ -4285,7 +4285,7 @@ dependencies = [
  "hound",
  "itertools 0.13.0",
  "kalosm-streams",
- "rand 0.8.5",
+ "rand 0.7.3",
  "ringbuf",
  "ringbuffer",
  "rodio",
@@ -4333,7 +4333,7 @@ dependencies = [
  "petgraph",
  "pico-args",
  "regex",
- "regex-syntax",
+ "regex-syntax 0.8.4",
  "string_cache",
  "term",
  "tiny-keccak",
@@ -6857,7 +6857,7 @@ dependencies = [
  "aho-corasick",
  "memchr",
  "regex-automata 0.4.7",
- "regex-syntax",
+ "regex-syntax 0.8.4",
 ]
 
 [[package]]
@@ -6865,6 +6865,9 @@ name = "regex-automata"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c230d73fb8d8c1b9c0b3135c5142a8acee3a0558fb8db5cf1cb65f8d7862132"
+dependencies = [
+ "regex-syntax 0.6.29",
+]
 
 [[package]]
 name = "regex-automata"
@@ -6874,8 +6877,14 @@ checksum = "38caf58cc5ef2fed281f89292ef23f6365465ed9a41b7a7754eb4e26496c92df"
 dependencies = [
  "aho-corasick",
  "memchr",
- "regex-syntax",
+ "regex-syntax 0.8.4",
 ]
+
+[[package]]
+name = "regex-syntax"
+version = "0.6.29"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f162c6dd7b008981e4d40210aca20b4bd0f9b60ca9271061b07f78537722f2e1"
 
 [[package]]
 name = "regex-syntax"
@@ -7230,7 +7239,7 @@ dependencies = [
  "kalosm-sample",
  "kalosm-streams",
  "llm-samplers",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde_json",
  "tokenizers 0.19.1",
  "tokio",
@@ -7485,7 +7494,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "pyo3",
- "rand 0.8.5",
+ "rand 0.7.3",
  "randua",
  "rayon",
  "regex",
@@ -7537,7 +7546,7 @@ dependencies = [
  "kalosm-language-model",
  "kalosm-sound",
  "kalosm-streams",
- "rand 0.8.5",
+ "rand 0.7.3",
  "ringbuf",
  "rodio",
  "serde_json",
@@ -8378,7 +8387,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "surrealdb-core 1.5.0",
+ "surrealdb-core 1.5.1",
  "surrealdb-core 2.0.0-1.5.3",
  "thiserror",
  "tokio",
@@ -8394,9 +8403,9 @@ dependencies = [
 
 [[package]]
 name = "surrealdb-core"
-version = "1.5.0"
+version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d765dbd25b093d89242c4eef253f49d9f026a6acf47b6dee07f86209a78a4080"
+checksum = "c3e0c2ab384286d025809460c65e6e24aef7919a6bfb98e961828d687560c2b8"
 dependencies = [
  "addr",
  "any_ascii",
@@ -8845,7 +8854,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d60769b80ad7953d8a7b2c70cdfe722bbcdcac6bccc8ac934c40c034d866fc18"
 dependencies = [
  "byteorder",
- "regex-syntax",
+ "regex-syntax 0.8.4",
  "utf8-ranges",
 ]
 
@@ -8970,7 +8979,7 @@ dependencies = [
  "lazy_static 1.5.0",
  "log",
  "pyo3",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rustmix",
  "serde",
  "serde_json",
@@ -9141,7 +9150,7 @@ dependencies = [
  "rayon",
  "rayon-cond",
  "regex",
- "regex-syntax",
+ "regex-syntax 0.8.4",
  "serde",
  "serde_json",
  "spm_precompiled",
@@ -9173,7 +9182,7 @@ dependencies = [
  "rayon",
  "rayon-cond",
  "regex",
- "regex-syntax",
+ "regex-syntax 0.8.4",
  "serde",
  "serde_json",
  "spm_precompiled",
@@ -9515,7 +9524,7 @@ version = "1.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
- "cfg-if 1.0.0",
+ "cfg-if 0.1.10",
  "static_assertions",
 ]
 
