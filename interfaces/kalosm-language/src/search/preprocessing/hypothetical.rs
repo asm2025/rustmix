@@ -22,10 +22,7 @@ const PREFIX: &str = "Questions that are answered by the previous text: ";
 type Constraints = kalosm_sample::SequenceParser<
     LiteralParser,
     kalosm_sample::RepeatParser<
-        kalosm_sample::SequenceParser<
-            IndexParser<LiteralParser, (), kalosm_sample::LiteralParserOffset>,
-            StopOn<&'static str>,
-        >,
+        kalosm_sample::SequenceParser<IndexParser<LiteralParser>, StopOn<&'static str>>,
     >,
 >;
 
@@ -189,9 +186,7 @@ where
             questions.append(&mut chunk_questions);
             questions_count.push(chunk_questions.len());
         }
-        let embeddings = embedder
-            .embed_batch(&questions.iter().map(|s| s.as_str()).collect::<Vec<_>>())
-            .await?;
+        let embeddings = embedder.embed_vec(questions).await?;
 
         let mut chunks = Vec::with_capacity(embeddings.len());
         let mut questions_count = questions_count.iter();

@@ -1,6 +1,6 @@
 [package]
 name = "kalosm-sample"
-version = "0.2.1"
+version = "0.3.2"
 edition = "2021"
 description = "A common interface for token sampling and helpers for structered llm sampling "
 license = "MIT/Apache-2.0"
@@ -9,12 +9,16 @@ authors = ["Evan Almloff"]
 keywords = ["ai", "llm", "llama", "mistral", "nlp"]
 
 [dependencies]
-llm-samplers = { workspace = true }
-rand = "0"
 anyhow = "1"
-tracing = "0"
-candle-core = { workspace = true }
-tokenizers = { version = "0" }
-rustc-hash = "1"
 regex-automata = "0"
-thiserror = "1"
+kalosm-parse-macro = { workspace = true }
+
+[dev-dependencies]
+tracing-subscriber = "0"
+criterion = "0"
+rand = "0"
+pretty_assertions = "1"
+
+[[bench]]
+name = "parse"
+harness = false

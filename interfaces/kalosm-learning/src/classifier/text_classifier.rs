@@ -1,5 +1,5 @@
 use candle_core::Device;
-use kalosm_language_model::{Embedder, Embedding, VectorSpace};
+use kalosm_language_model::{Embedder, EmbedderExt, Embedding, VectorSpace};
 
 use crate::{
     Class, ClassificationDataset, ClassificationDatasetBuilder, Classifier, ClassifierConfig,
@@ -7,14 +7,39 @@ use crate::{
 };
 
 /// A builder for [`TextClassifier`].
+///
+/// # Example
+/// ```rust, no_run
+/// # use kalosm_learning::*;
+/// # use rbert::*;
+/// # use std::collections::HashMap;
+/// # #[derive(Debug, Copy, Clone, PartialEq, Eq, Class)]
+/// # enum MyClass {
+/// #     Person,
+/// #     Thing,
+/// # }
+/// # #[tokio::main]
+/// # async fn main() -> anyhow::Result<()> {
+/// // Create a dataset for the classifier
+/// let bert = Bert::new().await?;
+/// let mut dataset = TextClassifierDatasetBuilder::<MyClass, _>::new(&bert);
+/// for question in ["What is the author's name?", "What is the author's age?"] {
+///     dataset.add(question, MyClass::Person).await?;
+/// }
+/// for question in ["What is the capital of France?", "What is the capital of England?"] {
+///     dataset.add(question, MyClass::Thing).await?;
+/// }
+/// # Ok::<(), anyhow::Error>(())
+/// # }
+/// ```
 pub struct TextClassifierDatasetBuilder<'a, T: Class, E: Embedder> {
     dataset: ClassificationDatasetBuilder<T>,
-    embedder: &'a mut E,
+    embedder: &'a E,
 }
 
 impl<'a, T: Class, E: Embedder> TextClassifierDatasetBuilder<'a, T, E> {
     /// Creates a new [`TextClassifierDatasetBuilder`].
-    pub fn new(embedder: &'a mut E) -> Self {
+    pub fn new(embedder: &'a E) -> Self {
         Self {
             dataset: ClassificationDatasetBuilder::new(),
             embedder,
@@ -22,19 +47,40 @@ impl<'a, T: Class, E: Embedder> TextClassifierDatasetBuilder<'a, T, E> {
     }
 
     /// Adds a new example to the dataset.
-    pub async fn add(&mut self, text: &str, class: T) -> anyhow::Result<()> {
+    pub async fn add(&mut self, text: impl ToString, class: T) -> anyhow::Result<()> {
         let embedding = self.embedder.embed(text).await?;
         self.dataset.add(embedding.to_vec(), class);
         Ok(())
     }
 
-    /// Add many examples to the dataset.
+    /// Add many examples to the dataset at once. This may be faster than adding each example individually depending on the embedding model.
+    ///
+    /// # Example
+    /// ```rust, no_run
+    /// # use kalosm_learning::*;
+    /// # use rbert::*;
+    /// # use std::collections::HashMap;
+    /// # #[derive(Debug, Copy, Clone, PartialEq, Eq, Class)]
+    /// # enum MyClass {
+    /// #     Person,
+    /// #     Thing,
+    /// # }
+    /// # #[tokio::main]
+    /// # async fn main() -> anyhow::Result<()> {
+    /// // Create a dataset for the classifier
+    /// let bert = Bert::new().await?;
+    /// let mut dataset = TextClassifierDatasetBuilder::<MyClass, _>::new(&bert);
+    /// dataset.extend(["What is the author's name?", "What is the author's age?"].into_iter().map(|q| (q, MyClass::Person))).await?;
+    /// dataset.extend(["What is the capital of France?", "What is the capital of England?"].into_iter().map(|q| (q, MyClass::Thing))).await?;
+    /// # Ok::<(), anyhow::Error>(())
+    /// # }
+    /// ```
     pub async fn extend(
         &mut self,
-        examples: impl IntoIterator<Item = (&str, T)>,
+        examples: impl IntoIterator<Item = (impl ToString, T)>,
     ) -> anyhow::Result<()> {
         let (texts, classes): (Vec<_>, Vec<_>) = examples.into_iter().unzip();
-        let embeddings = self.embedder.embed_batch(&texts).await?;
+        let embeddings = self.embedder.embed_batch(texts).await?;
         for (embedding, class) in embeddings.into_iter().zip(classes) {
             self.dataset.add(embedding.to_vec(), class);
         }
@@ -51,7 +97,7 @@ impl<'a, T: Class, E: Embedder> TextClassifierDatasetBuilder<'a, T, E> {
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust, no_run
 /// use kalosm_learning::{Class, Classifier, ClassifierConfig};
 /// use candle_core::Device;
 /// use kalosm_language_model::Embedder;
@@ -230,9 +276,7 @@ impl<T: Class, S: VectorSpace + Send + Sync + 'static> TextClassifier<T, S> {
 #[tokio::test]
 async fn simplified() -> anyhow::Result<()> {
     use crate::{Class, Classifier, ClassifierConfig};
-    use candle_core::Device;
-    use kalosm_language_model::Embedder;
-    use rbert::{Bert, BertSpace};
+    use rbert::{Bert, BertSource, BertSpace};
 
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Class)]
     enum MyClass {
@@ -240,10 +284,13 @@ async fn simplified() -> anyhow::Result<()> {
         Thing,
     }
 
-    let mut bert = Bert::builder().build().await?;
+    let bert = Bert::builder()
+        .with_source(BertSource::snowflake_arctic_embed_extra_small())
+        .build()
+        .await?;
 
-    let dev = Device::cuda_if_available(0)?;
-    let person_questions = vec![
+    let dev = kalosm_common::accelerated_device_if_available()?;
+    let person_questions = [
         "What is the author's name?",
         "What is the author's age?",
         "Who is the queen of England?",
@@ -268,7 +315,7 @@ async fn simplified() -> anyhow::Result<()> {
         "What is the name of the leader of the United States?",
         "What is the name of the leader of France?",
     ];
-    let thing_sentences = vec![
+    let thing_sentences = [
         "What is the capital of France?",
         "What is the capital of England?",
         "What is the name of the biggest city in the world?",
@@ -294,7 +341,7 @@ async fn simplified() -> anyhow::Result<()> {
         "What is the most spoken language in the United States?",
     ];
 
-    let mut dataset = TextClassifierDatasetBuilder::<MyClass, _>::new(&mut bert);
+    let mut dataset = TextClassifierDatasetBuilder::<MyClass, _>::new(&bert);
 
     for question in &person_questions {
         dataset.add(question, MyClass::Person).await?;
@@ -312,8 +359,9 @@ async fn simplified() -> anyhow::Result<()> {
     loop {
         classifier = TextClassifier::<MyClass, BertSpace>::new(Classifier::new(
             &dev,
-            ClassifierConfig::new(384).layers_dims(layers.clone()),
+            ClassifierConfig::new().layers_dims(layers.clone()),
         )?);
+        println!("Training...");
         if let Err(error) = classifier.train(&dataset, &dev, 100, 0.05, 100) {
             println!("Error: {:?}", error);
         } else {

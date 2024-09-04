@@ -2,6 +2,7 @@
 name = "testapp"
 version = "0.1.0"
 edition = "2021"
+license = "MIT/Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -39,32 +40,36 @@ members = [
     "interfaces/kalosm-streams",
     "interfaces/kalosm-learning",
     "interfaces/kalosm-learning-macro",
+    "interfaces/kalosm-parse-macro",
 ]
 
 [workspace.dependencies]
-candle-core = { git = "https://github.com/huggingface/candle", rev = "cdc8b57b5cf28ad92642b076d67e610bdb958b2d" }
-candle-nn = { git = "https://github.com/huggingface/candle", rev = "cdc8b57b5cf28ad92642b076d67e610bdb958b2d" }
-candle-transformers = { git = "https://github.com/huggingface/candle", rev = "cdc8b57b5cf28ad92642b076d67e610bdb958b2d" }
-candle-datasets = { git = "https://github.com/huggingface/candle", rev = "cdc8b57b5cf28ad92642b076d67e610bdb958b2d" }
-kalosm = { path = "./interfaces/kalosm", version = "0" }
-kalosm-sample = { path = "./interfaces/kalosm-sample", version = "0" }
-kalosm-common = { path = "./interfaces/kalosm-common", version = "0" }
-kalosm-language-model = { path = "./interfaces/language-model", version = "0" }
-kalosm-streams = { path = "./interfaces/kalosm-streams", version = "0" }
-kalosm-language = { path = "./interfaces/kalosm-language", version = "0" }
-kalosm-sound = { path = "./interfaces/kalosm-sound", version = "0" }
-kalosm-vision = { path = "./interfaces/kalosm-vision", version = "0" }
-kalosm-learning = { path = "./interfaces/kalosm-learning", version = "0" }
-kalosm-learning-macro = { path = "./interfaces/kalosm-learning-macro", version = "0" }
-rphi = { path = "./models/rphi", version = "0" }
-rbert = { path = "./models/rbert", version = "0" }
-kalosm-llama = { path = "./models/kalosm-llama", version = "0" }
-rwhisper = { path = "./models/rwhisper", version = "0" }
-rwuerstchen = { path = "./models/rwuerstchen", version = "0" }
-segment-anything-rs = { path = "./models/segment-anything-rs", version = "0" }
-kalosm-ocr = { path = "./models/kalosm-ocr", version = "0" }
-rustmix = { path = "./rustmix", version = "0" }
+candle-core = { version = "0" }
+candle-nn = { version = "0" }
+candle-transformers = { version = "0" }
+candle-datasets = { version = "0" }
+kalosm = { path = "./interfaces/kalosm" }
+kalosm-sample = { path = "./interfaces/kalosm-sample" }
+kalosm-parse-macro = { path = "./interfaces/kalosm-parse-macro" }
+kalosm-common = { path = "./interfaces/kalosm-common" }
+kalosm-language-model = { path = "./interfaces/language-model" }
+kalosm-streams = { path = "./interfaces/kalosm-streams" }
+kalosm-language = { path = "./interfaces/kalosm-language" }
+kalosm-sound = { path = "./interfaces/kalosm-sound" }
+kalosm-vision = { path = "./interfaces/kalosm-vision" }
+kalosm-learning = { path = "./interfaces/kalosm-learning" }
+kalosm-learning-macro = { path = "./interfaces/kalosm-learning-macro" }
+rphi = { path = "./models/rphi" }
+rbert = { path = "./models/rbert" }
+kalosm-llama = { path = "./models/kalosm-llama" }
+rwhisper = { path = "./models/rwhisper" }
+rwuerstchen = { path = "./models/rwuerstchen" }
+segment-anything-rs = { path = "./models/segment-anything-rs" }
+kalosm-ocr = { path = "./models/kalosm-ocr" }
+rustmix = { path = "./rustmix" }
 llm-samplers = "=0.0.7"
+parking_lot = "0"
+tokenizers = "0"
 
 [profile.dist]
 inherits = "release"

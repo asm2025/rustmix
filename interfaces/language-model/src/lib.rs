@@ -5,11 +5,11 @@
 //! ## Usage (with the RPhi implementation crate)
 //!
 //! ```rust, no_run
-//! use rphi::prelude::*;
+//! use kalosm::language::*;
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     let mut model = Phi::default();
+//!     let mut model = Llama::phi_3().await.unwrap();
 //!     let prompt = "The capital of France is ";
 //!     let mut result = model.stream_text(prompt).await.unwrap();
 //!

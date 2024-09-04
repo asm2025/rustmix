@@ -9,7 +9,7 @@ pub struct StringParser<F: Fn(char) -> bool + 'static = CharFilter> {
     character_filter: F,
 }
 
-impl CreateParserState for StringParser<fn(char) -> bool> {
+impl<F: Fn(char) -> bool + 'static> CreateParserState for StringParser<F> {
     fn create_parser_state(&self) -> <Self as Parser>::PartialState {
         StringParserState::default()
     }
@@ -35,6 +35,26 @@ impl<F: Fn(char) -> bool + 'static> StringParser<F> {
             len_range: self.len_range,
             character_filter,
         }
+    }
+
+    /// Only parse plain text that matches the character filter 'a'..'z' | 'A'..'Z' | '0'..'9' | ' ' | ',' | '.'
+    pub fn plain_text(self) -> StringParser {
+        self.with_allowed_characters(|c| {
+            matches!(
+                c,
+                'a'..='z' | 'A'..='Z' | ' ' | '0'..='9' | ',' | '.'
+            )
+        })
+    }
+
+    /// Only parse alphanumeric text and spaces (the character filter 'a'..'z' | 'A'..'Z' | '0'..'9' | ' ')
+    pub fn alphanumeric_with_spaces(self) -> StringParser {
+        self.with_allowed_characters(|c| {
+            matches!(
+                c,
+                'a'..='z' | 'A'..='Z' | '0'..='9' | ' '
+            )
+        })
     }
 }
 
@@ -106,13 +126,12 @@ impl<F: Fn(char) -> bool + 'static> Parser for StringParser<F> {
                     }
                 }
                 StringParserProgress::InString => {
-                    if (state.next_char_escaped || *byte != b'"')
-                        && !(self.character_filter)(*byte as char)
-                    {
+                    let byte_unescaped_quote = !state.next_char_escaped && *byte == b'"';
+                    if !byte_unescaped_quote && !(self.character_filter)(*byte as char) {
                         crate::bail!(StringParseError);
                     }
 
-                    if string.len() == *self.len_range.end() && *byte != b'"' {
+                    if string.len() == *self.len_range.end() && !byte_unescaped_quote {
                         crate::bail!(StringParseError);
                     }
 
@@ -148,7 +167,7 @@ impl<F: Fn(char) -> bool + 'static> Parser for StringParser<F> {
 }
 
 #[test]
-fn literal_parser() {
+fn string_parser() {
     let parser = StringParser::new(1..=20);
     let state = StringParserState::default();
     assert_eq!(

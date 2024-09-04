@@ -1,5 +1,6 @@
 #![allow(clippy::type_complexity)]
 
+pub use kalosm_parse_macro::*;
 mod integer;
 use std::{
     any::Any,
@@ -7,7 +8,7 @@ use std::{
     error::Error,
     fmt::{Debug, Display},
     ops::Deref,
-    sync::Arc,
+    sync::{Arc, Mutex, OnceLock},
 };
 
 pub use integer::*;
@@ -25,8 +26,8 @@ mod repeat;
 pub use repeat::*;
 mod separated;
 pub use separated::*;
-mod has_parser;
-pub use has_parser::*;
+mod parse;
+pub use parse::*;
 mod word;
 pub use word::*;
 mod sentence;
@@ -37,8 +38,12 @@ mod map;
 pub use map::*;
 mod regex;
 pub use regex::*;
+mod arc_linked_list;
+pub(crate) use arc_linked_list::*;
+mod schema;
+pub use schema::*;
 
-/// A parser error.
+/// An error that occurred while parsing.
 #[derive(Debug, Clone)]
 pub struct ParserError(Arc<anyhow::Error>);
 
@@ -106,6 +111,17 @@ where
 /// A result type for parsers.
 pub type ParseResult<T> = std::result::Result<T, ParserError>;
 
+/// An auto trait for a Send parser with a default state.
+pub trait SendCreateParserState:
+    Send + Sync + CreateParserState<PartialState: Send + Sync, Output: Send + Sync>
+{
+}
+
+impl<P: CreateParserState<PartialState: Send + Sync, Output: Send + Sync> + Send + Sync>
+    SendCreateParserState for P
+{
+}
+
 /// A trait for a parser with a default state.
 pub trait CreateParserState: Parser {
     /// Create the default state of the parser.
@@ -130,7 +146,7 @@ impl<P: ?Sized + CreateParserState> CreateParserState for Arc<P> {
     }
 }
 
-impl<O> CreateParserState for ArcParser<O> {
+impl<O: Clone> CreateParserState for ArcParser<O> {
     fn create_parser_state(&self) -> <Self as Parser>::PartialState {
         self.0.create_parser_state()
     }
@@ -139,9 +155,9 @@ impl<O> CreateParserState for ArcParser<O> {
 /// An incremental parser for a structured input.
 pub trait Parser {
     /// The output of the parser.
-    type Output;
+    type Output: Clone;
     /// The state of the parser.
-    type PartialState;
+    type PartialState: Clone;
 
     /// Parse the given input.
     fn parse<'a>(
@@ -208,23 +224,18 @@ impl<P: ?Sized + Parser> Parser for Arc<P> {
     }
 }
 
-trait AnyCreateParserState<O>:
-    Parser<Output = O, PartialState = Arc<dyn Any + Send + Sync>> + CreateParserState + Send + Sync
+trait AnyCreateParserState:
+    Parser<PartialState = Arc<dyn Any + Send + Sync>> + CreateParserState + Send + Sync
 {
 }
 
-impl<
-        O,
-        P: Parser<Output = O, PartialState = Arc<dyn Any + Send + Sync>>
-            + CreateParserState
-            + Send
-            + Sync,
-    > AnyCreateParserState<O> for P
+impl<P: Parser<PartialState = Arc<dyn Any + Send + Sync>> + CreateParserState + Send + Sync>
+    AnyCreateParserState for P
 {
 }
 
 /// A boxed parser.
-pub struct ArcParser<O = ()>(Arc<dyn AnyCreateParserState<O> + Send + Sync>);
+pub struct ArcParser<O = ()>(Arc<dyn AnyCreateParserState<Output = O> + Send + Sync>);
 
 impl<O> Clone for ArcParser<O> {
     fn clone(&self) -> Self {
@@ -245,7 +256,7 @@ impl<O> ArcParser<O> {
     }
 }
 
-impl<O> Parser for ArcParser<O> {
+impl<O: Clone> Parser for ArcParser<O> {
     type Output = O;
     type PartialState = Arc<dyn Any + Send + Sync>;
 
@@ -310,7 +321,7 @@ where
 /// An extension trait for parsers.
 pub trait ParserExt: Parser {
     /// Parse this parser, or another other parser.
-    fn or<V: Parser<Output = O, PartialState = PA>, O, PA>(self, other: V) -> ChoiceParser<Self, V>
+    fn otherwise<V: Parser>(self, other: V) -> ChoiceParser<Self, V>
     where
         Self: Sized,
     {
@@ -320,15 +331,69 @@ pub trait ParserExt: Parser {
         }
     }
 
-    /// Parse this parser, then the other parser.
-    fn then<V: Parser<Output = O, PartialState = PA>, O, PA>(
+    /// Parse this parser, or another other parser with the same type
+    fn or<V: Parser<Output = Self::Output>>(
         self,
         other: V,
-    ) -> SequenceParser<Self, V>
+    ) -> MapOutputParser<ChoiceParser<Self, V>, Self::Output>
+    where
+        Self: Sized,
+    {
+        self.otherwise(other).map_output(|either| match either {
+            Either::Left(left) => left,
+            Either::Right(right) => right,
+        })
+    }
+
+    /// Parse this parser, then the other parser.
+    fn then<V: Parser>(self, other: V) -> SequenceParser<Self, V>
     where
         Self: Sized,
     {
         SequenceParser::new(self, other)
+    }
+
+    /// Parse this parser, then the other parser that is created base on the output of this parser.
+    fn then_lazy<V, F>(self, other: F) -> ThenLazy<Self, F>
+    where
+        Self: Sized,
+        V: CreateParserState,
+        F: Fn(&Self::Output) -> V,
+    {
+        ThenLazy::new(self, other)
+    }
+
+    /// Parse this parser, then the other parser while ignoring the current parser's output.
+    fn ignore_output_then<V: CreateParserState>(
+        self,
+        other: V,
+    ) -> MapOutputParser<SequenceParser<Self, V>, <V as Parser>::Output>
+    where
+        Self: Sized,
+    {
+        SequenceParser::new(self, other).map_output(|(_, second)| second)
+    }
+
+    /// Parse this parser, then the other parser while ignoring the output of the other parser.
+    fn then_ignore_output<V: CreateParserState>(
+        self,
+        other: V,
+    ) -> MapOutputParser<SequenceParser<Self, V>, <Self as Parser>::Output>
+    where
+        Self: Sized,
+    {
+        SequenceParser::new(self, other).map_output(|(first, _)| first)
+    }
+
+    /// Parse this parser, then a literal. This is equivalent to `.then_ignore_output(LiteralParser::new(literal))`.
+    fn then_literal(
+        self,
+        literal: impl Into<Cow<'static, str>>,
+    ) -> MapOutputParser<SequenceParser<Self, LiteralParser>, <Self as Parser>::Output>
+    where
+        Self: Sized,
+    {
+        self.then_ignore_output(LiteralParser::new(literal))
     }
 
     /// Repeat this parser a number of times.
@@ -340,7 +405,7 @@ pub trait ParserExt: Parser {
     }
 
     /// Map the output of this parser.
-    fn map_output<F, O>(self, f: F) -> MapOutputParser<Self, F, O>
+    fn map_output<F, O>(self, f: F) -> MapOutputParser<Self, O, F>
     where
         Self: Sized,
         F: Fn(Self::Output) -> O,
@@ -361,9 +426,101 @@ pub trait ParserExt: Parser {
     {
         ArcParser::new(AnyParser(self))
     }
+
+    /// Create a new parser with a different initial state
+    fn with_initial_state<F: Fn() -> Self::PartialState + Clone>(
+        self,
+        initial_state: F,
+    ) -> WithInitialState<Self, F>
+    where
+        Self: Sized,
+    {
+        WithInitialState::new(self, initial_state)
+    }
 }
 
 impl<P: Parser> ParserExt for P {}
+
+/// A parser with lazy initial state
+pub struct WithInitialState<P, F> {
+    parser: P,
+    initial_state: F,
+}
+
+impl<P: Parser, F: Fn() -> P::PartialState + Clone> WithInitialState<P, F> {
+    /// Create a new parser with initial state
+    pub fn new(parser: P, initial_state: F) -> Self {
+        Self {
+            parser,
+            initial_state,
+        }
+    }
+}
+
+impl<P: Parser, F: Fn() -> P::PartialState + Clone> CreateParserState for WithInitialState<P, F> {
+    fn create_parser_state(&self) -> <Self as Parser>::PartialState {
+        (self.initial_state)()
+    }
+}
+
+impl<P: Parser, F: Fn() -> P::PartialState + Clone> Parser for WithInitialState<P, F> {
+    type Output = P::Output;
+    type PartialState = P::PartialState;
+
+    fn parse<'a>(
+        &self,
+        state: &Self::PartialState,
+        input: &'a [u8],
+    ) -> ParseResult<ParseStatus<'a, Self::PartialState, Self::Output>> {
+        self.parser.parse(state, input)
+    }
+}
+
+/// A parser that is lazily initialized.
+pub struct LazyParser<P, F> {
+    parser: Arc<OnceLock<P>>,
+    parser_fn: Arc<Mutex<Option<F>>>,
+}
+
+impl<P: Parser, F: FnOnce() -> P> LazyParser<P, F> {
+    /// Create a new parser that is lazily initialized.
+    pub fn new(parser_fn: F) -> Self {
+        Self {
+            parser: Arc::new(OnceLock::new()),
+            parser_fn: Arc::new(Mutex::new(Some(parser_fn))),
+        }
+    }
+
+    fn get_parser(&self) -> &P {
+        self.parser
+            .get_or_init(|| (self.parser_fn.lock().unwrap().take().unwrap())())
+    }
+}
+
+impl<P: CreateParserState, F: FnOnce() -> P> CreateParserState for LazyParser<P, F> {
+    fn create_parser_state(&self) -> <Self as Parser>::PartialState {
+        self.get_parser().create_parser_state()
+    }
+}
+
+impl<P: CreateParserState, F: FnOnce() -> P> From<F> for LazyParser<P, F> {
+    fn from(parser_fn: F) -> Self {
+        Self::new(parser_fn)
+    }
+}
+
+impl<P: Parser, F: FnOnce() -> P> Parser for LazyParser<P, F> {
+    type Output = P::Output;
+    type PartialState = P::PartialState;
+
+    fn parse<'a>(
+        &self,
+        state: &Self::PartialState,
+        input: &'a [u8],
+    ) -> ParseResult<ParseStatus<'a, Self::PartialState, Self::Output>> {
+        self.get_parser().parse(state, input)
+    }
+}
 
 /// A parser for a choice between two parsers.
 #[derive(Debug, PartialEq, Eq, Clone)]
