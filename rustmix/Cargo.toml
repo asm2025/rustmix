@@ -1,7 +1,7 @@
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [package]
 name = "rustmix"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "rustmix is a Rust library that has some basic utility functions and components."
 authors = ["asm <asm2025@outlook.com>"]
