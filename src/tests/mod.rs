@@ -1,3 +1,4 @@
+#[allow(unused_imports)]
 use serde::{Deserialize, Serialize};
 
 mod app;
@@ -8,18 +9,12 @@ mod log4rs;
 pub(crate) use self::log4rs::*;
 mod mail;
 pub(crate) use self::mail::*;
-mod python;
-pub(crate) use self::python::*;
 mod slog;
 pub(crate) use self::slog::*;
 mod threading;
 pub(crate) use self::threading::*;
 mod web;
 pub(crate) use self::web::*;
-mod audio;
-pub(crate) use self::audio::*;
-mod vision;
-pub(crate) use self::vision::*;
 mod random;
 pub(crate) use self::random::*;
 mod vpn;

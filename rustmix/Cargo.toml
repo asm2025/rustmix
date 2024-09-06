@@ -32,17 +32,12 @@ html-entities = { version = "0", optional = true }
 http-body-util = "0"
 image = { version = "0", optional = true }
 indicatif = "0"
-kalosm = { workspace = true, optional = true }
 lazy_static = "1"
 lettre = { version = "0", optional = true }
 log = "0"
 log4rs = { version = "1", optional = true }
 num_cpus = "1"
 once_cell = { version = "1", optional = true }
-pyo3 = { version = "0", features = [
-	"auto-initialize",
-	"abi3",
-], optional = true }
 rand = "0"
 randua = "0"
 rayon = { version = "1", optional = true }
@@ -79,11 +74,7 @@ urlencoding = "2"
 
 [features]
 default = ["mail", "threading", "log4rs"]
-full = ["mail", "threading", "log4rs", "slog", "python", "audio", "vision"]
-metal = ["kalosm?/metal"]
-cuda = ["kalosm?/cuda"]
-mkl = ["kalosm?/mkl"]
-language = ["kalosm/language"]
+full = ["mail", "threading", "log4rs", "slog"]
 mail = ["dep:html-entities", "dep:lettre", "dep:once_cell"]
 threading = ["dep:crossbeam", "dep:rayon"]
 log4rs = ["dep:log4rs"]
@@ -96,9 +87,6 @@ slog = [
 	"dep:slog-json",
 	"dep:file-rotate",
 ]
-python = ["dep:pyo3"]
-audio = ["kalosm/sound", "dep:rodio"]
-vision = ["kalosm/vision", "dep:image"]
 
 [package.metadata.scripts]
 run = "cargo run"

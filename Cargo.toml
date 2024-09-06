@@ -13,7 +13,6 @@ humantime = "2"
 image = "0"
 lazy_static = "1"
 log = "0"
-pyo3 = { version = "0", features = ["auto-initialize", "abi3"] }
 rand = "0"
 rustmix = { workspace = true, features = ["full"] }
 serde = { version = "1", features = ["derive"] }
@@ -21,55 +20,11 @@ serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 
 [workspace]
-members = [
-    "rustmix",
-    "models/rbert",
-    "models/kalosm-llama",
-    "models/rphi",
-    "models/rwhisper",
-    "models/rwuerstchen",
-    "models/segment-anything-rs",
-    "models/kalosm-ocr",
-    "interfaces/kalosm",
-    "interfaces/kalosm-common",
-    "interfaces/kalosm-language",
-    "interfaces/language-model",
-    "interfaces/kalosm-sample",
-    "interfaces/kalosm-vision",
-    "interfaces/kalosm-sound",
-    "interfaces/kalosm-streams",
-    "interfaces/kalosm-learning",
-    "interfaces/kalosm-learning-macro",
-    "interfaces/kalosm-parse-macro",
-]
+members = ["rustmix"]
 
 [workspace.dependencies]
-candle-core = { version = "0" }
-candle-nn = { version = "0" }
-candle-transformers = { version = "0" }
-candle-datasets = { version = "0" }
-kalosm = { path = "./interfaces/kalosm" }
-kalosm-sample = { path = "./interfaces/kalosm-sample" }
-kalosm-parse-macro = { path = "./interfaces/kalosm-parse-macro" }
-kalosm-common = { path = "./interfaces/kalosm-common" }
-kalosm-language-model = { path = "./interfaces/language-model" }
-kalosm-streams = { path = "./interfaces/kalosm-streams" }
-kalosm-language = { path = "./interfaces/kalosm-language" }
-kalosm-sound = { path = "./interfaces/kalosm-sound" }
-kalosm-vision = { path = "./interfaces/kalosm-vision" }
-kalosm-learning = { path = "./interfaces/kalosm-learning" }
-kalosm-learning-macro = { path = "./interfaces/kalosm-learning-macro" }
-rphi = { path = "./models/rphi" }
-rbert = { path = "./models/rbert" }
-kalosm-llama = { path = "./models/kalosm-llama" }
-rwhisper = { path = "./models/rwhisper" }
-rwuerstchen = { path = "./models/rwuerstchen" }
-segment-anything-rs = { path = "./models/segment-anything-rs" }
-kalosm-ocr = { path = "./models/kalosm-ocr" }
 rustmix = { path = "./rustmix" }
-llm-samplers = "=0.0.7"
 parking_lot = "0"
-tokenizers = "0"
 
 [profile.dist]
 inherits = "release"
