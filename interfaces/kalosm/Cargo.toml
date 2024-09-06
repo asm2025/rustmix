@@ -92,10 +92,19 @@ workspace = true
 
 [features]
 full = ["language", "vision", "sound", "surrealdb"]
-cuda = ["kalosm-language?/cublas", "kalosm-vision?/cublas", "kalosm-sound?/cuda"]
+cuda = [
+	"kalosm-language?/cublas",
+	"kalosm-vision?/cublas",
+	"kalosm-sound?/cuda",
+]
 mkl = ["kalosm-language?/mkl", "kalosm-vision?/mkl", "kalosm-sound?/mkl"]
 language = ["kalosm-language"]
-metal = ["kalosm-language?/metal", "kalosm-vision?/metal", "kalosm-sound?/metal", "kalosm-common/metal"]
+metal = [
+	"kalosm-language?/metal",
+	"kalosm-vision?/metal",
+	"kalosm-sound?/metal",
+	"kalosm-common/metal",
+]
 sound = ["kalosm-sound"]
 surrealdb = ["dep:surrealdb"]
 vision = ["kalosm-vision"]
