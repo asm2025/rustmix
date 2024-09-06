@@ -1,13 +1,27 @@
 use kalosm_common::FileSource;
 
-/// A the source of a [`Bert`] model
+const SNOWFLAKE_EMBEDDING_PREFIX: &str =
+    "Represent this sentence for searching relevant passages: ";
+
+/// A the source of a [`crate::Bert`] model
 pub struct BertSource {
+    pub(crate) search_embedding_prefix: Option<String>,
     pub(crate) config: FileSource,
     pub(crate) tokenizer: FileSource,
     pub(crate) model: FileSource,
 }
 
 impl BertSource {
+    /// Create a new [`BertSource`] for embedding plain text
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Create a new [`BertSource`] for embedding text for search
+    pub fn new_for_search() -> Self {
+        Self::snowflake_arctic_embed_extra_small()
+    }
+
     /// Set the model to use, check out available models: <https://huggingface.co/models?library=sentence-transformers&sort=trending>
     pub fn with_model(mut self, model: FileSource) -> Self {
         self.model = model;
@@ -23,6 +37,15 @@ impl BertSource {
     /// Set the config to use
     pub fn with_config(mut self, config: FileSource) -> Self {
         self.config = config;
+        self
+    }
+
+    /// Set the prefix to use when embedding search queries
+    pub(crate) fn with_search_embedding_prefix(
+        mut self,
+        prefix: impl Into<Option<String>>,
+    ) -> Self {
+        self.search_embedding_prefix = prefix.into();
         self
     }
 
@@ -68,22 +91,24 @@ impl BertSource {
 
     /// Create a new [`BertSource`] with the BGE small english preset
     pub fn bge_small_en() -> Self {
-        Self::default()
-            .with_model(FileSource::huggingface(
+        Self {
+            config: FileSource::huggingface(
                 "BAAI/bge-small-en-v1.5".to_string(),
-                "refs/pr/3".to_string(),
-                "model.safetensors".to_string(),
-            ))
-            .with_tokenizer(FileSource::huggingface(
-                "BAAI/bge-small-en-v1.5".to_string(),
-                "refs/pr/3".to_string(),
-                "tokenizer.json".to_string(),
-            ))
-            .with_config(FileSource::huggingface(
-                "BAAI/bge-small-en-v1.5".to_string(),
-                "refs/pr/3".to_string(),
+                "main".to_string(),
                 "config.json".to_string(),
-            ))
+            ),
+            tokenizer: FileSource::huggingface(
+                "BAAI/bge-small-en-v1.5".to_string(),
+                "main".to_string(),
+                "tokenizer.json".to_string(),
+            ),
+            model: FileSource::huggingface(
+                "BAAI/bge-small-en-v1.5".to_string(),
+                "main".to_string(),
+                "model.safetensors".to_string(),
+            ),
+            search_embedding_prefix: None,
+        }
     }
 
     /// Create a new [`BertSource`] with the MiniLM-L6-v2 preset
@@ -109,21 +134,22 @@ impl BertSource {
     /// Create a new [`BertSource`] with the [snowflake-arctic-embed-xs](https://huggingface.co/Snowflake/snowflake-arctic-embed-xs) model
     pub fn snowflake_arctic_embed_extra_small() -> Self {
         Self::default()
-            .with_model(FileSource::huggingface(
+            .with_config(FileSource::huggingface(
                 "Snowflake/snowflake-arctic-embed-xs".to_string(),
                 "main".to_string(),
-                "model.safetensors".to_string(),
+                "config.json".to_string(),
             ))
             .with_tokenizer(FileSource::huggingface(
                 "Snowflake/snowflake-arctic-embed-xs".to_string(),
                 "main".to_string(),
                 "tokenizer.json".to_string(),
             ))
-            .with_config(FileSource::huggingface(
+            .with_model(FileSource::huggingface(
                 "Snowflake/snowflake-arctic-embed-xs".to_string(),
                 "main".to_string(),
-                "config.json".to_string(),
+                "model.safetensors".to_string(),
             ))
+            .with_search_embedding_prefix(SNOWFLAKE_EMBEDDING_PREFIX.to_string())
     }
 
     /// Create a new [`BertSource`] with the [snowflake-arctic-embed-s](https://huggingface.co/Snowflake/snowflake-arctic-embed-s) model
@@ -144,27 +170,28 @@ impl BertSource {
                 "main".to_string(),
                 "config.json".to_string(),
             ))
+            .with_search_embedding_prefix(SNOWFLAKE_EMBEDDING_PREFIX.to_string())
     }
 
     /// Create a new [`BertSource`] with the [snowflake-arctic-embed-m](https://huggingface.co/Snowflake/snowflake-arctic-embed-m) model
     pub fn snowflake_arctic_embed_medium() -> Self {
-        Self {
-            config: FileSource::huggingface(
+        Self::default()
+            .with_config(FileSource::huggingface(
                 "Snowflake/snowflake-arctic-embed-m".to_string(),
                 "main".to_string(),
                 "config.json".to_string(),
-            ),
-            tokenizer: FileSource::huggingface(
+            ))
+            .with_tokenizer(FileSource::huggingface(
                 "Snowflake/snowflake-arctic-embed-m".to_string(),
                 "main".to_string(),
                 "tokenizer.json".to_string(),
-            ),
-            model: FileSource::huggingface(
+            ))
+            .with_model(FileSource::huggingface(
                 "Snowflake/snowflake-arctic-embed-m".to_string(),
                 "main".to_string(),
                 "model.safetensors".to_string(),
-            ),
-        }
+            ))
+            .with_search_embedding_prefix(SNOWFLAKE_EMBEDDING_PREFIX.to_string())
     }
 
     /// Create a new [`BertSource`] with the [snowflake-arctic-embed-m-long](https://huggingface.co/Snowflake/snowflake-arctic-embed-m-long) model
@@ -187,6 +214,7 @@ impl BertSource {
                 "main".to_string(),
                 "config.json".to_string(),
             ))
+            .with_search_embedding_prefix(SNOWFLAKE_EMBEDDING_PREFIX.to_string())
     }
 
     /// Create a new [`BertSource`] with the [snowflake-arctic-embed-l](https://huggingface.co/Snowflake/snowflake-arctic-embed-l) model
@@ -207,11 +235,12 @@ impl BertSource {
                 "main".to_string(),
                 "config.json".to_string(),
             ))
+            .with_search_embedding_prefix(SNOWFLAKE_EMBEDDING_PREFIX.to_string())
     }
 }
 
 impl Default for BertSource {
     fn default() -> Self {
-        Self::snowflake_arctic_embed_medium()
+        Self::bge_small_en()
     }
 }

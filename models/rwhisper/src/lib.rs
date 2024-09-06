@@ -5,7 +5,7 @@
 //!
 //! ```rust, no_run
 //! use futures_util::StreamExt;
-//! use rwhisper::*;
+//! use kalosm::sound::*;
 //! use tokio::time::{Duration, Instant};
 //!
 //! #[tokio::main]
@@ -17,7 +17,7 @@
 //!         .await?;
 //!
 //!     // Record audio from the microphone for 5 seconds.
-//!     let audio = kalosm_sound::MicInput::default()
+//!     let audio = MicInput::default()
 //!         .record_until(Instant::now() + Duration::from_secs(5))
 //!         .await?;
 //!
@@ -42,7 +42,7 @@ use kalosm_language_model::ModelBuilder;
 use kalosm_streams::text_stream::ChannelTextStream;
 use model::WhisperInner;
 use rodio::{source::UniformSourceIterator, Source};
-use std::{fmt::Display, str::FromStr, time::Duration};
+use std::{fmt::Display, ops::Range, str::FromStr, sync::Arc, time::Duration};
 
 use anyhow::Result;
 
@@ -53,8 +53,10 @@ use futures_util::{Stream, StreamExt};
 mod model;
 mod source;
 pub use source::*;
+mod quantized;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 struct DecodingResult {
     text: String,
     avg_logprob: f64,
@@ -63,8 +65,10 @@ struct DecodingResult {
 }
 
 /// A transcribed segment of audio.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Segment {
+    sample_range: Range<usize>,
     start: f64,
     duration: f64,
     elapsed_time: Duration,
@@ -74,6 +78,11 @@ pub struct Segment {
 }
 
 impl Segment {
+    /// Get the range this segment covers in the original audio.
+    pub fn sample_range(&self) -> Range<usize> {
+        self.sample_range.clone()
+    }
+
     /// Get the probability of no speech.
     pub fn probability_of_no_speech(&self) -> f64 {
         self.result.no_speech_prob
@@ -108,6 +117,11 @@ impl Segment {
     pub fn progress(&self) -> f32 {
         self.progress
     }
+
+    /// Return the confidence of the transcription result (between 0 and 1)
+    pub fn confidence(&self) -> f64 {
+        self.result.avg_logprob.exp()
+    }
 }
 
 impl AsRef<str> for Segment {
@@ -120,25 +134,25 @@ impl AsRef<str> for Segment {
     }
 }
 
-/// An extension trait for transcribing audio streams.
-pub trait TranscribeAudioStreamExt {
-    /// Transcribe the audio stream.
-    fn text(self, model: Whisper) -> ChannelTextStream<Segment>;
+/// An extension trait to transcribe pre-chunked audio streams
+pub trait TranscribeChunkedAudioStreamExt {
+    /// Transcribe each chunk of the audio stream with whisper and stream the result
+    fn transcribe(self, model: Whisper) -> ChannelTextStream<Segment>;
 }
 
-impl<S> TranscribeAudioStreamExt for S
+impl<S> TranscribeChunkedAudioStreamExt for S
 where
     S: Stream + std::marker::Unpin + Send + 'static,
     <S as Stream>::Item: Source + Send + 'static,
     <<S as Stream>::Item as Iterator>::Item: rodio::Sample,
     f32: FromSample<<<S as Stream>::Item as Iterator>::Item>,
 {
-    fn text(self, model: Whisper) -> ChannelTextStream<Segment> {
+    fn transcribe(self, model: Whisper) -> ChannelTextStream<Segment> {
         let mut stream = self;
         let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
         tokio::spawn(async move {
             while let Some(source) = stream.next().await {
-                let result = { model.transcribe(source) };
+                let result = model.transcribe(source);
                 match result {
                     Ok(mut stream) => {
                         while let Some(segment) = stream.next().await {
@@ -164,6 +178,19 @@ enum Task {
 }
 
 /// A builder with configuration for a Whisper model.
+///
+/// ```rust
+/// use kalosm::sound::*;
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), anyhow::Error> {
+/// // Create a new whisper model with a loading handler
+/// let model = Whisper::builder()
+///     // You can set the model to use in the builder
+///     .with_source(WhisperSource::DistilLargeV3)
+///     .build()
+///     .await?;
+/// # Ok(())
+/// # }
 #[derive(Debug)]
 pub struct WhisperBuilder {
     /// The model to be used, can be tiny, small, medium.
@@ -171,6 +198,9 @@ pub struct WhisperBuilder {
 
     /// Language.
     language: Option<WhisperLanguage>,
+
+    /// The cache location to use for the model (defaults DATA_DIR/kalosm/cache)
+    cache: kalosm_common::Cache,
 }
 
 impl Default for WhisperBuilder {
@@ -178,6 +208,7 @@ impl Default for WhisperBuilder {
         Self {
             model: WhisperSource::default(),
             language: Some(WhisperLanguage::English),
+            cache: kalosm_common::Cache::default(),
         }
     }
 }
@@ -260,6 +291,24 @@ impl WhisperBuilder {
                     );
                     WhisperModelConfig::new(model, tokenizer, config)
                 }
+                WhisperSource::QuantizedDistilMediumEn => {
+                    let model = FileSource::huggingface(
+                        model_id.to_owned(),
+                        revision.to_owned(),
+                        "model.gguf".to_owned(),
+                    );
+                    let tokenizer = FileSource::huggingface(
+                        model_id.to_owned(),
+                        revision.to_owned(),
+                        "tokenizer.json".to_owned(),
+                    );
+                    let config = FileSource::huggingface(
+                        model_id.to_owned(),
+                        revision.to_owned(),
+                        "config.json".to_owned(),
+                    );
+                    WhisperModelConfig::new(model, tokenizer, config)
+                }
                 _ => unreachable!(),
             }
         } else {
@@ -289,6 +338,32 @@ impl WhisperBuilder {
     }
 
     /// Build the model with a handler for progress as the download and loading progresses.
+    ///
+    /// ```rust, no_run
+    /// use kalosm::sound::*;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), anyhow::Error> {
+    /// // Create a new whisper model with a loading handler
+    /// let model = Whisper::builder()
+    ///     .build_with_loading_handler(|progress| match progress {
+    ///         ModelLoadingProgress::Downloading {
+    ///             source,
+    ///             start_time,
+    ///             progress,
+    ///         } => {
+    ///             let progress = (progress * 100.0) as u32;
+    ///             let elapsed = start_time.elapsed().as_secs_f32();
+    ///             println!("Downloading file {source} {progress}% ({elapsed}s)");
+    ///         }
+    ///         ModelLoadingProgress::Loading { progress } => {
+    ///             let progress = (progress * 100.0) as u32;
+    ///             println!("Loading model {progress}%");
+    ///         }
+    ///     })
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn build_with_loading_handler(
         self,
         mut progress_handler: impl FnMut(ModelLoadingProgress) + Send + Sync + 'static,
@@ -302,20 +377,29 @@ impl WhisperBuilder {
         let display_tokenizer_source = format!("Tokenizer ({})", tokenizer_source);
         let mut create_progress =
             ModelLoadingProgress::downloading_progress(display_tokenizer_source);
-        let tokenizer_filename = tokenizer_source
-            .download(|progress| progress_handler(create_progress(progress)))
+        let tokenizer_filename = self
+            .cache
+            .get(&tokenizer_source, |progress| {
+                progress_handler(create_progress(progress))
+            })
             .await?;
 
         let display_model_source = format!("Model ({})", model_source);
         let mut create_progress = ModelLoadingProgress::downloading_progress(display_model_source);
-        let filename = model_source
-            .download(|progress| progress_handler(create_progress(progress)))
+        let filename = self
+            .cache
+            .get(&model_source, |progress| {
+                progress_handler(create_progress(progress))
+            })
             .await?;
 
         let display_config_source = format!("Config ({})", config_source);
         let mut create_progress = ModelLoadingProgress::downloading_progress(display_config_source);
-        let config = config_source
-            .download(|progress| progress_handler(create_progress(progress)))
+        let config = self
+            .cache
+            .get(&config_source, |progress| {
+                progress_handler(create_progress(progress))
+            })
             .await?;
 
         let (rx, tx) = std::sync::mpsc::channel();
@@ -338,8 +422,10 @@ impl WhisperBuilder {
         });
 
         Ok(Whisper {
+            inner: Arc::new(WhisperDrop {
                 thread: Some(thread),
                 sender: rx,
+            }),
         })
     }
 
@@ -352,6 +438,13 @@ impl WhisperBuilder {
     /// Set the language to be used.
     pub fn with_language(mut self, language: Option<WhisperLanguage>) -> Self {
         self.language = language;
+        self
+    }
+
+    /// Set the cache location to use for the model (defaults DATA_DIR/kalosm/cache)
+    pub fn with_cache(mut self, cache: kalosm_common::Cache) -> Self {
+        self.cache = cache;
+
         self
     }
 }
@@ -686,11 +779,22 @@ impl Display for WhisperLanguage {
     }
 }
 
-/// A quantized whisper audio transcription model.
-#[derive(Debug)]
-pub struct Whisper {
+struct WhisperDrop {
     thread: Option<std::thread::JoinHandle<()>>,
     sender: std::sync::mpsc::Sender<WhisperMessage>,
+}
+
+impl Drop for WhisperDrop {
+    fn drop(&mut self) {
+        self.sender.send(WhisperMessage::Kill).unwrap();
+        self.thread.take().unwrap().join().unwrap();
+    }
+}
+
+#[derive(Clone)]
+/// A quantized whisper audio transcription model.
+pub struct Whisper {
+    inner: Arc<WhisperDrop>,
 }
 
 impl Whisper {
@@ -731,16 +835,10 @@ impl Whisper {
         f32: FromSample<<S as Iterator>::Item>,
     {
         let pcm_data: Vec<_> = normalize_audio(input)?;
-        self.sender
+        self.inner
+            .sender
             .send(WhisperMessage::Transcribe(pcm_data, sender))?;
         Ok(())
-    }
-}
-
-impl Drop for Whisper {
-    fn drop(&mut self) {
-        self.sender.send(WhisperMessage::Kill).unwrap();
-        self.thread.take().unwrap().join().unwrap();
     }
 }
 

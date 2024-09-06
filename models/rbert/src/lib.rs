@@ -10,15 +10,15 @@
 //!
 //! #[tokio::main]
 //! async fn main() -> anyhow::Result<()> {
-//!     let mut bert = Bert::builder().build()?;
-//!     let sentences = vec![
+//!     let mut bert = Bert::new().await?;
+//!     let sentences = [
 //!         "Cats are cool",
 //!         "The geopolitical situation is dire",
 //!         "Pets are great",
 //!         "Napoleon was a tyrant",
 //!         "Napoleon was a great general",
 //!     ];
-//!     let embeddings = bert.embed_batch(&sentences).await?;
+//!     let embeddings = bert.embed_batch(sentences).await?;
 //!     println!("embeddings {:?}", embeddings);
 //!
 //!     // Find the cosine similarity between the first two sentences
@@ -69,6 +69,7 @@ pub use crate::source::*;
 #[derive(Default)]
 pub struct BertBuilder {
     source: BertSource,
+    cache: kalosm_common::Cache,
 }
 
 impl BertBuilder {
@@ -84,7 +85,40 @@ impl BertBuilder {
             .await
     }
 
+    /// Set the cache location to use for the model (defaults DATA_DIR/kalosm/cache)
+    pub fn with_cache(mut self, cache: kalosm_common::Cache) -> Self {
+        self.cache = cache;
+
+        self
+    }
+
     /// Build the model with a loading handler
+    ///
+    /// ```rust, no_run
+    /// use kalosm::language::*;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), anyhow::Error> {
+    /// // Create a new bert model with a loading handler
+    /// let model = Bert::builder()
+    ///     .build_with_loading_handler(|progress| match progress {
+    ///         ModelLoadingProgress::Downloading {
+    ///             source,
+    ///             start_time,
+    ///             progress,
+    ///         } => {
+    ///             let progress = (progress * 100.0) as u32;
+    ///             let elapsed = start_time.elapsed().as_secs_f32();
+    ///             println!("Downloading file {source} {progress}% ({elapsed}s)");
+    ///         }
+    ///         ModelLoadingProgress::Loading { progress } => {
+    ///             let progress = (progress * 100.0) as u32;
+    ///             println!("Loading model {progress}%");
+    ///         }
+    ///     })
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn build_with_loading_handler(
         self,
         loading_handler: impl FnMut(ModelLoadingProgress) + Send + 'static,
@@ -102,9 +136,47 @@ pub enum Pooling {
     CLS,
 }
 
-/// A bert model
-#[derive(Debug, Clone)]
+/// A bert embedding model. The main interface for this model is [`EmbedderExt`].
+///
+/// # Example
+/// ```rust, no_run
+/// use kalosm_language_model::Embedder;
+/// use rbert::*;
+///
+/// #[tokio::main]
+/// async fn main() -> anyhow::Result<()> {
+///     let mut bert = Bert::new().await?;
+///     let sentences = [
+///         "Cats are cool",
+///         "The geopolitical situation is dire",
+///         "Pets are great",
+///         "Napoleon was a tyrant",
+///         "Napoleon was a great general",
+///     ];
+///     let embeddings = bert.embed_batch(sentences).await?;
+///     println!("embeddings {:?}", embeddings);
+///
+///     // Find the cosine similarity between the first two sentences
+///     let mut similarities = vec![];
+///     let n_sentences = sentences.len();
+///     for (i, e_i) in embeddings.iter().enumerate() {
+///         for j in (i + 1)..n_sentences {
+///             let e_j = embeddings.get(j).unwrap();
+///             let cosine_similarity = e_j.cosine_similarity(e_i);
+///             similarities.push((cosine_similarity, i, j))
+///         }
+///     }
+///     similarities.sort_by(|u, v| v.0.total_cmp(&u.0));
+///     for &(score, i, j) in similarities.iter() {
+///         println!("score: {score:.2} '{}' '{}'", sentences[i], sentences[j])
+///     }
+///
+///     Ok(())
+/// }
+/// ```
+#[derive(Clone)]
 pub struct Bert {
+    embedding_search_prefix: Arc<Option<String>>,
     model: Arc<BertModel>,
     tokenizer: Arc<RwLock<Tokenizer>>,
 }
@@ -120,31 +192,46 @@ impl Bert {
         Self::builder().build().await
     }
 
+    /// Create a new default bert model for search
+    pub async fn new_for_search() -> anyhow::Result<Self> {
+        Self::builder()
+            .with_source(BertSource::new_for_search())
+            .build()
+            .await
+    }
+
     async fn from_builder(
         builder: BertBuilder,
         mut progress_handler: impl FnMut(ModelLoadingProgress) + Send + 'static,
     ) -> anyhow::Result<Self> {
-        let BertBuilder { source } = builder;
+        let BertBuilder { source, cache } = builder;
         let BertSource {
             config,
             tokenizer,
             model,
+            search_embedding_prefix,
         } = source;
 
         let source = format!("Config ({})", config);
         let mut create_progress = ModelLoadingProgress::downloading_progress(source);
-        let config_filename = config
-            .download(|progress| progress_handler(create_progress(progress)))
+        let config_filename = cache
+            .get(&config, |progress| {
+                progress_handler(create_progress(progress))
+            })
             .await?;
         let tokenizer_source = format!("Tokenizer ({})", tokenizer);
         let mut create_progress = ModelLoadingProgress::downloading_progress(tokenizer_source);
-        let tokenizer_filename = tokenizer
-            .download(|progress| progress_handler(create_progress(progress)))
+        let tokenizer_filename = cache
+            .get(&tokenizer, |progress| {
+                progress_handler(create_progress(progress))
+            })
             .await?;
         let model_source = format!("Model ({})", model);
         let mut create_progress = ModelLoadingProgress::downloading_progress(model_source);
-        let weights_filename = model
-            .download(|progress| progress_handler(create_progress(progress)))
+        let weights_filename = cache
+            .get(&model, |progress| {
+                progress_handler(create_progress(progress))
+            })
             .await?;
 
         let config = std::fs::read_to_string(config_filename)?;
@@ -161,13 +248,14 @@ impl Bert {
         Ok(Bert {
             tokenizer: Arc::new(RwLock::new(tokenizer)),
             model: Arc::new(model),
+            embedding_search_prefix: Arc::new(search_embedding_prefix),
         })
     }
 
     /// Embed a batch of sentences
-    pub(crate) fn embed_batch_raw<'a>(
+    pub(crate) fn embed_batch_raw(
         &self,
-        sentences: impl IntoIterator<Item = &'a str>,
+        sentences: Vec<&str>,
         pooling: Pooling,
     ) -> anyhow::Result<Vec<Tensor>> {
         let embedding_dim = self.model.embedding_dim();
@@ -175,7 +263,6 @@ impl Bert {
         let limit = embedding_dim * 512usize.pow(2) * 2;
 
         // The sentences we are embedding may have a very different length. First we sort them so that similar length sentences are grouped together in the same batch to reduce the overhead of padding.
-        let sentences = sentences.into_iter().collect::<Vec<_>>();
         let encodings = {
             let tokenizer_read = self.tokenizer.read().unwrap();
             tokenizer_read.encode_batch(sentences, true)

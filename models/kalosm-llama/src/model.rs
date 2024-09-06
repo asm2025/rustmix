@@ -30,14 +30,30 @@ impl SyncModel for LlamaModel {
         Ok(Self::Session { cache })
     }
 
-    fn feed_text(&self, session: &mut Self::Session, prompt: &str) -> anyhow::Result<Vec<f32>> {
-        let encoded = self.tokenizer.encode(prompt, true).map_err(E::msg)?;
+    fn feed_text(
+        &self,
+        session: &mut Self::Session,
+        prompt: &str,
+        logits: &mut Vec<f32>,
+    ) -> anyhow::Result<()> {
+        let encoded = self.tokenizer.encode(prompt, false).map_err(E::msg)?;
         let tokens = encoded.get_ids();
-        self.feed_tokens(session, tokens)
+        self.feed_tokens(session, tokens, logits)
     }
 
-    fn feed_tokens(&self, session: &mut Self::Session, tokens: &[u32]) -> anyhow::Result<Vec<f32>> {
-        Self::forward(&self.model, &self.device, tokens, Some(&mut session.cache))
+    fn feed_tokens(
+        &self,
+        session: &mut Self::Session,
+        tokens: &[u32],
+        logits: &mut Vec<f32>,
+    ) -> anyhow::Result<()> {
+        Self::forward(
+            &self.model,
+            &self.device,
+            tokens,
+            Some(&mut session.cache),
+            logits,
+        )
     }
 
     fn stop_token(&self) -> anyhow::Result<u32> {
@@ -49,8 +65,8 @@ impl SyncModel for LlamaModel {
         Ok(eos_token)
     }
 
-    fn tokenizer(&self) -> std::sync::Arc<dyn kalosm_sample::Tokenizer + Send + Sync> {
-        self.tokenizer.clone() as std::sync::Arc<dyn kalosm_sample::Tokenizer + Send + Sync>
+    fn tokenizer(&self) -> Arc<Tokenizer> {
+        self.tokenizer.clone()
     }
 }
 
@@ -60,7 +76,8 @@ impl LlamaModel {
         device: &Device,
         tokens: &[u32],
         cache: Option<&mut LlamaCache>,
-    ) -> anyhow::Result<Vec<f32>> {
+        logits_vec: &mut Vec<f32>,
+    ) -> anyhow::Result<()> {
         if tokens.is_empty() {
             return Err(anyhow::anyhow!("Cannot run model on empty input"));
         }
@@ -68,8 +85,9 @@ impl LlamaModel {
         let logits = model.forward(tokens, device, cache)?;
 
         let logits = logits.squeeze(0)?.to_dtype(DType::F32)?;
-        let logits: Vec<f32> = logits.to_vec1()?;
-        Ok(logits)
+        copy_tensor_into_vec(&logits, logits_vec)?;
+
+        Ok(())
     }
 
     /// Create a new sync Llama model from a builder.
@@ -77,6 +95,8 @@ impl LlamaModel {
         builder: crate::LlamaBuilder,
         mut handler: impl FnMut(ModelLoadingProgress) + Send + Sync + 'static,
     ) -> anyhow::Result<Self> {
+        let device = builder.get_device()?;
+
         let tokenizer_source = format!("Tokenizer ({})", builder.source.tokenizer);
         let mut create_progress = ModelLoadingProgress::downloading_progress(tokenizer_source);
         let tokenizer = builder
@@ -84,7 +104,6 @@ impl LlamaModel {
             .tokenizer(|progress| handler(create_progress(progress)))
             .await?;
 
-        let device = accelerated_device_if_available()?;
         let source = format!("Model ({})", builder.source.model);
         let mut create_progress = ModelLoadingProgress::downloading_progress(source);
         let filename = builder

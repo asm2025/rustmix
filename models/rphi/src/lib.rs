@@ -12,7 +12,7 @@
 //! use rphi::prelude::*;
 //! #[tokio::main]
 //! async fn main() {
-//!     let mut model = Phi::default();
+//!     let mut model = Phi::v2().await.unwrap();
 //!     let prompt = "The capital of France is ";
 //!     let mut result = model.stream_text(prompt).await.unwrap();
 //!
@@ -205,6 +205,32 @@ impl PhiBuilder {
     }
 
     /// Build the model with a handler for progress as the download and loading progresses.
+    ///
+    /// ```rust, no_run
+    /// use kalosm::language::*;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), anyhow::Error> {
+    /// // Create a new phi model with a loading handler
+    /// let model = Phi::builder()
+    ///     .build_with_loading_handler(|progress| match progress {
+    ///         ModelLoadingProgress::Downloading {
+    ///             source,
+    ///             start_time,
+    ///             progress,
+    ///         } => {
+    ///             let progress = (progress * 100.0) as u32;
+    ///             let elapsed = start_time.elapsed().as_secs_f32();
+    ///             println!("Downloading file {source} {progress}% ({elapsed}s)");
+    ///         }
+    ///         ModelLoadingProgress::Loading { progress } => {
+    ///             let progress = (progress * 100.0) as u32;
+    ///             println!("Loading model {progress}%");
+    ///         }
+    ///     })
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn build_with_loading_handler(
         self,
         mut progress_handler: impl FnMut(ModelLoadingProgress) + Send + Sync + 'static,

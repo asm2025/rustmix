@@ -174,7 +174,7 @@ pub struct WuerstchenBuilder {
 impl Default for WuerstchenBuilder {
     fn default() -> Self {
         Self {
-            use_flash_attn: { cfg!(feature = "flash-attn") },
+            use_flash_attn: { cfg!(feature = "flash") },
             decoder_weights: None,
             clip_weights: None,
             prior_clip_weights: None,
@@ -391,13 +391,17 @@ impl ModelBuilder for WuerstchenBuilder {
 }
 
 /// A quantized wuerstchen image diffusion model
-#[derive(Debug)]
 pub struct Wuerstchen {
     thread: Option<std::thread::JoinHandle<()>>,
     sender: std::sync::mpsc::Sender<WuerstchenMessage>,
 }
 
 impl Wuerstchen {
+    /// Create a default Wuerstchen model.
+    pub async fn new() -> anyhow::Result<Self> {
+        Self::builder().build().await
+    }
+
     /// Create a new builder for the Wuerstchen model.
     pub fn builder() -> WuerstchenBuilder {
         WuerstchenBuilder::default()

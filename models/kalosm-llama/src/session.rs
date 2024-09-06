@@ -4,7 +4,7 @@ use candle_core::{Device, Tensor};
 use kalosm_language_model::Session;
 use std::collections::HashMap;
 
-/// A Llama-1.5 session.
+/// A Llama session with cached state for the current fed prompt
 #[derive(Debug, Clone)]
 pub struct LlamaSession {
     pub(crate) cache: LlamaCache,
@@ -15,6 +15,10 @@ impl Session for LlamaSession {
         let device = accelerated_device_if_available()?;
         let tensors = self.get_tensor_map(&device);
         Ok(candle_core::safetensors::save(&tensors, path)?)
+    }
+
+    fn tokens(&self) -> &[u32] {
+        &self.cache.tokens
     }
 
     fn load_from(path: impl AsRef<std::path::Path>) -> anyhow::Result<Self>

@@ -13,9 +13,9 @@
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     let mut model = Llama::default();
+//!     let mut model = Llama::new().await.unwrap();
 //!     let prompt = "The capital of France is ";
-//!     let mut result = model.stream_text(prompt).await?;
+//!     let mut result = model.stream_text(prompt).await.unwrap();
 //!
 //!     print!("{prompt}");
 //!     while let Some(token) = result.next().await {
@@ -99,7 +99,7 @@ impl Llama {
     /// Create a default chat model.
     pub async fn new_chat() -> anyhow::Result<Self> {
         Llama::builder()
-            .with_source(LlamaSource::llama_8b_chat())
+            .with_source(LlamaSource::llama_3_1_8b_chat())
             .build()
             .await
     }
@@ -107,7 +107,7 @@ impl Llama {
     /// Create a default phi-3 chat model.
     pub async fn phi_3() -> anyhow::Result<Self> {
         Llama::builder()
-            .with_source(LlamaSource::phi_3_mini_4k_instruct())
+            .with_source(LlamaSource::phi_3_5_mini_4k_instruct())
             .build()
             .await
     }
@@ -198,7 +198,7 @@ impl Llama {
 #[derive(Default)]
 pub struct LlamaBuilder {
     source: source::LlamaSource,
-
+    device: Option<Device>,
     flash_attn: bool,
 }
 
@@ -215,11 +215,53 @@ impl LlamaBuilder {
         self
     }
 
+    /// Set the device to run the model with. (Defaults to an accelerator if available, otherwise the CPU)
+    pub fn with_device(mut self, device: Device) -> Self {
+        self.device = Some(device);
+        self
+    }
+
+    /// Get the device or the default device if not set.
+    pub(crate) fn get_device(&self) -> anyhow::Result<Device> {
+        match self.device.clone() {
+            Some(device) => Ok(device),
+            None => Ok(accelerated_device_if_available()?),
+        }
+    }
+
     /// Build the model with a handler for progress as the download and loading progresses.
+    ///
+    /// ```rust, no_run
+    /// use kalosm::language::*;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), anyhow::Error> {
+    /// // Create a new llama model with a loading handler
+    /// let model = Llama::builder()
+    ///     .build_with_loading_handler(|progress| match progress {
+    ///         ModelLoadingProgress::Downloading {
+    ///             source,
+    ///             start_time,
+    ///             progress,
+    ///         } => {
+    ///             let progress = (progress * 100.0) as u32;
+    ///             let elapsed = start_time.elapsed().as_secs_f32();
+    ///             println!("Downloading file {source} {progress}% ({elapsed}s)");
+    ///         }
+    ///         ModelLoadingProgress::Loading { progress } => {
+    ///             let progress = (progress * 100.0) as u32;
+    ///             println!("Loading model {progress}%");
+    ///         }
+    ///     })
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn build_with_loading_handler(
         self,
         handler: impl FnMut(ModelLoadingProgress) + Send + Sync + 'static,
     ) -> anyhow::Result<Llama> {
+        let device = self.get_device()?;
+
         let handler = Arc::new(Mutex::new(handler));
         let filename = tokio::spawn({
             let source = self.source.clone();
@@ -242,7 +284,6 @@ impl LlamaBuilder {
         };
         let filename = filename.await??;
 
-        let device = accelerated_device_if_available()?;
         let mut file = std::fs::File::open(&filename)?;
         let model = match filename.extension().and_then(|v| v.to_str()) {
             Some("gguf") => {

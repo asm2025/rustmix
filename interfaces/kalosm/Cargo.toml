@@ -12,6 +12,7 @@ repository = "https://github.com/floneum/floneum"
 anyhow = "1"
 async-trait = "0"
 comfy-table = "7"
+ego-tree = "0"
 futures-util = "0"
 hdrhistogram = "7"
 image = "0"
@@ -52,7 +53,6 @@ features = ["derive"]
 
 [dependencies.surrealdb]
 version = "1"
-features = ["kv-rocksdb"]
 optional = true
 
 [dependencies.tokio]
@@ -69,6 +69,7 @@ axum = "0"
 scraper = "0"
 tokenizers = "0"
 tracing-subscriber = "0"
+surrealdb = { version = "1", features = ["kv-rocksdb"] }
 
 [dev-dependencies.candle-core]
 features = []
@@ -92,19 +93,10 @@ workspace = true
 
 [features]
 full = ["language", "vision", "sound", "surrealdb"]
-cuda = [
-	"kalosm-language?/cublas",
-	"kalosm-vision?/cublas",
-	"kalosm-sound?/cuda",
-]
+cuda = ["kalosm-language?/cublas", "kalosm-vision?/cublas", "kalosm-sound?/cuda"]
 mkl = ["kalosm-language?/mkl", "kalosm-vision?/mkl", "kalosm-sound?/mkl"]
 language = ["kalosm-language"]
-metal = [
-	"kalosm-language?/metal",
-	"kalosm-vision?/metal",
-	"kalosm-sound?/metal",
-	"kalosm-common/metal",
-]
+metal = ["kalosm-language?/metal", "kalosm-vision?/metal", "kalosm-sound?/metal", "kalosm-common/metal"]
 sound = ["kalosm-sound"]
 surrealdb = ["dep:surrealdb"]
 vision = ["kalosm-vision"]
