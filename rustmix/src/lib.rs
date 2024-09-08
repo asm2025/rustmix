@@ -3,7 +3,10 @@ mod app;
 pub mod log4rs;
 #[cfg(feature = "slog")]
 pub mod slog;
-
+#[cfg(feature = "audio")]
+pub mod sound;
+#[cfg(feature = "vision")]
+pub mod vision;
 pub use self::app::*;
 pub mod date;
 pub mod error;

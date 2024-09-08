@@ -26,12 +26,18 @@ fake = { version = "2", features = [
 ] }
 file-rotate = { version = "0", optional = true }
 futures = "0"
+futures-util = "0"
 fs_extra = "1"
 glob = "0"
 html-entities = { version = "0", optional = true }
 http-body-util = "0"
-image = { version = "0", optional = true }
+image = { version = "0.24.9", optional = true } # compatibility with Kalosm
 indicatif = "0"
+kalosm = { version = "0", features = [
+	"language",
+	"sound",
+	"vision",
+], optional = true }
 lazy_static = "1"
 lettre = { version = "0", optional = true }
 log = "0"
@@ -74,7 +80,7 @@ urlencoding = "2"
 
 [features]
 default = ["mail", "threading", "log4rs"]
-full = ["mail", "threading", "log4rs", "slog"]
+full = ["mail", "threading", "log4rs", "slog", "audio", "vision", "language"]
 mail = ["dep:html-entities", "dep:lettre", "dep:once_cell"]
 threading = ["dep:crossbeam", "dep:rayon"]
 log4rs = ["dep:log4rs"]
@@ -87,6 +93,12 @@ slog = [
 	"dep:slog-json",
 	"dep:file-rotate",
 ]
+metal = ["kalosm?/metal"]
+cuda = ["kalosm?/cuda"]
+mkl = ["kalosm?/mkl"]
+language = ["kalosm/language"]
+audio = ["kalosm/sound", "dep:rodio"]
+vision = ["kalosm/vision", "dep:image"]
 
 [package.metadata.scripts]
 run = "cargo run"
