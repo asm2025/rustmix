@@ -33,11 +33,7 @@ html-entities = { version = "0", optional = true }
 http-body-util = "0"
 image = { version = "0.24.9", optional = true } # compatibility with Kalosm
 indicatif = "0"
-kalosm = { version = "0", features = [
-	"language",
-	"sound",
-	"vision",
-], optional = true }
+kalosm = { version = "0", default-features = false, optional = true }
 lazy_static = "1"
 lettre = { version = "0", optional = true }
 log = "0"

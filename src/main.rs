@@ -13,7 +13,7 @@ async fn main() -> Result<()> {
     */
     dotenv::dotenv().ok();
 
-    //tests::test_app_info();
+    tests::test_app_info();
 
     //tests::test_random();
 
