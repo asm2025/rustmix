@@ -8,6 +8,7 @@ authors = ["asm <asm2025@outlook.com>"]
 license = "MIT"
 
 [dependencies]
+backtrace = "0"
 chrono = "0"
 crossbeam = { version = "0", optional = true }
 csv = "1"

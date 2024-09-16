@@ -1,6 +1,6 @@
 mod tests;
 
-use rustmix::Result;
+use rustmix::{error::ErrorEx, set_debug, Result};
 use tokio::{task, time::Duration};
 
 #[tokio::main]
