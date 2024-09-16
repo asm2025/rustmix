@@ -1,13 +1,12 @@
 use futures::{executor::block_on, stream::StreamExt};
-use kalosm::audio::*;
-pub use kalosm::audio::{Segment, WhisperLanguage, WhisperSource};
-use rodio::Decoder;
+use kalosm::sound::*;
+pub use kalosm::sound::{rodio::Decoder, Segment, WhisperLanguage, WhisperSource};
 use std::{fs::File, io::BufReader, path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::Result;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Audio {
     model: Arc<Whisper>,
 }

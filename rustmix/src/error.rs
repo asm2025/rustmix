@@ -1,5 +1,6 @@
 use std::error::Error as StdError;
 use thiserror::Error;
+use backtrace::Backtrace;
 
 use crate::is_debug;
 
@@ -10,9 +11,9 @@ pub trait ErrorStr {
 impl<E: StdError + ?Sized> ErrorStr for E {
     fn get_string(&self) -> String {
         if is_debug() {
-            return format!("{:?}", self);
+            return format!("{}\n{:?}", self, Backtrace::new());
         }
-
+    
         self.to_string()
     }
 }
@@ -126,3 +127,47 @@ pub struct NotFoundError(pub String);
 #[derive(Error, Debug)]
 #[error("Directory not found or source is not a directory. {0}")]
 pub struct InvalidDirectoryError(pub String);
+
+#[derive(Error, Debug)]
+#[error("Request was blocked")]
+pub struct BlockedRequestError;
+
+#[derive(Error, Debug)]
+#[error("No connection")]
+pub struct NoConnectionError;
+
+#[derive(Error, Debug)]
+#[error("Unsupported Browser")]
+pub struct UnsupportedBrowserError(pub String);
+
+#[derive(Error, Debug)]
+#[error("Max tries exceeded")]
+pub struct MaxTriesExceededError;
+
+#[derive(Error, Debug)]
+#[error("Error parsing enum of type {0}")]
+pub struct ParseEnumError(pub String);
+
+#[derive(Error, Debug)]
+#[error("Rate limit timeout exceeded")]
+pub struct RateLimitTimeoutExceededError;
+
+#[derive(Error, Debug)]
+#[error("Error parsing arguments. {0}")]
+pub struct ParseArgsError(pub String);
+
+#[derive(Error, Debug)]
+#[error("Invalid email address")]
+pub struct InvalidEmailError;
+
+#[derive(Error, Debug)]
+#[error("Application exited with error {0}")]
+pub struct ExitCodeError(pub i32);
+
+#[derive(Error, Debug)]
+#[error("Invalid value format.")]
+pub struct ParseError;
+
+#[derive(Error, Debug)]
+#[error("Argument is required. {0}")]
+pub struct ArgumentMissingError(pub String);

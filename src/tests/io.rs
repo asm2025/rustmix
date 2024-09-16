@@ -9,7 +9,7 @@ use rustmix::{
 };
 use std::{
     io::{stdin, LineWriter, Write},
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
 use super::*;

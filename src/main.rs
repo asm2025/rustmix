@@ -1,6 +1,6 @@
 mod tests;
 
-use rustmix::Result;
+use rustmix::{error::ErrorEx, set_debug, Result};
 use tokio::{task, time::Duration};
 
 #[tokio::main]
@@ -39,8 +39,6 @@ async fn main() -> Result<()> {
     //tests::test_producer_consumer(Duration::from_millis(150)).await?;
     //tests::test_injector_worker(Duration::ZERO).await?;
     //tests::test_injector_worker(Duration::from_millis(150)).await?;
-
-    //tests::test_python()?;
 
     //tests::test_sound().await?;
     //tests::test_image().await?;

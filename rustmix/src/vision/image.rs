@@ -1,19 +1,17 @@
 use futures::executor::block_on;
 pub use image::{ImageBuffer, Rgb};
-use kalosm::vision::Wuerstchen;
-pub use kalosm::{vision::WuerstchenInferenceSettings, *};
+pub use kalosm::{vision::*, *};
 use std::sync::Arc;
 
 use crate::Result;
 
-#[derive(Debug)]
 pub struct Image {
     model: Arc<Wuerstchen>,
 }
 
 impl Image {
     pub async fn new() -> Result<Self> {
-        let model = Wuerstchen::builder().build().await?;
+        let model = Wuerstchen::new().await?;
         Ok(Image {
             model: Arc::new(model),
         })
@@ -48,11 +46,11 @@ impl Image {
     pub fn generate(&self, prompt: &str) -> Result<Vec<ImageBuffer<Rgb<u8>, Vec<u8>>>> {
         let settings = WuerstchenInferenceSettings::new(prompt);
         let mut stream = self.model.run(settings)?;
-        block_on(async move {
+        block_on(async {
             let mut images = Vec::new();
 
-            while let Some(image) = stream.next().await {
-                if let Some(buffer) = image.generated_image() {
+            while let Some(img) = stream.next().await {
+                if let Some(buffer) = img.generated_image() {
                     images.push(buffer);
                 }
             }
@@ -66,8 +64,8 @@ impl Image {
         let mut stream = self.model.run(settings)?;
         let mut images = Vec::new();
 
-        while let Some(image) = stream.next().await {
-            if let Some(buffer) = image.generated_image() {
+        while let Some(img) = stream.next().await {
+            if let Some(buffer) = img.generated_image() {
                 images.push(buffer);
             }
         }

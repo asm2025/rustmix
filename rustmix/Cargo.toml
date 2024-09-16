@@ -8,6 +8,7 @@ authors = ["asm <asm2025@outlook.com>"]
 license = "MIT"
 
 [dependencies]
+backtrace = "0"
 chrono = "0"
 crossbeam = { version = "0", optional = true }
 csv = "1"
@@ -26,23 +27,20 @@ fake = { version = "2", features = [
 ] }
 file-rotate = { version = "0", optional = true }
 futures = "0"
+futures-util = "0"
 fs_extra = "1"
 glob = "0"
 html-entities = { version = "0", optional = true }
 http-body-util = "0"
-image = { version = "0", optional = true }
+image = { version = "0.24.9", optional = true } # compatibility with Kalosm
 indicatif = "0"
-kalosm = { workspace = true, optional = true }
+kalosm = { version = "0", default-features = false, optional = true }
 lazy_static = "1"
 lettre = { version = "0", optional = true }
 log = "0"
 log4rs = { version = "1", optional = true }
 num_cpus = "1"
 once_cell = { version = "1", optional = true }
-pyo3 = { version = "0", features = [
-	"auto-initialize",
-	"abi3",
-], optional = true }
 rand = "0"
 randua = "0"
 rayon = { version = "1", optional = true }
@@ -79,11 +77,7 @@ urlencoding = "2"
 
 [features]
 default = ["mail", "threading", "log4rs"]
-full = ["mail", "threading", "log4rs", "slog", "python", "audio", "vision"]
-metal = ["kalosm?/metal"]
-cublas = ["kalosm?/cublas"]
-mkl = ["kalosm?/mkl"]
-language = ["kalosm/language"]
+full = ["mail", "threading", "log4rs", "slog", "audio", "vision", "language"]
 mail = ["dep:html-entities", "dep:lettre", "dep:once_cell"]
 threading = ["dep:crossbeam", "dep:rayon"]
 log4rs = ["dep:log4rs"]
@@ -96,7 +90,10 @@ slog = [
 	"dep:slog-json",
 	"dep:file-rotate",
 ]
-python = ["dep:pyo3"]
+metal = ["kalosm?/metal"]
+cuda = ["kalosm?/cuda"]
+mkl = ["kalosm?/mkl"]
+language = ["kalosm/language"]
 audio = ["kalosm/sound", "dep:rodio"]
 vision = ["kalosm/vision", "dep:image"]
 

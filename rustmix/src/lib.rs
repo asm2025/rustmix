@@ -7,14 +7,11 @@ pub mod slog;
 pub mod sound;
 #[cfg(feature = "vision")]
 pub mod vision;
-
 pub use self::app::*;
 pub mod date;
 pub mod error;
 pub mod input;
 pub mod io;
-#[cfg(feature = "python")]
-pub mod python;
 pub mod random;
 pub mod string;
 pub mod threading;
