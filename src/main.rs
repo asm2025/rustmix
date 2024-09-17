@@ -1,6 +1,6 @@
 mod tests;
 
-use rustmix::{error::ErrorEx, set_debug, Result};
+use rustmix::{error::*, set_debug, Result};
 use tokio::{task, time::Duration};
 
 #[tokio::main]
@@ -12,6 +12,9 @@ async fn main() -> Result<()> {
      It has to be done seperately.
     */
     dotenv::dotenv().ok();
+
+	// set_debug(true);
+	// println!("{}", CanceledError.get_message());
 
     //tests::test_app_info();
 

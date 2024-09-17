@@ -1,8 +1,14 @@
 use std::error::Error as StdError;
+use regex::Regex;
 use thiserror::Error;
 use backtrace::Backtrace;
+use lazy_static::lazy_static;
 
 use crate::is_debug;
+
+lazy_static! {
+    static ref RGX_LINE_NUM: Regex = Regex::new(r"^\s*\d+:").unwrap();
+}
 
 pub trait ErrorStr {
     fn get_string(&self) -> String;
@@ -10,11 +16,22 @@ pub trait ErrorStr {
 
 impl<E: StdError + ?Sized> ErrorStr for E {
     fn get_string(&self) -> String {
-        if is_debug() {
-            return format!("{}\n{:?}", self, Backtrace::new());
+        let message = self.to_string();
+
+		if is_debug() {
+            let backtrace = Backtrace::new();
+			let formatted = format!("{:?}", backtrace)
+				.lines()
+				.filter(|e| !RGX_LINE_NUM.is_match(e))
+				.collect::<Vec<&str>>()
+				.join("\n");
+			
+			if !message.contains(&formatted) {
+				return format!("{}\n{}", message, formatted);
+			}
         }
     
-        self.to_string()
+        message
     }
 }
 
