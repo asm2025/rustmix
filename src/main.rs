@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+#![allow(dead_code)]
 mod tests;
 
 use rustmix::{error::*, set_debug, Result};
@@ -13,8 +15,8 @@ async fn main() -> Result<()> {
     */
     dotenv::dotenv().ok();
 
-	// set_debug(true);
-	// println!("{}", CanceledError.get_message());
+    // set_debug(true);
+    // println!("{}", CanceledError.get_message());
 
     //tests::test_app_info();
 
