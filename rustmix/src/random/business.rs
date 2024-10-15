@@ -24,7 +24,7 @@ pub fn industry() -> String {
 }
 
 pub fn catch_phase() -> String {
-    f_company::CatchPhase(locales::EN).fake()
+    f_company::CatchPhrase(locales::EN).fake()
 }
 
 pub fn buzzword() -> String {
