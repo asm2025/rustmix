@@ -28,7 +28,7 @@ pub async fn test_sound() -> Result<()> {
     spinner.set_message(format!("Transcribing file [text]: {}", &base_name));
     let snd = sound.clone();
     let timer = time::Instant::now();
-    let result = spinner.run(move || snd.transcribe_file(&file_name).unwrap())?;
+    let result = spinner.run(move || snd.transcribe(&file_name).unwrap())?;
     spinner.finish_with_message(format!(
         "Sound transcription [{}]: '{}'",
         &base_name, result
@@ -45,7 +45,7 @@ pub async fn test_sound() -> Result<()> {
     spinner.set_message(format!("Transcribing file [text]: {}", &base_name));
     let snd = sound.clone();
     let timer = time::Instant::now();
-    let result = spinner.run(move || snd.transcribe_file(&file_name).unwrap())?;
+    let result = spinner.run(move || snd.transcribe(&file_name).unwrap())?;
     spinner.finish_with_message(format!(
         "Sound transcription [{}]: '{}'",
         &base_name, result
@@ -62,7 +62,7 @@ pub async fn test_sound() -> Result<()> {
     spinner.set_message(format!("Transcribing file [text]: {}", &base_name));
     let snd = sound.clone();
     let timer = time::Instant::now();
-    let result = spinner.run(move || snd.transcribe_file(&file_name).unwrap())?;
+    let result = spinner.run(move || snd.transcribe(&file_name).unwrap())?;
     spinner.finish_with_message(format!(
         "Sound transcription [{}]: '{}'",
         &base_name, result
@@ -79,7 +79,7 @@ pub async fn test_sound() -> Result<()> {
     spinner.set_message(format!("Transcribing file [text]: {}", &base_name));
     let snd = sound.clone();
     let timer = time::Instant::now();
-    let result = spinner.run(move || snd.transcribe_file(&file_name).unwrap())?;
+    let result = spinner.run(move || snd.transcribe(&file_name).unwrap())?;
     spinner.finish_with_message(format!(
         "Sound transcription [{}]: '{}'",
         &base_name, result
@@ -97,7 +97,7 @@ pub async fn test_sound() -> Result<()> {
     let timer = time::Instant::now();
     print!("Sound transcription [{}]: '", &base_name);
     std::io::stdout().flush().unwrap();
-    snd.transcribe_file_callback(&file_name, move |e| {
+    snd.callback(&file_name, move |e| {
         print!("{}", e);
         std::io::stdout().flush().unwrap();
     })
@@ -123,7 +123,7 @@ pub async fn test_sound() -> Result<()> {
         }
     });
     let timer = time::Instant::now();
-    sound.transcribe_stream(&file_name, tx)?;
+    sound.stream(&file_name, tx)?;
     handle.await?;
     println!("'");
     println!("Time elapsed: {}", format_duration(timer.elapsed()));

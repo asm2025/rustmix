@@ -13,7 +13,6 @@ pub struct Audio {
 
 impl Audio {
     /// Creates a new `Audio` instance with the Whisper source set to TinyEn and the language set to English.
-    /// DO NOT USE THIS FUNCTION IF YOU WANT ACCURATE RESULT.
     pub async fn quick() -> Result<Self> {
         let model = WhisperBuilder::default()
             .with_source(WhisperSource::TinyEn)
@@ -25,6 +24,7 @@ impl Audio {
         })
     }
 
+    /// Creates a new `Audio` instance with the language set to English.
     pub async fn new() -> Result<Self> {
         let model = WhisperBuilder::default()
             .with_language(Some(WhisperLanguage::English))
@@ -56,7 +56,7 @@ impl Audio {
         })
     }
 
-    pub fn transcribe_file<T: AsRef<Path>>(&self, file_name: T) -> Result<String> {
+    pub fn transcribe<T: AsRef<Path>>(&self, file_name: T) -> Result<String> {
         let file = File::open(file_name)?;
         let source = Decoder::new(BufReader::new(file))?;
         let mut stream = self.model.transcribe(source)?;
@@ -71,7 +71,7 @@ impl Audio {
         })
     }
 
-    pub async fn transcribe_file_async<T: AsRef<Path>>(&self, file_name: T) -> Result<String> {
+    pub async fn transcribe_async<T: AsRef<Path>>(&self, file_name: T) -> Result<String> {
         let file = File::open(file_name)?;
         let source = Decoder::new(BufReader::new(file))?;
         let mut stream = self.model.transcribe(source)?;
@@ -84,7 +84,7 @@ impl Audio {
         Ok(text)
     }
 
-    pub fn transcribe_file_callback<T: AsRef<Path>>(
+    pub fn callback<T: AsRef<Path>>(
         &self,
         file_name: T,
         callback: impl Fn(&str) -> (),
@@ -100,7 +100,7 @@ impl Audio {
         Ok(())
     }
 
-    pub async fn transcribe_file_callback_async<T: AsRef<Path>>(
+    pub async fn callback_async<T: AsRef<Path>>(
         &self,
         file_name: T,
         callback: impl Fn(&str) -> (),
@@ -116,7 +116,7 @@ impl Audio {
         Ok(())
     }
 
-    pub fn transcribe_stream<T: AsRef<Path>>(
+    pub fn stream<T: AsRef<Path>>(
         &self,
         file_name: T,
         sender: UnboundedSender<Segment>,
