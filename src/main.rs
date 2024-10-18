@@ -46,7 +46,7 @@ async fn main() -> Result<()> {
     //tests::test_injector_worker(Duration::from_millis(150)).await?;
 
     //tests::test_sound().await?;
-    //tests::test_bot().await?;
+    //tests::test_chat().await?;
     //tests::test_image().await?;
 
     //tests::test_expressvpn().await?;

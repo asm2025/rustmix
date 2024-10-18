@@ -8,7 +8,7 @@ use rustmix::{
 use std::{io::Write, time};
 use tokio::sync::mpsc::unbounded_channel;
 
-pub async fn test_bot() -> Result<()> {
+pub async fn test_chat() -> Result<()> {
     println!(
         "If this is the first time to run it, it will download the model and tokenizer files."
     );
