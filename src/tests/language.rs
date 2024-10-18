@@ -22,7 +22,7 @@ pub async fn test_chat() -> Result<()> {
     println!();
 
     loop {
-        match bot.prompt("You: ") {
+        match bot.prompt("\nYou: ") {
             Ok(mut stream) => {
                 stream.to_std_out().await?;
             }
