@@ -11,9 +11,9 @@ pub async fn test_sound() -> Result<()> {
     println!("So have patience and wait for the model initialized message");
 
     let spinner = Spinner::new();
-    spinner.set_message("Initializing audio model...");
+    spinner.set_message("Initializing model...");
     let sound = Audio::with_source(WhisperSource::DistilLargeV3).await?;
-    spinner.finish_with_message("Audio model initialized")?;
+    spinner.finish_with_message("Model initialized")?;
     println!();
 
     let curdir = directory::current().join("files/audio");
