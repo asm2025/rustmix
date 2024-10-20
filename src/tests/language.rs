@@ -1,12 +1,22 @@
 use humantime::format_duration;
-use rustmix::{
-    io::directory,
-    language::{Bot, TextStream},
-    threading::Spinner,
-    Result,
-};
+use rustmix::{io::directory, language::*, threading::Spinner, Result};
+use serde::de;
 use std::{io::Write, time};
 use tokio::sync::mpsc::unbounded_channel;
+
+#[derive(Schema, Parse, Debug, Clone)]
+enum Language {
+    Rust,
+    C,
+    CPP,
+    Java,
+    CSharp,
+    VisualBasic,
+    JavaScript,
+    VBScript,
+    Python,
+    Ruby,
+}
 
 pub async fn test_chat() -> Result<()> {
     println!(
