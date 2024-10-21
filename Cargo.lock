@@ -5743,13 +5743,6 @@ dependencies = [
 name = "testapp"
 version = "0.1.0"
 dependencies = [
- "chrono",
- "dotenv",
- "humantime",
- "image",
- "lazy_static 1.5.0",
- "log",
- "rand 0.8.5",
  "rustmix",
  "serde",
  "serde_json",
