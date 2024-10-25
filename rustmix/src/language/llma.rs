@@ -143,27 +143,23 @@ impl Llma {
         }
     }
 
-    pub fn prompt<T: AsRef<str>>(&self, prompt: T) -> Result<ChannelTextStream> {
+    pub fn prompt<T: AsRef<str>>(
+        &self,
+        prompt: T,
+        on_start: Option<impl Fn() -> ()>,
+    ) -> Result<ChannelTextStream> {
         let prompt = prompt.as_ref();
         let prompt = if prompt.is_empty() { "\n>" } else { prompt };
         match prompt_input(prompt) {
             Ok(prompt) => {
+                if let Some(on_start) = on_start {
+                    on_start();
+                }
                 let mut model = self.model.lock().unwrap();
                 Ok(model.add_message(prompt))
             }
             Err(e) => Err(e.into()),
         }
-    }
-
-    pub fn send<T: AsRef<str>>(&self, prompt: T) -> Result<ChannelTextStream> {
-        let prompt = prompt.as_ref();
-
-        if prompt.is_empty() {
-            return Err(NoInputError.into());
-        }
-
-        let mut model = self.model.lock().unwrap();
-        Ok(model.add_message(prompt))
     }
 
     pub fn load_session<T: Model, P: AsRef<Path>>(

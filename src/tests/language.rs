@@ -4,20 +4,6 @@ use serde::de;
 use std::{io::Write, time};
 use tokio::sync::mpsc::unbounded_channel;
 
-#[derive(Schema, Parse, Debug, Clone)]
-enum Language {
-    Rust,
-    C,
-    CPP,
-    Java,
-    CSharp,
-    VisualBasic,
-    JavaScript,
-    VBScript,
-    Python,
-    Ruby,
-}
-
 pub async fn test_chat() -> Result<()> {
     println!(
         "If this is the first time to run it, it will download the model and tokenizer files."
@@ -29,12 +15,29 @@ pub async fn test_chat() -> Result<()> {
     spinner.set_message("Initializing model...");
     let llma = Llma::quick().await?;
     spinner.finish_with_message("Model initialized")?;
-    println!();
 
     loop {
-        match llma.prompt("\nYou: ") {
+        match llma.prompt(
+            "\nYou: ",
+            Some(|| {
+                print!("Thinking...");
+            }),
+        ) {
             Ok(mut stream) => {
-                stream.to_std_out().await?;
+                match stream.next().await {
+                    Some(text) => {
+                        print!("\nBot: {}", text);
+                        std::io::stdout().flush()?
+                    }
+                    _ => break,
+                }
+
+                while let Some(text) = stream.next().await {
+                    print!("{}", text);
+                    std::io::stdout().flush()?
+                }
+
+                println!()
             }
             Err(_) => break,
         }
