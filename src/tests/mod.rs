@@ -17,6 +17,8 @@ mod web;
 pub(crate) use self::web::*;
 mod audio;
 pub(crate) use self::audio::*;
+mod language;
+pub(crate) use self::language::*;
 mod vision;
 pub(crate) use self::vision::*;
 mod random;

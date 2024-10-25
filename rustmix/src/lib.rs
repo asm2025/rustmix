@@ -1,4 +1,6 @@
 mod app;
+#[cfg(feature = "language")]
+pub mod language;
 #[cfg(feature = "log4rs")]
 pub mod log4rs;
 #[cfg(feature = "slog")]
