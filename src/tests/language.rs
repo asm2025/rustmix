@@ -27,12 +27,12 @@ pub async fn test_chat() -> Result<()> {
 
     let spinner = Spinner::new();
     spinner.set_message("Initializing model...");
-    let bot = Bot::quick().await?;
+    let llma = Llma::quick().await?;
     spinner.finish_with_message("Model initialized")?;
     println!();
 
     loop {
-        match bot.prompt("\nYou: ") {
+        match llma.prompt("\nYou: ") {
             Ok(mut stream) => {
                 stream.to_std_out().await?;
             }

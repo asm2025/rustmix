@@ -1,5 +1,4 @@
 use std::{
-    borrow::Borrow,
     path::Path,
     sync::{Arc, Mutex},
 };
@@ -56,18 +55,18 @@ To use CUDA on your machine, follow these steps:
 After completing these steps, you should be able to use CUDA on your machine.
 */
 #[derive(Clone)]
-pub struct Bot {
+pub struct Llma {
     model: Arc<Mutex<Chat>>,
 }
 
-impl Bot {
+impl Llma {
     pub async fn quick() -> Result<Self> {
         let model = Llama::builder()
             .with_source(LlamaSource::llama_3_1_8b_chat())
             .build()
             .await?;
         let chat = Chat::builder(model).build();
-        Ok(Bot {
+        Ok(Llma {
             model: Arc::new(Mutex::new(chat)),
         })
     }
@@ -78,7 +77,7 @@ impl Bot {
             .build()
             .await?;
         let chat = Chat::builder(model).build();
-        Ok(Bot {
+        Ok(Llma {
             model: Arc::new(Mutex::new(chat)),
         })
     }
@@ -89,7 +88,7 @@ impl Bot {
             .build()
             .await?;
         let chat = Chat::builder(model).build();
-        Ok(Bot {
+        Ok(Llma {
             model: Arc::new(Mutex::new(chat)),
         })
     }
@@ -97,7 +96,7 @@ impl Bot {
     pub async fn with_source(source: LlamaSource) -> Result<Self> {
         let model = Llama::builder().with_source(source).build().await?;
         let chat = Chat::builder(model).build();
-        Ok(Bot {
+        Ok(Llma {
             model: Arc::new(Mutex::new(chat)),
         })
     }
@@ -108,13 +107,13 @@ impl Bot {
         <T::SyncModel as SyncModel>::Session: Send,
     {
         let chat = Chat::builder(model).build();
-        Bot {
+        Llma {
             model: Arc::new(Mutex::new(chat)),
         }
     }
 
     pub fn with_chat(chat: Chat) -> Self {
-        Bot {
+        Llma {
             model: Arc::new(Mutex::new(chat)),
         }
     }
@@ -128,7 +127,7 @@ impl Bot {
         <T::SyncModel as SyncModel>::Session: Send,
     {
         let chat = Chat::builder(model).with_session(session).build();
-        Bot {
+        Llma {
             model: Arc::new(Mutex::new(chat)),
         }
     }
@@ -139,7 +138,7 @@ impl Bot {
         <T::SyncModel as SyncModel>::Session: Send,
     {
         let chat = Chat::builder(model).with_try_session_path(path).build();
-        Bot {
+        Llma {
             model: Arc::new(Mutex::new(chat)),
         }
     }

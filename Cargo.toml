@@ -7,7 +7,14 @@ license = "MIT/Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rustmix = { workspace = true, features = ["full", "cuda"] }
+chrono = "0"
+dotenv = "0"
+humantime = "2"
+image = "0.24.9"
+lazy_static = "1"
+log = "0"
+rand = "0"
+rustmix = { workspace = true, features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
