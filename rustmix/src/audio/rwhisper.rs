@@ -4,35 +4,27 @@ pub use kalosm::sound::{rodio::Decoder, Segment, WhisperLanguage, WhisperSource}
 use std::{fs::File, io::BufReader, path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::Result;
+use crate::{ai::SourceSize, Result};
 
 #[derive(Clone)]
-pub struct Audio {
+pub struct RWhisper {
     model: Arc<Whisper>,
 }
 
-impl Audio {
-    /// Creates a new `Audio` instance with the Whisper source set to TinyEn and the language set to English.
+impl RWhisper {
     pub async fn quick() -> Result<Self> {
-        let model = WhisperBuilder::default()
-            .with_source(WhisperSource::TinyEn)
-            .with_language(Some(WhisperLanguage::English))
-            .build()
-            .await?;
-        Ok(Audio {
-            model: Arc::new(model),
-        })
+        Self::new(SourceSize::Tiny).await
     }
 
-    /// Creates a new `Audio` instance with the language set to English.
-    pub async fn new() -> Result<Self> {
-        let model = WhisperBuilder::default()
-            .with_language(Some(WhisperLanguage::English))
-            .build()
-            .await?;
-        Ok(Audio {
-            model: Arc::new(model),
-        })
+    pub async fn new(size: SourceSize) -> Result<Self> {
+        let source = match size {
+            SourceSize::Tiny => WhisperSource::QuantizedTiny,
+            SourceSize::Small => WhisperSource::Small,
+            SourceSize::Base => WhisperSource::Base,
+            SourceSize::Medium => WhisperSource::Medium,
+            SourceSize::Large => WhisperSource::QuantizedDistilLargeV3,
+        };
+        Self::with_source(source).await
     }
 
     pub async fn with_source(source: WhisperSource) -> Result<Self> {
@@ -40,7 +32,7 @@ impl Audio {
             .with_source(source)
             .build()
             .await?;
-        Ok(Audio {
+        Ok(RWhisper {
             model: Arc::new(model),
         })
     }
@@ -51,7 +43,7 @@ impl Audio {
             .with_language(Some(language))
             .build()
             .await?;
-        Ok(Audio {
+        Ok(RWhisper {
             model: Arc::new(model),
         })
     }

@@ -1,12 +1,10 @@
 mod app;
+#[cfg(feature = "audio")]
+pub mod audio;
 #[cfg(feature = "language")]
 pub mod language;
-#[cfg(feature = "log4rs")]
-pub mod log4rs;
-#[cfg(feature = "slog")]
-pub mod slog;
-#[cfg(feature = "audio")]
-pub mod sound;
+#[cfg(feature = "log")]
+pub mod log;
 #[cfg(feature = "vision")]
 pub mod vision;
 pub use self::app::*;
@@ -20,56 +18,25 @@ pub mod threading;
 pub mod vpn;
 pub mod web;
 
+pub use ::backoff::*;
+
 use lazy_static::lazy_static;
-use log::LevelFilter;
-use std::sync::Mutex;
-
-pub const LOG_DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S.%f";
-pub const LOG_SIZE_MIN: usize = 1024 * 1024 * 2;
-pub const LOG_SIZE_MAX: usize = 1024 * 1024 * 10;
-
-lazy_static! {
-    static ref DEBUG: Mutex<bool> = Mutex::new(false);
-}
+use std::sync::RwLock;
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum LogLevel {
-    Off,
-    #[default]
-    Default,
-    Trace,
-    Debug,
-    Info,
-    Warn,
-    Error,
-    Critical,
-}
-
-impl From<LogLevel> for LevelFilter {
-    fn from(level: LogLevel) -> LevelFilter {
-        match level {
-            LogLevel::Off => LevelFilter::Off,
-            LogLevel::Trace => LevelFilter::Trace,
-            LogLevel::Debug => LevelFilter::Debug,
-            LogLevel::Warn => LevelFilter::Warn,
-            LogLevel::Error => LevelFilter::Error,
-            LogLevel::Critical => LevelFilter::Error,
-            _ => LevelFilter::Info,
-        }
-    }
+lazy_static! {
+    static ref DEBUG: RwLock<bool> = RwLock::new(false);
 }
 
 pub fn set_debug(value: bool) {
-    let mut debug = DEBUG.lock().unwrap();
+    let mut debug = DEBUG.write().unwrap();
     *debug = value;
 }
 
 #[cfg(debug_assertions)]
 pub fn is_debug() -> bool {
-    let debug = DEBUG.lock().unwrap();
-    *debug
+    *DEBUG.read().unwrap()
 }
 
 #[cfg(not(debug_assertions))]
@@ -77,10 +44,30 @@ pub fn is_debug() -> bool {
     false
 }
 
-pub fn num_cpus() -> usize {
-    if is_debug() {
-        1
-    } else {
-        num_cpus::get()
+pub trait CallbackHandler<T> {
+    fn starting(&self);
+    fn update(&self, data: T);
+    fn completed(&self);
+}
+
+pub mod ai {
+    #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub enum SourceSize {
+        Tiny,
+        #[default]
+        Small,
+        Base,
+        Medium,
+        Large,
+    }
+}
+
+pub mod system {
+    pub fn num_cpus() -> usize {
+        if crate::is_debug() {
+            1
+        } else {
+            num_cpus::get()
+        }
     }
 }

@@ -2,7 +2,8 @@ use log::{debug, error, info, trace, warn};
 
 use rustmix::{
     io::{directory, path::AsPath},
-    log4rs, Result,
+    log::{log4rs, slog},
+    Result,
 };
 
 pub fn test_log4rs(from_config_file: bool) -> Result<()> {
@@ -24,6 +25,19 @@ pub fn test_log4rs(from_config_file: bool) -> Result<()> {
         log_a_few_messages("Messages configured logger programmatically:");
         println!("Check the log file: {}", &path);
     }
+
+    Ok(())
+}
+
+pub fn test_slog() -> Result<()> {
+    println!("\nTesting slog functions...");
+
+    println!("Building loggers from code...");
+    let path = ("_logs", "test.log").as_path();
+    let _gaurd = slog::build(&path)?;
+    println!("Logger was built");
+    log_a_few_messages("Messages configured logger programmatically:");
+    println!("Check the log file at: {}", &path);
 
     Ok(())
 }
