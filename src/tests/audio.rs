@@ -1,9 +1,15 @@
 use humantime::format_duration;
-use rustmix::{io::directory, sound::*, threading::Spinner, Result};
+use rustmix::{
+    ai::SourceSize,
+    audio::rwhisper::{RWhisper, Segment},
+    io::directory,
+    threading::Spinner,
+    Result,
+};
 use std::{io::Write, time};
 use tokio::sync::mpsc::unbounded_channel;
 
-pub async fn test_sound() -> Result<()> {
+pub async fn test_rwhisper() -> Result<()> {
     println!(
         "If this is the first time to run it, it will download the model and tokenizer files."
     );
@@ -12,7 +18,7 @@ pub async fn test_sound() -> Result<()> {
 
     let spinner = Spinner::new();
     spinner.set_message("Initializing model...");
-    let sound = Audio::with_source(WhisperSource::DistilLargeV3).await?;
+    let sound = RWhisper::new(SourceSize::Base).await?;
     spinner.finish_with_message("Model initialized")?;
     println!();
 

@@ -1,10 +1,16 @@
 use humantime::format_duration;
-use rustmix::{io::directory, language::*, threading::Spinner, Result};
+use rustmix::{
+    ai::SourceSize,
+    io::directory,
+    language::{llma::*, *},
+    threading::Spinner,
+    Result,
+};
 use serde::de;
 use std::{io::Write, time};
 use tokio::sync::mpsc::unbounded_channel;
 
-pub async fn test_chat() -> Result<()> {
+pub async fn test_llma() -> Result<()> {
     println!(
         "If this is the first time to run it, it will download the model and tokenizer files."
     );
@@ -13,20 +19,16 @@ pub async fn test_chat() -> Result<()> {
 
     let spinner = Spinner::new();
     spinner.set_message("Initializing model...");
-    let llma = Llma::quick().await?;
+
+    let llma = Llma::new(SourceSize::Small).await?;
     spinner.finish_with_message("Model initialized")?;
 
     loop {
-        match llma.prompt(
-            "\nYou: ",
-            Some(|| {
-                print!("Thinking...");
-            }),
-        ) {
+        match llma.prompt("\nYou: ") {
             Ok(mut stream) => {
                 match stream.next().await {
                     Some(text) => {
-                        print!("\nBot: {}", text);
+                        print!("Bot: {}", text);
                         std::io::stdout().flush()?
                     }
                     _ => break,
@@ -36,8 +38,6 @@ pub async fn test_chat() -> Result<()> {
                     print!("{}", text);
                     std::io::stdout().flush()?
                 }
-
-                println!()
             }
             Err(_) => break,
         }

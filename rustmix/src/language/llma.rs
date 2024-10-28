@@ -1,10 +1,10 @@
+use kalosm::language::*;
 use std::{
     path::Path,
     sync::{Arc, Mutex},
 };
 
-use super::*;
-use crate::{error::*, Result};
+use crate::{ai::SourceSize, error::*, Result};
 
 /**
 A chatbot that can be used to interact with the model.
@@ -61,36 +61,18 @@ pub struct Llma {
 
 impl Llma {
     pub async fn quick() -> Result<Self> {
-        let model = Llama::builder()
-            .with_source(LlamaSource::llama_3_1_8b_chat())
-            .build()
-            .await?;
-        let chat = Chat::builder(model).build();
-        Ok(Llma {
-            model: Arc::new(Mutex::new(chat)),
-        })
+        Self::new(SourceSize::Tiny).await
     }
 
-    pub async fn phi() -> Result<Self> {
-        let model = Llama::builder()
-            .with_source(LlamaSource::phi_3_5_mini_4k_instruct())
-            .build()
-            .await?;
-        let chat = Chat::builder(model).build();
-        Ok(Llma {
-            model: Arc::new(Mutex::new(chat)),
-        })
-    }
-
-    pub async fn new() -> Result<Self> {
-        let model = Llama::builder()
-            .with_source(LlamaSource::llama_8b())
-            .build()
-            .await?;
-        let chat = Chat::builder(model).build();
-        Ok(Llma {
-            model: Arc::new(Mutex::new(chat)),
-        })
+    pub async fn new(size: SourceSize) -> Result<Self> {
+        let source = match size {
+            SourceSize::Tiny => LlamaSource::llama_3_2_1b_chat(),
+            SourceSize::Small => LlamaSource::llama_7b_chat(),
+            SourceSize::Base => LlamaSource::llama_8b_chat(),
+            SourceSize::Medium => LlamaSource::llama_13b_chat(),
+            SourceSize::Large => LlamaSource::llama_70b_chat(),
+        };
+        Self::with_source(source).await
     }
 
     pub async fn with_source(source: LlamaSource) -> Result<Self> {
@@ -143,23 +125,15 @@ impl Llma {
         }
     }
 
-    pub fn prompt<T: AsRef<str>>(
-        &self,
-        prompt: T,
-        on_start: Option<impl Fn() -> ()>,
-    ) -> Result<ChannelTextStream> {
+    pub fn prompt<T: AsRef<str>>(&self, prompt: T) -> Result<ChannelTextStream> {
         let prompt = prompt.as_ref();
         let prompt = if prompt.is_empty() { "\n>" } else { prompt };
-        match prompt_input(prompt) {
-            Ok(prompt) => {
-                if let Some(on_start) = on_start {
-                    on_start();
-                }
-                let mut model = self.model.lock().unwrap();
-                Ok(model.add_message(prompt))
-            }
-            Err(e) => Err(e.into()),
+        let prompt = prompt_input(prompt)?;
+        if prompt.is_empty() {
+            return Err(NoInputError.into());
         }
+        let mut model = self.model.lock().unwrap();
+        Ok(model.add_message(prompt))
     }
 
     pub fn load_session<T: Model, P: AsRef<Path>>(
