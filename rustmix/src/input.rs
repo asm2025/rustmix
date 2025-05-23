@@ -1,8 +1,11 @@
+use crossterm::{
+    event::{self, Event, KeyCode, KeyEvent},
+    terminal::{disable_raw_mode, enable_raw_mode},
+};
 use std::{
     io::{stdin, stdout, Write},
     str::FromStr,
 };
-use termion::{event::Key, input::TermRead};
 
 use crate::{
     error::{InvalidInputError, NoInputError, NotConfirmError},
@@ -32,13 +35,23 @@ pub fn get_char(prompt: &str) -> Result<char> {
         stdout().flush()?;
     }
 
-    let mut input = stdin().keys();
+    // Enable raw mode to read single characters
+    enable_raw_mode()?;
 
-    if let Some(Ok(Key::Char(c))) = input.next() {
-        return Ok(c);
-    }
+    let result = loop {
+        if let Ok(Event::Key(KeyEvent { code, .. })) = event::read() {
+            match code {
+                KeyCode::Char(c) => break Ok(c),
+                KeyCode::Esc | KeyCode::Enter => break Err(NoInputError.into()),
+                _ => continue,
+            }
+        }
+    };
 
-    Err(NoInputError.into())
+    // Disable raw mode before returning
+    disable_raw_mode()?;
+
+    result
 }
 
 pub fn get_numeric<T: FromStr>(prompt: &str) -> Result<T>
