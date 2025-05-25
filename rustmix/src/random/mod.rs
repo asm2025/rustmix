@@ -10,7 +10,7 @@ pub mod lorem;
 pub mod person;
 
 use fake::{faker::boolean::raw as f_boolean, locales, uuid, Fake};
-use rand::{thread_rng, Rng};
+use rand::{distr::uniform::SampleUniform, rngs::StdRng, Rng};
 use std::ops::Range;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -23,7 +23,7 @@ pub enum UuidVersion {
 }
 
 pub fn alphanum() -> char {
-    let mut rng = rand::thread_rng();
+    let mut rng = StdRng::from_entropy();
     let num = rng.gen_range(0..62);
     match num {
         0..=9 => char::from_u32(num as u32 + 48).unwrap(), // ASCII values for 0-9
@@ -47,7 +47,7 @@ pub fn alphanum_str(len: usize) -> String {
 }
 
 pub fn char() -> char {
-    let mut rng = rand::thread_rng();
+    let mut rng = StdRng::from_entropy();
     let num = rng.gen_range(0..94);
     match num {
         0..=9 => char::from_u32(num as u32 + 48).unwrap(), // ASCII values for 0-9
@@ -76,12 +76,12 @@ pub fn boolean() -> bool {
 }
 
 pub fn float() -> f64 {
-    let mut rng = thread_rng();
+    let mut rng = StdRng::from_entropy();
     rng.gen_range(0.0..1.0)
 }
 
-pub fn numeric<T: rand::distributions::uniform::SampleUniform + PartialOrd>(r: Range<T>) -> T {
-    let mut rng = thread_rng();
+pub fn numeric<T: SampleUniform + PartialOrd>(r: Range<T>) -> T {
+    let mut rng = StdRng::from_entropy();
     rng.gen_range(r)
 }
 

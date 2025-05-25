@@ -66,10 +66,10 @@ impl RWhisper {
     pub async fn transcribe_async<T: AsRef<Path>>(&self, file_name: T) -> Result<String> {
         let file = File::open(file_name)?;
         let source = Decoder::new(BufReader::new(file))?;
-        let mut stream = self.model.transcribe(source)?;
+        let mut transcription = self.model.transcribe(source);
         let mut text = String::new();
 
-        while let Some(result) = stream.next().await {
+        while let Some(result) = transcription.next().await {
             text.push_str(result.text());
         }
 
@@ -99,9 +99,9 @@ impl RWhisper {
     ) -> Result<()> {
         let file = File::open(file_name)?;
         let source = Decoder::new(BufReader::new(file))?;
-        let mut stream = self.model.transcribe(source)?;
+        let mut transcription = self.model.transcribe(source);
 
-        while let Some(result) = stream.next().await {
+        while let Some(result) = transcription.next().await {
             callback(result.text());
         }
 

@@ -36,7 +36,8 @@ html-entities = { version = "0", optional = true }
 http-body-util = "0"
 image = { version = "0.24.9", optional = true } # compatibility with Kalosm
 indicatif = "0"
-kalosm = { version = "0", default-features = false, optional = true }
+kalosm = { version = "0", features = ["bert", "llama", "anthropic", "openai", "remote"], optional = true }
+kalosm-language = { version = "0", features = ["bert", "llama", "anthropic", "openai", "remote"], optional = true }
 lazy_static = "1"
 lettre = { version = "0", optional = true }
 log = "0"
@@ -80,6 +81,7 @@ urlencoding = "2"
 [features]
 default = ["mail", "threading", "log"]
 full = ["mail", "threading", "log", "audio", "vision", "language"]
+kalosm = ["dep:kalosm", "kalosm-language"]
 mail = ["dep:html-entities", "dep:lettre", "dep:once_cell"]
 threading = ["dep:crossbeam", "dep:rayon"]
 log = [
@@ -92,9 +94,9 @@ log = [
 	"dep:slog-json",
 	"dep:file-rotate",
 ]
-metal = ["kalosm?/metal"]
-cuda = ["kalosm?/cuda"]
-mkl = ["kalosm?/mkl"]
+metal = ["kalosm?/metal", "kalosm-language?/metal"]
+cuda = ["kalosm?/cuda", "kalosm-language?/cublas"]
+mkl = ["kalosm?/mkl", "kalosm-language?/mkl"]
 language = ["kalosm/language", "async-openai"]
 audio = ["kalosm/sound", "async-openai", "dep:rodio"]
 vision = ["kalosm/vision", "dep:image"]
