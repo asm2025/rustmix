@@ -1,6 +1,6 @@
 use futures::executor::block_on;
-pub use image::{ImageBuffer, Rgb};
-pub use kalosm::{vision::*, *};
+use image::{ImageBuffer, Rgb};
+use kalosm::{vision::*, *};
 use std::sync::Arc;
 
 use crate::Result;

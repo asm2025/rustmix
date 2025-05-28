@@ -3,7 +3,7 @@ use fake::{
     locales, Fake,
 };
 use randua;
-pub use randua::UserAgent;
+use randua::UserAgent;
 use std::ops::Range;
 
 pub fn status_code() -> String {

@@ -9,7 +9,7 @@ lazy_static! {
     static ref LOCATION_CLEAN: Regex = Regex::new(r"[\s\t]{2,}").unwrap();
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ExpressVPNStatus {
     #[default]
     Unknown,
@@ -19,7 +19,6 @@ pub enum ExpressVPNStatus {
     Error(String),
 }
 
-#[derive(Debug)]
 pub struct ExpressVPN;
 
 impl ExpressVPN {

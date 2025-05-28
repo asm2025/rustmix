@@ -12,7 +12,7 @@ use crate::Result;
 
 const LINES_BUFFER_DEFAULT: usize = 1000;
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FileOpenOptions {
     #[default]
     Default,

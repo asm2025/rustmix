@@ -24,7 +24,7 @@ pub(crate) use self::random::*;
 mod vpn;
 pub(crate) use self::vpn::*;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Employee {
     id: u32,
     #[serde(rename = "employee_name")]

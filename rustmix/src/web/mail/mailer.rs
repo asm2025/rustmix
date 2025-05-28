@@ -5,7 +5,7 @@ use lettre::{
 
 use crate::Result;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Mailer {
     smtp: SmtpTransport,
 }

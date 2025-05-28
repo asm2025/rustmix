@@ -1,6 +1,6 @@
 extern crate reqwest as _reqwest;
 
-pub use _reqwest::*;
+use _reqwest::*;
 
 fn build_default_headers() -> header::HeaderMap {
     let mut headers = header::HeaderMap::new();

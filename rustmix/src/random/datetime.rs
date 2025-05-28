@@ -1,4 +1,4 @@
-pub use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
+use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use fake::{faker::chrono::raw as f_chrono, locales, Fake};
 
 pub fn naive() -> NaiveDateTime {

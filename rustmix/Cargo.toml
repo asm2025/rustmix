@@ -79,8 +79,8 @@ url = { version = "2", features = ["serde"] }
 urlencoding = "2"
 
 [features]
-default = ["mail", "threading", "log"]
-full = ["mail", "threading", "log", "audio", "vision", "language"]
+default = ["threading", "log"]
+full = ["mail", "threading", "log", "language", "audio", "imaging", "vision"]
 kalosm = ["dep:kalosm", "kalosm-language"]
 mail = ["dep:html-entities", "dep:lettre", "dep:once_cell"]
 threading = ["dep:crossbeam", "dep:rayon"]
@@ -99,6 +99,7 @@ cuda = ["kalosm?/cuda", "kalosm-language?/cublas"]
 mkl = ["kalosm?/mkl", "kalosm-language?/mkl"]
 language = ["kalosm/language", "async-openai"]
 audio = ["kalosm/sound", "async-openai", "dep:rodio"]
+imaging = ["kalosm/vision", "dep:image"]
 vision = ["kalosm/vision", "dep:image"]
 
 [package.metadata.scripts]

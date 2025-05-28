@@ -1,11 +1,11 @@
-pub use dirs::*;
-pub use fs_extra::file::CopyOptions;
+use dirs::*;
+use fs_extra::file::CopyOptions;
 use fs_extra::{
     dir::{self as dirExtra, CopyOptions as DirCopyOptions},
     file as fileExtra,
 };
 use glob::glob_with;
-pub use std::path::{Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::{fs, result::Result as StdResult};
 
 use crate::{error::*, string::*, Result};

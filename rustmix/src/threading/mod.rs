@@ -36,7 +36,7 @@ const PAUSE_TIMEOUT_MIN: Duration = Duration::from_millis(10);
 const PAUSE_TIMEOUT_MAX: Duration = Duration::from_secs(5);
 pub const INTERVAL: u64 = 100;
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TaskResult {
     #[default]
     None,
@@ -58,7 +58,7 @@ impl fmt::Display for TaskResult {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum QueueBehavior {
     #[default]
     FIFO,

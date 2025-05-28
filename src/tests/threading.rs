@@ -14,7 +14,7 @@ use tokio::time::Duration;
 const THREADS: usize = 4;
 const TEST_SIZE: usize = 10000;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct TaskHandler {
     pub tasks: Arc<AtomicUsize>,
     pub done: Arc<AtomicUsize>,

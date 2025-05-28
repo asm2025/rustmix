@@ -1,4 +1,4 @@
-pub use log4rs::*;
+use log4rs::*;
 use std::path::Path;
 
 use self::{

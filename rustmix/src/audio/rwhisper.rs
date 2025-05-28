@@ -1,6 +1,6 @@
 use futures::{executor::block_on, stream::StreamExt};
 use kalosm::sound::*;
-pub use kalosm::sound::{rodio::Decoder, Segment, WhisperLanguage, WhisperSource};
+use kalosm::sound::{rodio::Decoder, Segment, WhisperLanguage, WhisperSource};
 use std::{fs::File, io::BufReader, path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 

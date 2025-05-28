@@ -14,7 +14,7 @@ use tokio::{
 use super::{cond::Mutcond, *};
 use crate::{error::*, Result};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ProducerConsumerOptions {
     pub capacity: usize,
     pub threads: usize,

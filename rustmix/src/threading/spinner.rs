@@ -1,4 +1,4 @@
-pub use indicatif::*;
+use indicatif::*;
 use std::{
     borrow::Cow,
     sync::{
@@ -41,7 +41,7 @@ impl Default for SpinnerOptions {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Spinner {
     pb: ProgressBar,
     is_finished: Arc<AtomicBool>,

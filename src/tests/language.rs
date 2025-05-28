@@ -2,7 +2,7 @@ use humantime::format_duration;
 use rustmix::{
     ai::SourceSize,
     io::directory,
-    language::{llma::*, *},
+    language::{llama::*, *},
     threading::Spinner,
     Result,
 };

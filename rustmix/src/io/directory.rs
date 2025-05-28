@@ -1,5 +1,5 @@
 use std::fs;
-pub use std::path::{Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 use crate::Result;
 

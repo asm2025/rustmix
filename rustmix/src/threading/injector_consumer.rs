@@ -15,7 +15,7 @@ use tokio::{
 use super::{cond::Mutcond, *};
 use crate::{error::*, Result};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct InjectorWorkerOptions {
     pub behavior: QueueBehavior,
     pub threads: usize,
@@ -70,7 +70,7 @@ impl InjectorWorkerOptions {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct InjectorWorker<T: StaticTaskItem> {
     pub options: InjectorWorkerOptions,
     injector: Arc<Injector<T>>,

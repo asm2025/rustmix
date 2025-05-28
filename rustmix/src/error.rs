@@ -1,8 +1,8 @@
-use std::error::Error as StdError;
-use regex::Regex;
-use thiserror::Error;
 use backtrace::Backtrace;
 use lazy_static::lazy_static;
+use regex::Regex;
+use std::error::Error as StdError;
+use thiserror::Error;
 
 use crate::is_debug;
 
@@ -18,19 +18,19 @@ impl<E: StdError + ?Sized> ErrorStr for E {
     fn get_string(&self) -> String {
         let message = self.to_string();
 
-		if is_debug() {
+        if is_debug() {
             let backtrace = Backtrace::new();
-			let formatted = format!("{:?}", backtrace)
-				.lines()
-				.filter(|e| !RGX_LINE_NUM.is_match(e))
-				.collect::<Vec<&str>>()
-				.join("\n");
-			
-			if !message.contains(&formatted) {
-				return format!("{}\n{}", message, formatted);
-			}
+            let formatted = format!("{:?}", backtrace)
+                .lines()
+                .filter(|e| !RGX_LINE_NUM.is_match(e))
+                .collect::<Vec<&str>>()
+                .join("\n");
+
+            if !message.contains(&formatted) {
+                return format!("{}\n{}", message, formatted);
+            }
         }
-    
+
         message
     }
 }
@@ -164,6 +164,10 @@ pub struct MaxTriesExceededError;
 #[derive(Error, Debug)]
 #[error("Error parsing enum of type {0}")]
 pub struct ParseEnumError(pub String);
+
+#[derive(Error, Debug)]
+#[error("Invalid Enum value '{0}' for type {1}")]
+pub struct InvalidEnumError(pub String, pub String);
 
 #[derive(Error, Debug)]
 #[error("Rate limit timeout exceeded")]

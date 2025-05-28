@@ -13,7 +13,7 @@ use fake::{faker::boolean::raw as f_boolean, locales, uuid, Fake};
 use rand::{distr::uniform::SampleUniform, rngs::StdRng, Rng};
 use std::ops::Range;
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum UuidVersion {
     V1,
     V3,

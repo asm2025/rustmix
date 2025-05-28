@@ -1,4 +1,4 @@
-pub use async_openai::*;
+use async_openai::*;
 use config::Config;
 use futures::StreamExt;
 use kalosm::language::prompt_input;
@@ -12,7 +12,7 @@ use types::{ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArg
 
 use crate::{ai::SourceSize, error::*, Result};
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum OpenAiSource {
     gpt_3_5_turbo,
     #[default]
@@ -36,7 +36,7 @@ impl fmt::Display for OpenAiSource {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ChatGpt<C: Config> {
     client: Arc<Client<C>>,
     source: OpenAiSource,

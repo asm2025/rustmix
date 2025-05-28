@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Mutcond {
     pair: Arc<(Mutex<bool>, Condvar)>,
 }
