@@ -4,33 +4,27 @@ name = "rustmix"
 version = "0.4.0"
 edition = "2021"
 description = "rustmix is a Rust library that has some basic utility functions and components."
-authors = ["asm <asm2025@outlook.com>"]
+authors = ["asm <asm2do@gmail.com>"]
 license = "MIT"
 
 [dependencies]
 async-openai = { version = "0", optional = true }
-backtrace = "0"
 backoff = "0"
+backtrace = "0"
+bcrypt = "0"
 chrono = "0"
 crossbeam = { version = "0", optional = true }
+crossterm = "0"
 csv = "1"
+dialoguer = "0"
 dirs = "6"
 dotenv = "0"
 execute = "0"
-fake = { version = "4", features = [
-	"derive",
-	"uuid",
-	"always-true-rng",
-	"random_color",
-	"chrono",
-	"time",
-	"http",
-	"geo",
-] }
+fake = { version = "4", features = ["derive", "uuid", "always-true-rng", "random_color", "chrono", "time", "http", "geo", "email_address"] }
 file-rotate = { version = "0", optional = true }
+fs_extra = "1"
 futures = "0"
 futures-util = "0"
-fs_extra = "1"
 glob = "0"
 html-entities = { version = "0", optional = true }
 http-body-util = "0"
@@ -48,19 +42,7 @@ rand = "0"
 randua = "0"
 rayon = { version = "1", optional = true }
 regex = "1"
-reqwest = { version = "0", features = [
-	"blocking",
-	"cookies",
-	"http2",
-	"json",
-	"gzip",
-	"deflate",
-	"brotli",
-	"zstd",
-	"multipart",
-	"socks",
-	"stream",
-] }
+reqwest = { version = "0", features = ["blocking", "cookies", "http2", "json", "gzip", "deflate", "brotli", "zstd", "multipart", "socks", "stream"] }
 rodio = { version = "0", optional = true }
 rpassword = "7"
 serde = { version = "1", features = ["derive"] }
@@ -71,12 +53,12 @@ slog-json = { version = "2", optional = true }
 slog-scope = { version = "4", optional = true }
 slog-stdlog = { version = "4", optional = true }
 slog-term = { version = "2", optional = true }
-crossterm = "0"
 thiserror = "2"
 time = "0"
 tokio = { version = "1", features = ["full"] }
 url = { version = "2", features = ["serde"] }
 urlencoding = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
 
 [features]
 default = ["threading", "log"]

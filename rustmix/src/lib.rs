@@ -12,7 +12,6 @@ pub mod vision;
 pub use self::app::*;
 pub mod date;
 pub mod error;
-pub mod input;
 pub mod io;
 pub mod random;
 pub mod string;
@@ -20,14 +19,12 @@ pub mod threading;
 pub mod vpn;
 pub mod web;
 
-use ::backoff::*;
-
 use lazy_static::lazy_static;
 use std::sync::RwLock;
 
 use crate::error::*;
 
-pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+pub type Result<T> = std::result::Result<T, RmxError>;
 
 lazy_static! {
     static ref DEBUG: RwLock<bool> = RwLock::new(false);
